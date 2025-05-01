@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import os
-from typing import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import BaseModel, ConfigDict
 import upath
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 StrPath = str | os.PathLike[str]
@@ -36,6 +40,37 @@ class Schema(BaseModel):
 
         data = yamling.load_yaml(content, resolve_inherit=inherit_path or False)
         return cls.model_validate(data)
+
+    @classmethod
+    def for_function(
+        cls, func: Callable[..., Any], *, name: str | None = None
+    ) -> type[Schema]:
+        """Create a schema model from a function's signature.
+
+        Args:
+            func: The function to create a schema from
+            name: Optional name for the model
+
+        Returns:
+            A new schema model class based on the function parameters
+        """
+        from schemez.convert import get_function_model
+
+        return get_function_model(func, name=name)
+
+    @classmethod
+    def for_class_ctor(cls, target_cls: type) -> type[Schema]:
+        """Create a schema model from a class constructor.
+
+        Args:
+            target_cls: The class whose constructor to convert
+
+        Returns:
+            A new schema model class based on the constructor parameters
+        """
+        from schemez.convert import get_ctor_basemodel
+
+        return get_ctor_basemodel(target_cls)
 
     def model_dump_yaml(self) -> str:
         """Dump configuration to YAML string."""

@@ -35,6 +35,7 @@ keywords = []
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 dependencies = [
+    "griffe>=1.7.3",
     "pydantic",
     # Only add below (Copier)
     "universal-pathlib>=0.2.6",
