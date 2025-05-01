@@ -95,7 +95,7 @@ class Schema(BaseModel):
             content: BaseContent = PDFBase64Content.from_bytes(file_content)
         else:
             content = ImageBase64Content.from_bytes(file_content)
-        agent = Agent[None](
+        agent = Agent[None](  # type:ignore[var-annotated]
             model=model,
             system_prompt=system_prompt.format(name=cls.__name__),
             provider=provider,
@@ -132,7 +132,7 @@ class Schema(BaseModel):
             content: BaseContent = PDFBase64Content.from_bytes(file_content)
         else:
             content = ImageBase64Content.from_bytes(file_content)
-        agent = Agent[None](
+        agent = Agent[None](  # type:ignore[var-annotated]
             model=model,
             system_prompt=system_prompt.format(name=cls.__name__),
             provider=provider,
@@ -163,7 +163,7 @@ class Schema(BaseModel):
         """
         from llmling_agent import Agent
 
-        agent = Agent[None](
+        agent = Agent[None](  # type:ignore[var-annotated]
             model=model,
             system_prompt=system_prompt.format(name=cls.__name__),
             provider=provider,
@@ -194,7 +194,7 @@ class Schema(BaseModel):
         """
         from llmling_agent import Agent
 
-        agent = Agent[None](
+        agent = Agent[None](  # type:ignore[var-annotated]
             model=model,
             system_prompt=system_prompt.format(name=cls.__name__),
             provider=provider,
