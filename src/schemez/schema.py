@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
+import anyenv
 from pydantic import BaseModel, ConfigDict
 import upath
 
@@ -12,8 +13,15 @@ import upath
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from llmling_agent.agent.agent import AgentType
+    from llmling_agent.models.content import BaseContent
+
 
 StrPath = str | os.PathLike[str]
+SourceType = Literal["pdf", "image"]
+
+DEFAULT_SYSTEM_PROMPT = "You are a schema extractor for {name} BaseModels."
+DEFAULT_USER_PROMPT = "Extract information from this document:"
 
 
 class Schema(BaseModel):
@@ -57,6 +65,142 @@ class Schema(BaseModel):
         from schemez.convert import get_function_model
 
         return get_function_model(func, name=name)
+
+    @classmethod
+    def from_vision_llm_sync(
+        cls,
+        file_content: bytes,
+        source_type: SourceType = "pdf",
+        model: str = "google-gla:gemini-2.0-flash",
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        user_prompt: str = DEFAULT_USER_PROMPT,
+        provider: AgentType = "pydantic_ai",
+    ) -> Self:
+        """Create a schema model from a document using AI.
+
+        Args:
+            file_content: The document content to create a schema from
+            source_type: The type of the document
+            model: The AI model to use for schema extraction
+            system_prompt: The system prompt to use for schema extraction
+            user_prompt: The user prompt to use for schema extraction
+            provider: The provider to use for schema extraction
+
+        Returns:
+            A new schema model class based on the document
+        """
+        from llmling_agent import Agent, ImageBase64Content, PDFBase64Content
+
+        if source_type == "pdf":
+            content: BaseContent = PDFBase64Content.from_bytes(file_content)
+        else:
+            content = ImageBase64Content.from_bytes(file_content)
+        agent = Agent[None](
+            model=model,
+            system_prompt=system_prompt.format(name=cls.__name__),
+            provider=provider,
+        ).to_structured(cls)
+        chat_message = anyenv.run_sync(agent.run(user_prompt, content))
+        return chat_message.content
+
+    @classmethod
+    async def from_vision_llm(
+        cls,
+        file_content: bytes,
+        source_type: SourceType = "pdf",
+        model: str = "google-gla:gemini-2.0-flash",
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        user_prompt: str = DEFAULT_USER_PROMPT,
+        provider: AgentType = "pydantic_ai",
+    ) -> Self:
+        """Create a schema model from a document using AI.
+
+        Args:
+            file_content: The document content to create a schema from
+            source_type: The type of the document
+            model: The AI model to use for schema extraction
+            system_prompt: The system prompt to use for schema extraction
+            user_prompt: The user prompt to use for schema extraction
+            provider: The provider to use for schema extraction
+
+        Returns:
+            A new schema model class based on the document
+        """
+        from llmling_agent import Agent, ImageBase64Content, PDFBase64Content
+
+        if source_type == "pdf":
+            content: BaseContent = PDFBase64Content.from_bytes(file_content)
+        else:
+            content = ImageBase64Content.from_bytes(file_content)
+        agent = Agent[None](
+            model=model,
+            system_prompt=system_prompt.format(name=cls.__name__),
+            provider=provider,
+        ).to_structured(cls)
+        chat_message = await agent.run(user_prompt, content)
+        return chat_message.content
+
+    @classmethod
+    def from_llm_sync(
+        cls,
+        text: str,
+        model: str = "google-gla:gemini-2.0-flash",
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        user_prompt: str = DEFAULT_USER_PROMPT,
+        provider: AgentType = "pydantic_ai",
+    ) -> Self:
+        """Create a schema model from a text snippet using AI.
+
+        Args:
+            text: The text to create a schema from
+            model: The AI model to use for schema extraction
+            system_prompt: The system prompt to use for schema extraction
+            user_prompt: The user prompt to use for schema extraction
+            provider: The provider to use for schema extraction
+
+        Returns:
+            A new schema model class based on the document
+        """
+        from llmling_agent import Agent
+
+        agent = Agent[None](
+            model=model,
+            system_prompt=system_prompt.format(name=cls.__name__),
+            provider=provider,
+        ).to_structured(cls)
+        chat_message = anyenv.run_sync(agent.run(user_prompt, text))
+        return chat_message.content
+
+    @classmethod
+    async def from_llm(
+        cls,
+        text: str,
+        model: str = "google-gla:gemini-2.0-flash",
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        user_prompt: str = DEFAULT_USER_PROMPT,
+        provider: AgentType = "pydantic_ai",
+    ) -> Self:
+        """Create a schema model from a text snippet using AI.
+
+        Args:
+            text: The text to create a schema from
+            model: The AI model to use for schema extraction
+            system_prompt: The system prompt to use for schema extraction
+            user_prompt: The user prompt to use for schema extraction
+            provider: The provider to use for schema extraction
+
+        Returns:
+            A new schema model class based on the document
+        """
+        from llmling_agent import Agent
+
+        agent = Agent[None](
+            model=model,
+            system_prompt=system_prompt.format(name=cls.__name__),
+            provider=provider,
+        ).to_structured(cls)
+        chat_message = await agent.run(user_prompt, text)
+        return chat_message.content
 
     @classmethod
     def for_class_ctor(cls, target_cls: type) -> type[Schema]:

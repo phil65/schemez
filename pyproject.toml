@@ -27,9 +27,9 @@ classifiers = [
     "Topic :: Documentation",
     "Topic :: Software Development",
     "Topic :: Utilities",
-    "Typing :: Typed","Framework :: Pydantic",
+    "Typing :: Typed",
+    "Framework :: Pydantic",
     "Framework :: Pydantic :: 2",
-
 ]
 keywords = []
 requires-python = ">=3.12"
@@ -41,8 +41,9 @@ dependencies = [
     "universal-pathlib>=0.2.6",
 ]
 
-[project-optional-dependencies]
+[project.optional-dependencies]
 yaml = ["yamling"]
+ai = ["llmling-agent", "anyenv>=0.4.14"]
 
 [tool.uv]
 default-groups = ["dev", "lint", "docs"]
@@ -158,7 +159,7 @@ select = [
     # "TD",   # flake8-todos
     "T10", # flake8-debugger
     # "T20",  # flake8-print
-    "TC", # flake8-type-checking
+    "TC",  # flake8-type-checking
     "TID", # flake8-tidy-imports
     "TRY", # tryceratops
     "UP",  # PyUpgrade
@@ -198,7 +199,7 @@ ignore = [
     # "PLR2004", # Magic values instead of named consts
     "SLF001", # Private member accessed
     "TRY003", # Avoid specifying long messages outside the exception class
-    "TC006", # runtime-cast-value
+    "TC006",  # runtime-cast-value
 ]
 
 [tool.ruff.lint.flake8-quotes]
