@@ -9,11 +9,15 @@ from schemez.schemadef.schemadef import (
     ImportedSchemaDef,
     InlineSchemaDef,
 )
+from schemez.pydantic_types import ModelIdentifier, ModelTemperature, MimeType
 
 __all__ = [
     "ImportedSchemaDef",
     "InlineSchemaDef",
     "JSONCode",
+    "MimeType",
+    "ModelIdentifier",
+    "ModelTemperature",
     "PythonCode",
     "Schema",
     "SchemaDef",
