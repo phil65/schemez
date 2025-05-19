@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 
 ModelIdentifier = Annotated[
@@ -40,3 +40,13 @@ MimeType = Annotated[
         description="Standard MIME type identifying file formats and content types",
     ),
 ]
+
+
+def get_field_type(model: type[BaseModel], field_name: str) -> dict[str, Any]:
+    """Extract field_type metadata from a model field."""
+    field_info = model.model_fields[field_name]
+    metadata = {}
+    if field_info.json_schema_extra and isinstance(field_info.json_schema_extra, dict):
+        metadata.update(field_info.json_schema_extra)
+
+    return metadata
