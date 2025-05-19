@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, create_model
@@ -16,6 +17,7 @@ class SchemaField(Schema):
     - Data type specification
     - Optional description
     - Validation constraints
+    - Enum values (when type is 'enum')
 
     Used by InlineSchemaDef to structure response fields.
     """
@@ -26,8 +28,58 @@ class SchemaField(Schema):
     description: str | None = None
     """Optional description of what this field represents"""
 
+    values: list[Any] | None = None
+    """Values for enum type fields"""
+
+    # Common validation constraints
+    default: Any | None = None
+    """Default value for the field"""
+
+    title: str | None = None
+    """Title for the field in generated JSON Schema"""
+
+    pattern: str | None = None
+    """Regex pattern for string validation"""
+
+    min_length: int | None = None
+    """Minimum length for collections"""
+
+    max_length: int | None = None
+    """Maximum length for collections"""
+
+    gt: float | None = None
+    """Greater than (exclusive) validation for numbers"""
+
+    ge: float | None = None
+    """Greater than or equal (inclusive) validation for numbers"""
+
+    lt: float | None = None
+    """Less than (exclusive) validation for numbers"""
+
+    le: float | None = None
+    """Less than or equal (inclusive) validation for numbers"""
+
+    multiple_of: float | None = None
+    """Number must be a multiple of this value"""
+
+    literal_value: Any | None = None
+    """Value for Literal type constraint, makes field accept only this specific value"""
+
+    examples: list[Any] | None = None
+    """Examples for this field in JSON Schema"""
+
+    optional: bool = False
+    """Whether this field is optional (None value allowed)"""
+
+    json_schema_extra: dict[str, Any] | None = None
+    """Additional JSON Schema information"""
+
+    field_config: dict[str, Any] | None = None
+    """Configuration for Pydantic model fields"""
+
+    # Extensibility for future or custom constraints
     constraints: dict[str, Any] = Field(default_factory=dict)
-    """Optional validation constraints for the field"""
+    """Additional constraints not covered by explicit fields"""
 
 
 class BaseSchemaDef(Schema):
@@ -66,12 +118,95 @@ class InlineSchemaDef(BaseSchemaDef):
         """Create Pydantic model from inline definition."""
         fields = {}
         for name, field in self.fields.items():
-            python_type = helpers.resolve_type_string(field.type)
-            if not python_type:
-                msg = f"Unsupported field type: {field.type}"
-                raise ValueError(msg)
+            # Initialize constraint dictionary
+            field_constraints = {}
 
-            field_info = Field(description=field.description, **(field.constraints))
+            # Handle enum type
+            if field.type == "enum":
+                if not field.values:
+                    msg = f"Field '{name}' has type 'enum' but no values defined"
+                    raise ValueError(msg)
+
+                # Create dynamic Enum class
+                enum_name = f"{name.capitalize()}Enum"
+
+                # Create enum members dictionary
+                enum_members = {}
+                for i, value in enumerate(field.values):
+                    if isinstance(value, str) and value.isidentifier():
+                        # If value is a valid Python identifier, use it as is
+                        key = value
+                    else:
+                        # Otherwise, create a synthetic name
+                        key = f"VALUE_{i}"
+                    enum_members[key] = value
+
+                # Create the enum class
+                enum_class = Enum(enum_name, enum_members)
+                python_type: Any = enum_class
+
+                # Handle enum default value specially
+                if field.default is not None:
+                    # Store default value as the enum value string
+                    # Pydantic v2 will convert it to the enum instance
+                    if field.default in list(field.values):
+                        field_constraints["default"] = field.default
+                    else:
+                        msg = (
+                            f"Default value {field.default!r} not found "
+                            f"in enum values for field {name!r}"
+                        )
+                        raise ValueError(msg)
+            else:
+                python_type = helpers.resolve_type_string(field.type)
+                if not python_type:
+                    msg = f"Unsupported field type: {field.type}"
+                    raise ValueError(msg)
+
+            # Handle literal constraint if provided
+            if field.literal_value is not None:
+                from typing import Literal as LiteralType
+
+                python_type = LiteralType[field.literal_value]
+
+            # Handle optional fields (allowing None)
+            if field.optional:
+                python_type = python_type | None  # type: ignore
+
+            # Add standard Pydantic constraints
+            # Collect all constraint values
+            for constraint in [
+                "default",
+                "title",
+                "min_length",
+                "max_length",
+                "pattern",
+                "min_length",
+                "max_length",
+                "gt",
+                "ge",
+                "lt",
+                "le",
+                "multiple_of",
+            ]:
+                value = getattr(field, constraint, None)
+                if value is not None:
+                    field_constraints[constraint] = value
+
+            # Handle examples separately (Pydantic v2 way)
+            if field.examples:
+                if field.json_schema_extra is None:
+                    field.json_schema_extra = {}
+                field.json_schema_extra["examples"] = field.examples
+
+            # Add json_schema_extra if provided
+            if field.json_schema_extra:
+                field_constraints["json_schema_extra"] = field.json_schema_extra
+
+            # Add any additional constraints
+            field_constraints.update(field.constraints)
+
+            field_info = Field(description=field.description, **field_constraints)
             fields[name] = (python_type, field_info)
 
         cls_name = self.description or "ResponseType"
