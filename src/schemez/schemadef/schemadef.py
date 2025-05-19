@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, create_model, field_validator
 
 from schemez import Schema, helpers
 
@@ -31,7 +31,6 @@ class SchemaField(Schema):
     values: list[Any] | None = None
     """Values for enum type fields"""
 
-    # Common validation constraints
     default: Any | None = None
     """Default value for the field"""
 
@@ -41,10 +40,10 @@ class SchemaField(Schema):
     pattern: str | None = None
     """Regex pattern for string validation"""
 
-    min_length: int | None = None
+    min_length: Annotated[int | None, Field(ge=0)] = None
     """Minimum length for collections"""
 
-    max_length: int | None = None
+    max_length: Annotated[int | None, Field(ge=0)] = None
     """Maximum length for collections"""
 
     gt: float | None = None
@@ -59,7 +58,7 @@ class SchemaField(Schema):
     le: float | None = None
     """Less than or equal (inclusive) validation for numbers"""
 
-    multiple_of: float | None = None
+    multiple_of: Annotated[float | None, Field(gt=0)] = None
     """Number must be a multiple of this value"""
 
     literal_value: Any | None = None
@@ -80,6 +79,18 @@ class SchemaField(Schema):
     # Extensibility for future or custom constraints
     constraints: dict[str, Any] = Field(default_factory=dict)
     """Additional constraints not covered by explicit fields"""
+
+    @field_validator("max_length")
+    @classmethod
+    def validate_max_min_length(cls, v: int | None, info) -> int | None:
+        if (
+            v is not None
+            and info.data.get("min_length") is not None
+            and v < info.data.get("min_length")
+        ):
+            msg = "max_length must be ≥ min_length"
+            raise ValueError(msg)
+        return v
 
 
 class BaseSchemaDef(Schema):
