@@ -216,11 +216,21 @@ class Schema(BaseModel):
 
         return get_ctor_basemodel(target_cls)
 
-    def model_dump_yaml(self) -> str:
+    def model_dump_yaml(
+        self,
+        exclude_none: bool = True,
+        exclude_defaults: bool = False,
+        exclude_unset: bool = False,
+    ) -> str:
         """Dump configuration to YAML string."""
         import yamling
 
-        return yamling.dump_yaml(self.model_dump(exclude_none=True))
+        text = self.model_dump(
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults,
+            exclude_unset=exclude_unset,
+        )
+        return yamling.dump_yaml(text)
 
     def save(self, path: StrPath, overwrite: bool = False) -> None:
         """Save configuration to a YAML file.
