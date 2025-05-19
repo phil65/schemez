@@ -114,7 +114,7 @@ class InlineSchemaDef(BaseSchemaDef):
     fields: dict[str, SchemaField]
     """A dictionary containing all fields."""
 
-    def get_schema(self) -> type[Schema]:  # type: ignore
+    def get_schema(self) -> type[BaseModel]:  # type: ignore
         """Create Pydantic model from inline definition."""
         fields = {}
         for name, field in self.fields.items():
@@ -210,7 +210,12 @@ class InlineSchemaDef(BaseSchemaDef):
             fields[name] = (python_type, field_info)
 
         cls_name = self.description or "ResponseType"
-        return create_model(cls_name, **fields, __base__=Schema, __doc__=self.description)  # type: ignore[call-overload]
+        return create_model(
+            cls_name,
+            **fields,
+            __base__=BaseModel,
+            __doc__=self.description,
+        )  # type: ignore[call-overload]
 
 
 class ImportedSchemaDef(BaseSchemaDef):
