@@ -193,6 +193,7 @@ ignore = [
     "D409",    # Section underline should match the length of its name ("{name}")
     "D413",    # Missing blank line after last section ("{name}")
     "ISC001",
+    "PLC0415",
     "PLR0912", # Too many branches
     "PLR0913", # Too many arguments to function call
     "PLR0915", # Too many statements
@@ -219,6 +220,9 @@ combine-as-imports = true
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "I001"]
 "scripts/*" = ["INP001"]
+
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pyright]
 venvPath = "."
