@@ -2,8 +2,6 @@
 
 [![PyPI License](https://img.shields.io/pypi/l/schemez.svg)](https://pypi.org/project/schemez/)
 [![Package status](https://img.shields.io/pypi/status/schemez.svg)](https://pypi.org/project/schemez/)
-[![Daily downloads](https://img.shields.io/pypi/dd/schemez.svg)](https://pypi.org/project/schemez/)
-[![Weekly downloads](https://img.shields.io/pypi/dw/schemez.svg)](https://pypi.org/project/schemez/)
 [![Monthly downloads](https://img.shields.io/pypi/dm/schemez.svg)](https://pypi.org/project/schemez/)
 [![Distribution format](https://img.shields.io/pypi/format/schemez.svg)](https://pypi.org/project/schemez/)
 [![Wheel availability](https://img.shields.io/pypi/wheel/schemez.svg)](https://pypi.org/project/schemez/)
@@ -21,12 +19,8 @@
 [![Github last commit](https://img.shields.io/github/last-commit/phil65/schemez)](https://github.com/phil65/schemez/commits)
 [![Github release date](https://img.shields.io/github/release-date/phil65/schemez)](https://github.com/phil65/schemez/releases)
 [![Github language count](https://img.shields.io/github/languages/count/phil65/schemez)](https://github.com/phil65/schemez)
-[![Github commits this week](https://img.shields.io/github/commit-activity/w/phil65/schemez)](https://github.com/phil65/schemez)
 [![Github commits this month](https://img.shields.io/github/commit-activity/m/phil65/schemez)](https://github.com/phil65/schemez)
-[![Github commits this year](https://img.shields.io/github/commit-activity/y/phil65/schemez)](https://github.com/phil65/schemez)
 [![Package status](https://codecov.io/gh/phil65/schemez/branch/main/graph/badge.svg)](https://codecov.io/gh/phil65/schemez/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![PyUp](https://pyup.io/repos/github/phil65/schemez/shield.svg)](https://pyup.io/repos/github/phil65/schemez/)
 
 [Read the documentation!](https://phil65.github.io/schemez/)
-

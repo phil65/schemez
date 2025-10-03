@@ -105,6 +105,7 @@ extend-exclude = ['docs']
 target-version = "py312"
 
 [tool.ruff.lint]
+future-annotations = true
 select = [
     "A", # Flake8-builtins
     # "ANN",  # Flake8-Annotations
@@ -205,6 +206,10 @@ ignore = [
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase", "schemez.Schema"]
+runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define", "fastapi.FastAPI.get", "fastapi.FastAPI.post", "fastmcp.FastMCP.tool"]
 
 [tool.ruff.format]
 # Enable preview style formatting.
