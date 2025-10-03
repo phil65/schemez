@@ -203,12 +203,12 @@ class InlineSchemaDef(BaseSchemaDef):
     def get_schema(self) -> type[BaseModel]:  # type: ignore
         """Create Pydantic model from inline definition."""
         fields = {}
-        model_dependencies = {}
+        model_dependencies: dict[str, dict[str, Any]] = {}
 
         # First pass: collect all field information
         for name, field in self.fields.items():
             # Initialize constraint dictionary
-            field_constraints = {}
+            field_constraints: dict[str, Any] = {}
 
             # Handle enum type
             if field.type == "enum":
