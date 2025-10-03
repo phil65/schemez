@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 
 ModelIdentifier = Annotated[
