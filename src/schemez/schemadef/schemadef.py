@@ -18,6 +18,7 @@ class SchemaField(Schema):
     - Optional description
     - Validation constraints
     - Enum values (when type is 'enum')
+    - Field dependencies and relationships
 
     Used by InlineSchemaDef to structure response fields.
     """
@@ -76,9 +77,42 @@ class SchemaField(Schema):
     field_config: dict[str, Any] | None = None
     """Configuration for Pydantic model fields"""
 
+    # Dependencies between fields
+    dependent_required: dict[str, list[str]] = Field(default_factory=dict)
+    """Field dependencies - when this field exists, dependent fields are required"""
+
+    dependent_schema: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    """Schema dependencies - when this field exists, dependent fields must match schema"""
+
     # Extensibility for future or custom constraints
     constraints: dict[str, Any] = Field(default_factory=dict)
     """Additional constraints not covered by explicit fields"""
+
+    def add_required_dependency(
+        self, field_name: str, required_fields: list[str]
+    ) -> None:
+        """Add a dependency requiring other fields when this field exists.
+
+        Args:
+            field_name: The field that triggers the dependency
+            required_fields: Fields that become required when field_name exists
+        """
+        if field_name not in self.dependent_required:
+            self.dependent_required[field_name] = []
+        self.dependent_required[field_name].extend([
+            field
+            for field in required_fields
+            if field not in self.dependent_required[field_name]
+        ])
+
+    def add_schema_dependency(self, field_name: str, schema: dict[str, Any]) -> None:
+        """Add a schema dependency when this field exists.
+
+        Args:
+            field_name: The field that triggers the dependency
+            schema: JSON Schema to apply when field_name exists
+        """
+        self.dependent_schema[field_name] = schema
 
     @field_validator("max_length")
     @classmethod
@@ -109,14 +143,21 @@ class InlineSchemaDef(BaseSchemaDef):
     - Field definitions with types and descriptions
     - Optional validation constraints
     - Custom field descriptions
+    - Field dependencies and relationships
 
     Example:
-        schemas:
-          BasicResult:
-            type: inline
-            fields:
-              success: {type: bool, description: "Operation success"}
-              message: {type: str, description: "Result details"}
+        type: inline
+        fields:
+            success: {type: bool, description: "Operation success"}
+            message: {type: str, description: "Result details"}
+            payment_method: {type: str, description: "Payment method used"}
+            card_number: {
+                type: str,
+                description: "Credit card number",
+                dependent_required: {
+                "payment_method": ["card_expiry", "card_cvc"]
+                }
+            }
     """
 
     type: Literal["inline"] = Field("inline", init=False)
@@ -125,9 +166,46 @@ class InlineSchemaDef(BaseSchemaDef):
     fields: dict[str, SchemaField]
     """A dictionary containing all fields."""
 
+    def add_field_dependency(
+        self, field_name: str, dependent_on: str, required_fields: list[str]
+    ) -> None:
+        """Add a dependency between fields.
+
+        Args:
+            field_name: The field where to add the dependency
+            dependent_on: The field that triggers the dependency
+            required_fields: Fields that become required when the dependency is triggered
+        """
+        if field_name not in self.fields:
+            msg = f"Field '{field_name}' not found in schema"
+            raise ValueError(msg)
+
+        field = self.fields[field_name]
+        field.add_required_dependency(dependent_on, required_fields)
+
+    def add_schema_dependency(
+        self, field_name: str, dependent_on: str, schema: dict[str, Any]
+    ) -> None:
+        """Add a schema dependency between fields.
+
+        Args:
+            field_name: The field where to add the dependency
+            dependent_on: The field that triggers the dependency
+            schema: JSON Schema to apply when dependent_on exists
+        """
+        if field_name not in self.fields:
+            msg = f"Field '{field_name}' not found in schema"
+            raise ValueError(msg)
+
+        field = self.fields[field_name]
+        field.add_schema_dependency(dependent_on, schema)
+
     def get_schema(self) -> type[BaseModel]:  # type: ignore
         """Create Pydantic model from inline definition."""
         fields = {}
+        model_dependencies = {}
+
+        # First pass: collect all field information
         for name, field in self.fields.items():
             # Initialize constraint dictionary
             field_constraints = {}
@@ -214,19 +292,81 @@ class InlineSchemaDef(BaseSchemaDef):
             if field.json_schema_extra:
                 field_constraints["json_schema_extra"] = field.json_schema_extra
 
+            # Handle field dependencies
+            if field.dependent_required or field.dependent_schema:
+                if field.json_schema_extra is None:
+                    field_constraints["json_schema_extra"] = {}
+
+                json_extra = field_constraints.get("json_schema_extra", {})
+
+                if field.dependent_required:
+                    if "dependentRequired" not in json_extra:
+                        json_extra["dependentRequired"] = {}
+                    json_extra["dependentRequired"].update(field.dependent_required)
+
+                if field.dependent_schema:
+                    if "dependentSchemas" not in json_extra:
+                        json_extra["dependentSchemas"] = {}
+                    json_extra["dependentSchemas"].update(field.dependent_schema)
+
+                field_constraints["json_schema_extra"] = json_extra
+
             # Add any additional constraints
             field_constraints.update(field.constraints)
 
             field_info = Field(description=field.description, **field_constraints)
             fields[name] = (python_type, field_info)
 
+            # Collect model-level dependencies for JSON Schema
+            if field.dependent_required or field.dependent_schema:
+                if not model_dependencies:
+                    model_dependencies = {"json_schema_extra": {}}
+
+                if field.dependent_required:
+                    if "dependentRequired" not in model_dependencies["json_schema_extra"]:
+                        model_dependencies["json_schema_extra"]["dependentRequired"] = {}
+                    model_dependencies["json_schema_extra"]["dependentRequired"].update(
+                        field.dependent_required
+                    )
+
+                if field.dependent_schema:
+                    if "dependentSchemas" not in model_dependencies["json_schema_extra"]:
+                        model_dependencies["json_schema_extra"]["dependentSchemas"] = {}
+                    model_dependencies["json_schema_extra"]["dependentSchemas"].update(
+                        field.dependent_schema
+                    )
+
+        # Create the model class with field definitions
         cls_name = self.description or "ResponseType"
-        return create_model(
+        model = create_model(
             cls_name,
             **fields,
             __base__=BaseModel,
             __doc__=self.description,
         )  # type: ignore[call-overload]
+
+        # Add model-level JSON Schema extras for dependencies
+        if model_dependencies:
+            if not hasattr(model, "model_config") or not model.model_config:
+                model.model_config = {}
+
+            if "json_schema_extra" not in model.model_config:
+                model.model_config["json_schema_extra"] = {}
+
+            schema_extra = model.model_config["json_schema_extra"]
+
+            if "dependentRequired" in model_dependencies["json_schema_extra"]:
+                schema_extra["dependentRequired"] = model_dependencies[
+                    "json_schema_extra"
+                ]["dependentRequired"]
+
+            if "dependentSchemas" in model_dependencies["json_schema_extra"]:
+                schema_extra["dependentSchemas"] = model_dependencies[
+                    "json_schema_extra"
+                ]["dependentSchemas"]
+
+        # Return the created model
+        return model
 
 
 class ImportedSchemaDef(BaseSchemaDef):
