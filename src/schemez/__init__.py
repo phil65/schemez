@@ -1,4 +1,7 @@
-"""Schemez: Pydantic shim for config stuff"""
+"""Schemez: main package.
+
+Pydantic shim for config stuff.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ from importlib.metadata import version
 
 __version__ = version("schemez")
 __title__ = "Schemez"
-__description__ = "Pydantic shim for config stuff"
+
 __author__ = "Philipp Temminghoff"
 __author_email__ = "philipptemminghoff@googlemail.com"
 __copyright__ = "Copyright (c) 2025 Philipp Temminghoff"
