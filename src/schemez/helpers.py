@@ -177,6 +177,42 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
             raise ValueError(msg) from e
 
 
+async def _detect_command(command: str, *, test_flag: str = "--version") -> list[str]:
+    """Detect the correct command prefix for running a command.
+
+    Tries 'uv run' first, then falls back to direct execution.
+
+    Args:
+        command: The command to detect
+        test_flag: Flag to test command availability with
+
+    Returns:
+        Command prefix list (empty for direct execution)
+
+    Raises:
+        RuntimeError: If command is not available
+    """
+    cmd_prefixes = [["uv", "run"], []]
+
+    for prefix in cmd_prefixes:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *prefix,
+                command,
+                test_flag,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            if proc.returncode == 0:
+                return prefix
+        except FileNotFoundError:
+            continue
+
+    msg = f"{command} not available (tried both 'uv run' and direct execution)"
+    raise RuntimeError(msg)
+
+
 async def model_to_python_code(
     model: type[BaseModel],
     *,
@@ -200,23 +236,7 @@ async def model_to_python_code(
         RuntimeError: If datamodel-codegen is not available
         subprocess.CalledProcessError: If code generation fails
     """
-    try:
-        # Check if datamodel-codegen is available
-        proc = await asyncio.create_subprocess_exec(
-            "uv",
-            "run",
-            "datamodel-codegen",
-            "--version",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
-        if proc.returncode != 0:
-            code = proc.returncode or -1
-            raise subprocess.CalledProcessError(code, "datamodel-codegen")
-    except FileNotFoundError as e:
-        msg = "datamodel-codegen not available"
-        raise RuntimeError(msg) from e
+    working_prefix = await _detect_command("datamodel-codegen")
 
     schema = model.model_json_schema()
     name = class_name or model.__name__
@@ -247,17 +267,15 @@ async def model_to_python_code(
 
     try:  # Generate model using datamodel-codegen
         proc = await asyncio.create_subprocess_exec(
-            "uv",
-            "run",
+            *working_prefix,
             "datamodel-codegen",
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        stdout, _stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            msg = f"datamodel-codegen failed: {stderr.decode()}"
             code = proc.returncode or -1
             raise subprocess.CalledProcessError(code, "datamodel-codegen")
 
