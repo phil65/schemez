@@ -213,29 +213,22 @@ class InlineSchemaDef(BaseSchemaDef):
             # Handle enum type
             if field.type == "enum":
                 if not field.values:
-                    msg = f"Field '{name}' has type 'enum' but no values defined"
+                    msg = f"Field {name!r} has type 'enum' but no values defined"
                     raise ValueError(msg)
 
-                # Create dynamic Enum class
-                enum_name = f"{name.capitalize()}Enum"
-
-                # Create enum members dictionary
-                enum_members = {}
+                enum_name = f"{name.capitalize()}Enum"  # Create dynamic Enum class
+                enum_members = {}  # Create enum members dictionary
                 for i, value in enumerate(field.values):
                     if isinstance(value, str) and value.isidentifier():
-                        # If value is a valid Python identifier, use it as is
-                        key = value
+                        key = value  # If value is a valid Python identifier, use as is
                     else:
-                        # Otherwise, create a synthetic name
-                        key = f"VALUE_{i}"
+                        key = f"VALUE_{i}"  # Otherwise, create a synthetic name
                     enum_members[key] = value
 
-                # Create the enum class
-                enum_class = Enum(enum_name, enum_members)
+                enum_class = Enum(enum_name, enum_members)  # Create the enum class
                 python_type: Any = enum_class
 
-                # Handle enum default value specially
-                if field.default is not None:
+                if field.default is not None:  # Handle enum default value specially
                     # Store default value as the enum value string
                     # Pydantic v2 will convert it to the enum instance
                     if field.default in list(field.values):
@@ -252,18 +245,13 @@ class InlineSchemaDef(BaseSchemaDef):
                     msg = f"Unsupported field type: {field.type}"
                     raise ValueError(msg)
 
-            # Handle literal constraint if provided
-            if field.literal_value is not None:
-                from typing import Literal as LiteralType
+            if field.literal_value is not None:  # Handle literal constraint if provided
+                python_type = Literal[field.literal_value]
 
-                python_type = LiteralType[field.literal_value]
-
-            # Handle optional fields (allowing None)
-            if field.optional:
+            if field.optional:  # Handle optional fields (allowing None)
                 python_type = python_type | None  # type: ignore
 
-            # Add standard Pydantic constraints
-            # Collect all constraint values
+            # Add standard Pydantic constraints. Collect all constraint values
             for constraint in [
                 "default",
                 "title",
@@ -282,23 +270,19 @@ class InlineSchemaDef(BaseSchemaDef):
                 if value is not None:
                     field_constraints[constraint] = value
 
-            # Handle examples separately (Pydantic v2 way)
             if field.examples:
                 if field.json_schema_extra is None:
                     field.json_schema_extra = {}
                 field.json_schema_extra["examples"] = field.examples
 
-            # Add json_schema_extra if provided
             if field.json_schema_extra:
                 field_constraints["json_schema_extra"] = field.json_schema_extra
 
-            # Handle field dependencies
             if field.dependent_required or field.dependent_schema:
                 if field.json_schema_extra is None:
                     field_constraints["json_schema_extra"] = {}
 
                 json_extra = field_constraints.get("json_schema_extra", {})
-
                 if field.dependent_required:
                     if "dependentRequired" not in json_extra:
                         json_extra["dependentRequired"] = {}
@@ -311,9 +295,7 @@ class InlineSchemaDef(BaseSchemaDef):
 
                 field_constraints["json_schema_extra"] = json_extra
 
-            # Add any additional constraints
-            field_constraints.update(field.constraints)
-
+            field_constraints.update(field.constraints)  # Add any additional constraints
             field_info = Field(description=field.description, **field_constraints)
             fields[name] = (python_type, field_info)
 
@@ -336,10 +318,8 @@ class InlineSchemaDef(BaseSchemaDef):
                         field.dependent_schema
                     )
 
-        # Create the model class with field definitions
-        cls_name = self.description or "ResponseType"
-        model = create_model(
-            cls_name,
+        model = create_model(  # Create the model class
+            self.description or "ResponseType",
             **fields,
             __base__=BaseModel,
             __doc__=self.description,
@@ -347,9 +327,6 @@ class InlineSchemaDef(BaseSchemaDef):
 
         # Add model-level JSON Schema extras for dependencies
         if model_dependencies:
-            if not hasattr(model, "model_config") or not model.model_config:
-                model.model_config = {}
-
             if "json_schema_extra" not in model.model_config:
                 model.model_config["json_schema_extra"] = {}
 
