@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 StrPath = str | os.PathLike[str]
 SourceType = Literal["pdf", "image"]
+PythonVersion = Literal["3.13", "3.14", "3.15"]
 
 DEFAULT_SYSTEM_PROMPT = "You are a schema extractor for {name} BaseModels."
 DEFAULT_USER_PROMPT = "Extract information from this document:"
@@ -260,7 +261,7 @@ class Schema(BaseModel):
         cls,
         *,
         class_name: str | None = None,
-        target_python_version: str | None = None,
+        target_python_version: PythonVersion | None = None,
     ) -> str:
         """Convert this model to Python code asynchronously.
 

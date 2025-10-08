@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 
 StrPath = str | os.PathLike[str]
-
+PythonVersion = Literal["3.13", "3.14", "3.15"]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -181,7 +181,8 @@ async def model_to_python_code(
     model: type[BaseModel],
     *,
     class_name: str | None = None,
-    target_python_version: Literal["3.13", "3.14", "3.15"] | None = None,
+    target_python_version: PythonVersion | None = None,
+    model_type: str = "pydantic.BaseModel",
 ) -> str:
     """Convert a BaseModel to Python code asynchronously.
 
@@ -190,6 +191,7 @@ async def model_to_python_code(
         class_name: Optional custom class name for the generated code
         target_python_version: Target Python version for code generation.
             Defaults to current system Python version.
+        model_type: Type of the generated model. Defaults to "pydantic.BaseModel".
 
     Returns:
         Generated Python code as string
@@ -220,24 +222,29 @@ async def model_to_python_code(
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(schema, f)
         schema_file = Path(f.name)
+
+    args = [
+        "--input",
+        str(schema_file),
+        "--input-file-type",
+        "jsonschema",
+        "--output-model-type",
+        model_type,
+        "--class-name",
+        name,
+        "--disable-timestamp",
+        "--use-union-operator",
+        "--use-schema-description",
+        "--enum-field-as-literal",
+        "all",
+        "--target-python-version",
+        py,
+    ]
+
     try:  # Generate model using datamodel-codegen
         proc = await asyncio.create_subprocess_exec(
             "datamodel-codegen",
-            "--input",
-            str(schema_file),
-            "--input-file-type",
-            "jsonschema",
-            "--output-model-type",
-            "pydantic.BaseModel",
-            "--class-name",
-            name,
-            "--disable-timestamp",
-            "--use-union-operator",
-            "--use-schema-description",
-            "--enum-field-as-literal",
-            "all",
-            "--target-python-version",
-            py,
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
