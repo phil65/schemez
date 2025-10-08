@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from py2openai.functionschema import create_schema
+from schemez.functionschema import create_schema
 
 
 if TYPE_CHECKING:

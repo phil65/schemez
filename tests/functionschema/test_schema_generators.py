@@ -3,12 +3,12 @@
 import enum
 from typing import Any
 
-from py2openai.functionschema import (
+from schemez.functionschema import (
     FunctionSchema,
     FunctionType,
     create_schema,
 )
-from py2openai.schema_generators import (
+from schemez.schema_generators import (
     create_schemas_from_callables,
     create_schemas_from_class,
     create_schemas_from_module,
@@ -171,13 +171,13 @@ def test_create_schemas_from_class() -> None:
 
 def test_create_schemas_from_module() -> None:
     """Test schema generation from modules with different prefix options."""
-    import py2openai.schema_generators as schema_module
+    import schemez.schema_generators as schema_module
 
     # Test default prefix (module name)
     schemas = create_schemas_from_module(schema_module)
-    assert "py2openai.schema_generators.create_schemas_from_callables" in schemas
-    assert "py2openai.schema_generators.create_schemas_from_class" in schemas
-    assert "py2openai.schema_generators.create_schemas_from_module" in schemas
+    assert "schemez.schema_generators.create_schemas_from_callables" in schemas
+    assert "schemez.schema_generators.create_schemas_from_class" in schemas
+    assert "schemez.schema_generators.create_schemas_from_module" in schemas
 
     # Test with no prefix
     no_prefix = create_schemas_from_module(schema_module, prefix=False)
@@ -199,7 +199,7 @@ def test_create_schemas_from_module() -> None:
     assert "API.create_schemas_from_callables" in included
 
     # Verify schemas are identical regardless of prefix
-    base_schema = schemas["py2openai.schema_generators.create_schemas_from_callables"]
+    base_schema = schemas["schemez.schema_generators.create_schemas_from_callables"]
     no_prefix_schema = no_prefix["create_schemas_from_callables"]
     custom_schema = custom["API.create_schemas_from_callables"]
 

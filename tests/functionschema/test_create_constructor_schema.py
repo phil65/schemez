@@ -7,7 +7,7 @@ from typing import Literal
 
 import pydantic
 
-from py2openai.schema_generators import create_constructor_schema
+from schemez.schema_generators import create_constructor_schema
 
 
 def test_regular_class_constructor_schema() -> None:

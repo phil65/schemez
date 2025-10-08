@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator  # noqa: TC003
 
-from py2openai.executable import create_executable
+from schemez.executable import create_executable
 
 
 def test_sync_generator_execution() -> None:

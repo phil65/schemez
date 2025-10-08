@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 import pytest
 
-from py2openai.functionschema import FunctionSchema, create_schema
+from schemez.functionschema import FunctionSchema, create_schema
 
 
 def test_from_dict_complete_tool() -> None:

@@ -16,7 +16,7 @@ from uuid import UUID  # noqa: TC003
 
 import pytest
 
-from py2openai.functionschema import (
+from schemez.functionschema import (
     FunctionType,
     create_schema,
 )

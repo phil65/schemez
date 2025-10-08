@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from py2openai.functionschema import create_schema
+from schemez.functionschema import create_schema
 
 
 def regular_function(x: int) -> str:
