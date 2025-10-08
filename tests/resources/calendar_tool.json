@@ -1,0 +1,117 @@
+{
+	"type": "function",
+	"function": {
+		"name": "create_calendar_event",
+		"description": "Create a new calendar event with attendees and scheduling details",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"title": {
+					"type": "string",
+					"description": "Event title"
+				},
+				"description": {
+					"type": "string",
+					"description": "Event description",
+					"default": ""
+				},
+				"start_time": {
+					"type": "string",
+					"format": "date-time",
+					"description": "Event start time in ISO 8601 format"
+				},
+				"duration_minutes": {
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 1440,
+					"description": "Event duration in minutes",
+					"default": 60
+				},
+				"attendees": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"email": {
+								"type": "string",
+								"format": "email",
+								"description": "Attendee email address"
+							},
+							"name": {
+								"type": "string",
+								"description": "Attendee display name"
+							},
+							"required": {
+								"type": "boolean",
+								"description": "Whether attendance is required",
+								"default": false
+							}
+						},
+						"required": ["email", "name"]
+					},
+					"description": "List of event attendees"
+				},
+				"location": {
+					"type": "object",
+					"properties": {
+						"address": {
+							"type": "string",
+							"description": "Physical address"
+						},
+						"room": {
+							"type": "string",
+							"description": "Room or meeting space"
+						},
+						"virtual_link": {
+							"type": "string",
+							"format": "uri",
+							"description": "Virtual meeting link"
+						}
+					},
+					"description": "Event location details"
+				},
+				"reminder_minutes": {
+					"type": "array",
+					"items": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"description": "Reminder times in minutes before event",
+					"default": [15]
+				}
+			},
+			"required": ["title", "start_time"]
+		},
+		"returns": {
+			"type": "object",
+			"properties": {
+				"event_id": {
+					"type": "string",
+					"description": "Unique identifier for the created event"
+				},
+				"calendar_url": {
+					"type": "string",
+					"format": "uri",
+					"description": "URL to view the event in calendar"
+				},
+				"attendees_notified": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "List of attendee emails that were notified"
+				},
+				"conflicts": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"attendee_email": { "type": "string" },
+							"conflicting_event": { "type": "string" }
+						}
+					},
+					"description": "Any scheduling conflicts detected"
+				}
+			},
+			"required": ["event_id", "calendar_url"]
+		}
+	}
+}
