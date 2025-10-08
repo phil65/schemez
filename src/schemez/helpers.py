@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
 
@@ -181,7 +181,7 @@ async def model_to_python_code(
     model: type[BaseModel],
     *,
     class_name: str | None = None,
-    target_python_version: str | None = None,
+    target_python_version: Literal["3.13", "3.14", "3.15"] | None = None,
 ) -> str:
     """Convert a BaseModel to Python code asynchronously.
 
@@ -208,27 +208,19 @@ async def model_to_python_code(
         )
         await proc.communicate()
         if proc.returncode != 0:
-            raise subprocess.CalledProcessError(
-                proc.returncode or -1, "datamodel-codegen"
-            )
+            code = proc.returncode or -1
+            raise subprocess.CalledProcessError(code, "datamodel-codegen")
     except FileNotFoundError as e:
         msg = "datamodel-codegen not available"
         raise RuntimeError(msg) from e
 
-    # Get model schema
     schema = model.model_json_schema()
     name = class_name or model.__name__
-    python_version = (
-        target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
-    )
-
-    # Create temporary file with schema
+    py = target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(schema, f)
         schema_file = Path(f.name)
-
-    try:
-        # Generate model using datamodel-codegen
+    try:  # Generate model using datamodel-codegen
         proc = await asyncio.create_subprocess_exec(
             "datamodel-codegen",
             "--input",
@@ -245,7 +237,7 @@ async def model_to_python_code(
             "--enum-field-as-literal",
             "all",
             "--target-python-version",
-            python_version,
+            py,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -253,12 +245,10 @@ async def model_to_python_code(
 
         if proc.returncode != 0:
             msg = f"datamodel-codegen failed: {stderr.decode()}"
-            raise subprocess.CalledProcessError(
-                proc.returncode or -1, "datamodel-codegen"
-            )
+            code = proc.returncode or -1
+            raise subprocess.CalledProcessError(code, "datamodel-codegen")
 
         return stdout.decode().strip()
 
-    finally:
-        # Cleanup temp file
+    finally:  # Cleanup temp file
         schema_file.unlink(missing_ok=True)
