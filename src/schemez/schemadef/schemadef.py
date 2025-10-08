@@ -303,20 +303,15 @@ class InlineSchemaDef(BaseSchemaDef):
             if field.dependent_required or field.dependent_schema:
                 if not model_dependencies:
                     model_dependencies = {"json_schema_extra": {}}
-
+                extra = model_dependencies["json_schema_extra"]
                 if field.dependent_required:
-                    if "dependentRequired" not in model_dependencies["json_schema_extra"]:
-                        model_dependencies["json_schema_extra"]["dependentRequired"] = {}
-                    model_dependencies["json_schema_extra"]["dependentRequired"].update(
-                        field.dependent_required
-                    )
-
+                    if "dependentRequired" not in extra:
+                        extra["dependentRequired"] = {}
+                    extra["dependentRequired"].update(field.dependent_required)
                 if field.dependent_schema:
-                    if "dependentSchemas" not in model_dependencies["json_schema_extra"]:
-                        model_dependencies["json_schema_extra"]["dependentSchemas"] = {}
-                    model_dependencies["json_schema_extra"]["dependentSchemas"].update(
-                        field.dependent_schema
-                    )
+                    if "dependentSchemas" not in extra:
+                        extra["dependentSchemas"] = {}
+                    extra["dependentSchemas"].update(field.dependent_schema)
 
         model = create_model(  # Create the model class
             self.description or "ResponseType",
