@@ -254,3 +254,27 @@ class Schema(BaseModel):
         except Exception as exc:
             msg = f"Failed to save configuration to {path}"
             raise ValueError(msg) from exc
+
+    @classmethod
+    async def to_python_code(
+        cls,
+        *,
+        class_name: str | None = None,
+        target_python_version: str | None = None,
+    ) -> str:
+        """Convert this model to Python code asynchronously.
+
+        Args:
+            class_name: Optional custom class name for the generated code
+            target_python_version: Target Python version for code generation
+
+        Returns:
+            Generated Python code as string
+        """
+        from schemez.helpers import model_to_python_code
+
+        return await model_to_python_code(
+            cls,
+            class_name=class_name,
+            target_python_version=target_python_version,
+        )

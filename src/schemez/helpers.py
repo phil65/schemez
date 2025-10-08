@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
+import json
 import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
@@ -169,3 +175,90 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         except Exception as e:
             msg = f"Failed to resolve type {type_string} in unsafe mode"
             raise ValueError(msg) from e
+
+
+async def model_to_python_code(
+    model: type[BaseModel],
+    *,
+    class_name: str | None = None,
+    target_python_version: str | None = None,
+) -> str:
+    """Convert a BaseModel to Python code asynchronously.
+
+    Args:
+        model: The BaseModel class to convert
+        class_name: Optional custom class name for the generated code
+        target_python_version: Target Python version for code generation.
+            Defaults to current system Python version.
+
+    Returns:
+        Generated Python code as string
+
+    Raises:
+        RuntimeError: If datamodel-codegen is not available
+        subprocess.CalledProcessError: If code generation fails
+    """
+    try:
+        # Check if datamodel-codegen is available
+        proc = await asyncio.create_subprocess_exec(
+            "datamodel-codegen",
+            "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(
+                proc.returncode or -1, "datamodel-codegen"
+            )
+    except FileNotFoundError as e:
+        msg = "datamodel-codegen not available"
+        raise RuntimeError(msg) from e
+
+    # Get model schema
+    schema = model.model_json_schema()
+    name = class_name or model.__name__
+    python_version = (
+        target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
+    )
+
+    # Create temporary file with schema
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(schema, f)
+        schema_file = Path(f.name)
+
+    try:
+        # Generate model using datamodel-codegen
+        proc = await asyncio.create_subprocess_exec(
+            "datamodel-codegen",
+            "--input",
+            str(schema_file),
+            "--input-file-type",
+            "jsonschema",
+            "--output-model-type",
+            "pydantic.BaseModel",
+            "--class-name",
+            name,
+            "--disable-timestamp",
+            "--use-union-operator",
+            "--use-schema-description",
+            "--enum-field-as-literal",
+            "all",
+            "--target-python-version",
+            python_version,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+
+        if proc.returncode != 0:
+            msg = f"datamodel-codegen failed: {stderr.decode()}"
+            raise subprocess.CalledProcessError(
+                proc.returncode or -1, "datamodel-codegen"
+            )
+
+        return stdout.decode().strip()
+
+    finally:
+        # Cleanup temp file
+        schema_file.unlink(missing_ok=True)
