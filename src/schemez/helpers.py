@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -13,6 +12,7 @@ import tempfile
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
+from pydantic_core import to_json
 
 
 StrPath = str | os.PathLike[str]
@@ -203,6 +203,8 @@ async def model_to_python_code(
     try:
         # Check if datamodel-codegen is available
         proc = await asyncio.create_subprocess_exec(
+            "uv",
+            "run",
             "datamodel-codegen",
             "--version",
             stdout=asyncio.subprocess.PIPE,
@@ -220,7 +222,9 @@ async def model_to_python_code(
     name = class_name or model.__name__
     py = target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump(schema, f)
+        # Use pydantic_core.to_json for proper schema serialization
+        schema_json = to_json(schema, indent=2).decode()
+        f.write(schema_json)
         schema_file = Path(f.name)
 
     args = [
@@ -243,6 +247,8 @@ async def model_to_python_code(
 
     try:  # Generate model using datamodel-codegen
         proc = await asyncio.create_subprocess_exec(
+            "uv",
+            "run",
             "datamodel-codegen",
             *args,
             stdout=asyncio.subprocess.PIPE,
