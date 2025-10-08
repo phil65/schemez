@@ -9,7 +9,6 @@ from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from schemez.functionschema import FunctionSchema
@@ -19,6 +18,8 @@ from schemez.schema import Schema
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from fastapi import FastAPI
 
     from schemez.tool_executor.types import ToolHandler
 
@@ -216,6 +217,8 @@ from datetime import datetime
 
     async def generate_server_app(self) -> FastAPI:
         """Create configured FastAPI server."""
+        from fastapi import FastAPI, HTTPException
+
         if self._server_app is not None:
             return self._server_app
 
