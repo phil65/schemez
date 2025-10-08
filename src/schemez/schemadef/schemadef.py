@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
 from typing import Annotated, Any, Literal
 
@@ -322,20 +323,22 @@ class InlineSchemaDef(BaseSchemaDef):
 
         # Add model-level JSON Schema extras for dependencies
         if model_dependencies:
-            if "json_schema_extra" not in model.model_config:
-                model.model_config["json_schema_extra"] = {}
+            existing_extra = model.model_config.get("json_schema_extra")
+            deps_extra = model_dependencies["json_schema_extra"]
 
-            schema_extra = model.model_config["json_schema_extra"]
+            match existing_extra:
+                case None:
+                    model.model_config["json_schema_extra"] = deps_extra
+                case dict() as schema_extra:
+                    schema_extra.update(deps_extra)
+                case Callable() as callable_func:
 
-            if "dependentRequired" in model_dependencies["json_schema_extra"]:
-                schema_extra["dependentRequired"] = model_dependencies[
-                    "json_schema_extra"
-                ]["dependentRequired"]
+                    def wrapped_extra(*args: Any) -> None:
+                        callable_func(*args)
+                        schema = args[0]
+                        schema.update(deps_extra)
 
-            if "dependentSchemas" in model_dependencies["json_schema_extra"]:
-                schema_extra["dependentSchemas"] = model_dependencies[
-                    "json_schema_extra"
-                ]["dependentSchemas"]
+                    model.model_config["json_schema_extra"] = wrapped_extra
 
         # Return the created model
         return model
