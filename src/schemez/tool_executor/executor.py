@@ -57,14 +57,15 @@ class HttpToolExecutor:
         loaded_schemas = []
 
         for schema in self.schemas:
-            if isinstance(schema, dict):
-                loaded_schemas.append(schema)
-            elif isinstance(schema, (str, Path)):
-                with Path(schema).open() as f:
-                    loaded_schemas.append(json.load(f))
-            else:
-                msg = f"Invalid schema type: {type(schema)}"
-                raise TypeError(msg)
+            match schema:
+                case dict():
+                    loaded_schemas.append(schema)
+                case str() | Path():
+                    with Path(schema).open() as f:
+                        loaded_schemas.append(json.load(f))
+                case _:
+                    msg = f"Invalid schema type: {type(schema)}"
+                    raise TypeError(msg)
 
         return loaded_schemas
 
@@ -119,7 +120,7 @@ async def {name}(input: {input_class_name}) -> str:
         logger.info("Starting tools code generation")
 
         schemas = await self._load_schemas()
-        code_parts = []
+        code_parts: list[str] = []
         await self._get_tool_mappings()
 
         # Module header
@@ -175,8 +176,6 @@ from datetime import datetime
             return self._server_app
 
         tool_mappings = await self._get_tool_mappings()
-
-        # Create app
         app = FastAPI(title="Tool Server", version="1.0.0")
 
         @app.post("/tools/{tool_name}")
@@ -199,9 +198,8 @@ from datetime import datetime
             try:
                 return await self.handler(tool_name, dynamic_input)
             except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Tool execution failed: {e}"
-                ) from e
+                msg = f"Tool execution failed: {e}"
+                raise HTTPException(status_code=500, detail=msg) from e
 
         self._server_app = app
         return app
@@ -221,7 +219,7 @@ from datetime import datetime
         # Create namespace and execute
         namespace = {
             "BaseModel": BaseModel,
-            "Field": BaseModel.__fields_set__,
+            "Field": BaseModel.model_fields_set,
             "Literal": Any,
             "List": list,
             "datetime": __import__("datetime").datetime,
@@ -235,11 +233,11 @@ from datetime import datetime
 
         # Extract tool functions
         tool_mappings = await self._get_tool_mappings()
-        self._tool_functions = {}
-
-        for tool_name in tool_mappings:
-            if tool_name in namespace:
-                self._tool_functions[tool_name] = namespace[tool_name]
+        self._tool_functions = {
+            tool_name: namespace[tool_name]
+            for tool_name in tool_mappings
+            if tool_name in namespace
+        }
 
         elapsed = time.time() - start_time
         logger.info(f"Tool functions generation completed in {elapsed:.2f}s")  # noqa: G004
@@ -255,17 +253,14 @@ from datetime import datetime
             port: Port to bind to
             background: If True, run server in background task
         """
+        import uvicorn
+
         app = await self.generate_server_app()
 
         if background:
-            # Start server in background
-            import uvicorn
-
             config = uvicorn.Config(app, host=host, port=port)
             server = uvicorn.Server(config)
             return asyncio.create_task(server.serve())
-        # Run server blocking
-        import uvicorn
 
         uvicorn.run(app, host=host, port=port)
         return None
@@ -325,5 +320,4 @@ if __name__ == "__main__":
         server_file = output_dir / "server_example.py"
         server_file.write_text(server_template)
         saved_files["server_example"] = server_file
-
         return saved_files

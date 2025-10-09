@@ -21,7 +21,6 @@ async def generate_input_model(schema_dict: dict) -> tuple[str, str]:
     code = await model_to_python_code(schema_dict["parameters"], class_name=cls_name)
     elapsed = time.time() - start_time
     logger.debug("Generated input model for %s in %.2fs", schema_dict["name"], elapsed)
-
     return code, cls_name
 
 
