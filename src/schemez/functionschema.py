@@ -37,7 +37,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FunctionType(str, enum.Enum):
+class FunctionType(enum.StrEnum):
     """Enum representing different function types."""
 
     SYNC = "sync"
