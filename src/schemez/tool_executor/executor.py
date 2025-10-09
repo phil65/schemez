@@ -12,12 +12,11 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from schemez.functionschema import FunctionSchema
-from schemez.helpers import model_to_python_code
-from schemez.schema import Schema
+from schemez.tool_executor.helpers import clean_generated_code, generate_input_model
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from fastapi import FastAPI
 
@@ -32,7 +31,7 @@ class HttpToolExecutor:
 
     def __init__(
         self,
-        schemas: list[dict[str, Any] | Path],
+        schemas: Sequence[dict[str, Any] | Path],
         handler: ToolHandler,
         base_url: str = "http://localhost:8000",
     ):
@@ -82,53 +81,6 @@ class HttpToolExecutor:
                 self._tool_mappings[function_schema.name] = input_class_name
 
         return self._tool_mappings
-
-    def _clean_generated_code(self, code: str) -> str:
-        """Clean generated code by removing future imports and headers."""
-        lines = code.split("\n")
-        cleaned_lines = []
-        skip_until_class = True
-
-        for line in lines:
-            # Skip lines until we find a class or other meaningful content
-            if skip_until_class:
-                if line.strip().startswith("class ") or (
-                    line.strip()
-                    and not line.startswith("#")
-                    and not line.startswith("from __future__")
-                ):
-                    skip_until_class = False
-                    cleaned_lines.append(line)
-                continue
-            cleaned_lines.append(line)
-
-        return "\n".join(cleaned_lines)
-
-    async def _generate_input_model(self, schema_dict: dict) -> tuple[str, str]:
-        """Generate input model code from schema."""
-        start_time = time.time()
-        logger.debug("Generating input model for %s", schema_dict["name"])
-
-        class TempInputSchema(Schema):
-            @classmethod
-            def model_json_schema(cls, **kwargs):
-                return schema_dict["parameters"]
-
-        input_class_name = (
-            f"{''.join(word.title() for word in schema_dict['name'].split('_'))}Input"
-        )
-
-        input_code = await model_to_python_code(
-            TempInputSchema,
-            class_name=input_class_name,
-        )
-
-        elapsed = time.time() - start_time
-        logger.debug(
-            "Generated input model for %s in %.2fs", schema_dict["name"], elapsed
-        )
-
-        return input_code, input_class_name
 
     async def _generate_http_wrapper(
         self, schema_dict: dict, input_class_name: str
@@ -194,9 +146,9 @@ from datetime import datetime
             }
 
             # Generate input model (strip future imports from generated code)
-            input_code, input_class_name = await self._generate_input_model(schema_data)
+            input_code, input_class_name = await generate_input_model(schema_data)
             # Remove future imports and datamodel-codegen header from individual models
-            cleaned_input_code = self._clean_generated_code(input_code)
+            cleaned_input_code = clean_generated_code(input_code)
             code_parts.append(cleaned_input_code)
 
             # Generate HTTP wrapper
