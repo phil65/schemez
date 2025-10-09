@@ -6,7 +6,6 @@ import logging
 import time
 
 from schemez.helpers import model_to_python_code
-from schemez.schema import Schema
 
 
 logger = logging.getLogger(__name__)
@@ -17,24 +16,13 @@ async def generate_input_model(schema_dict: dict) -> tuple[str, str]:
     start_time = time.time()
     logger.debug("Generating input model for %s", schema_dict["name"])
 
-    class TempInputSchema(Schema):
-        @classmethod
-        def model_json_schema(cls, **kwargs):
-            return schema_dict["parameters"]
-
-    input_class_name = (
-        f"{''.join(word.title() for word in schema_dict['name'].split('_'))}Input"
-    )
-
-    input_code = await model_to_python_code(
-        TempInputSchema,
-        class_name=input_class_name,
-    )
-
+    words = [word.title() for word in schema_dict["name"].split("_")]
+    cls_name = f"{''.join(words)}Input"
+    code = await model_to_python_code(schema_dict["parameters"], class_name=cls_name)
     elapsed = time.time() - start_time
     logger.debug("Generated input model for %s in %.2fs", schema_dict["name"], elapsed)
 
-    return input_code, input_class_name
+    return code, cls_name
 
 
 def clean_generated_code(code: str) -> str:

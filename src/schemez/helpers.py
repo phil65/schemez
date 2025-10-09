@@ -214,16 +214,16 @@ async def _detect_command(command: str, *, test_flag: str = "--version") -> list
 
 
 async def model_to_python_code(
-    model: type[BaseModel],
+    model: type[BaseModel] | dict[str, Any],
     *,
     class_name: str | None = None,
     target_python_version: PythonVersion | None = None,
     model_type: str = "pydantic.BaseModel",
 ) -> str:
-    """Convert a BaseModel to Python code asynchronously.
+    """Convert a BaseModel or schema dict to Python code asynchronously.
 
     Args:
-        model: The BaseModel class to convert
+        model: The BaseModel class or schema dictionary to convert
         class_name: Optional custom class name for the generated code
         target_python_version: Target Python version for code generation.
             Defaults to current system Python version.
@@ -238,8 +238,12 @@ async def model_to_python_code(
     """
     working_prefix = await _detect_command("datamodel-codegen")
 
-    schema = model.model_json_schema()
-    name = class_name or model.__name__
+    if isinstance(model, dict):
+        schema = model
+        name = class_name or "GeneratedModel"
+    else:
+        schema = model.model_json_schema()
+        name = class_name or model.__name__
     py = target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         # Use pydantic_core.to_json for proper schema serialization
