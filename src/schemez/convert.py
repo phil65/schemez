@@ -64,7 +64,7 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
 
     for param_name, param in sig.parameters.items():
         # Skip self/cls for methods
-        if param_name in ("self", "cls"):
+        if param_name in {"self", "cls"}:
             continue
 
         type_hint = hints.get(param_name, Any)

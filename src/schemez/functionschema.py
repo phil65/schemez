@@ -393,7 +393,7 @@ def _is_optional_type(typ: type) -> TypeGuard[type]:
         True if the type is Optional, False otherwise
     """
     origin = typing.get_origin(typ)
-    if origin not in (typing.Union, types.UnionType):  # pyright: ignore
+    if origin not in {typing.Union, types.UnionType}:  # pyright: ignore
         return False
     args = typing.get_args(typ)
     # Check if any of the union members is None or NoneType
@@ -448,7 +448,7 @@ def _resolve_type_annotation(
     args = typing.get_args(typ)
 
     # Handle Union types (including Optional)
-    if origin in (typing.Union, types.UnionType):  # pyright: ignore
+    if origin in {typing.Union, types.UnionType}:  # pyright: ignore
         # For Optional (union with None), filter out None type
         non_none_types = [t for t in args if t is not type(None)]
         if non_none_types:
@@ -495,7 +495,7 @@ def _resolve_type_annotation(
             schema["required"] = required
     # Handle mappings - updated check
     elif (
-        origin in (dict, typing.Dict)  # noqa: UP006
+        origin in {dict, typing.Dict}  # noqa: UP006
         or (origin is not None and isinstance(origin, type) and issubclass(origin, dict))
     ):
         schema["type"] = "object"
@@ -503,14 +503,14 @@ def _resolve_type_annotation(
             schema["additionalProperties"] = True
 
     # Handle sequences
-    elif origin in (
+    elif origin in {
         list,
         set,
         tuple,
         frozenset,
         typing.List,  # noqa: UP006  # pyright: ignore
         typing.Set,  # noqa: UP006  # pyright: ignore
-    ) or (
+    } or (
         origin is not None
         and origin.__module__ == "collections.abc"
         and origin.__name__ in {"Sequence", "MutableSequence", "Collection"}
@@ -534,11 +534,11 @@ def _resolve_type_annotation(
             schema["enum"] = [e.value for e in typ]
 
         # Basic types
-        elif typ in (str, Path, UUID, re.Pattern):
+        elif typ in {str, Path, UUID, re.Pattern}:
             schema["type"] = "string"
         elif typ is int:
             schema["type"] = "integer"
-        elif typ in (float, decimal.Decimal):
+        elif typ in {float, decimal.Decimal}:
             schema["type"] = "number"
         elif typ is bool:
             schema["type"] = "boolean"
@@ -569,7 +569,7 @@ def _resolve_type_annotation(
                 description = f"{description} (IANA timezone name)"
         elif typ is UUID:
             schema["type"] = "string"
-        elif typ in (bytes, bytearray):
+        elif typ in {bytes, bytearray}:
             schema["type"] = "string"
             if description:
                 description = f"{description} (base64 encoded)"
@@ -696,10 +696,10 @@ def create_schema(
         # Skip the first parameter for bound methods
         if skip_first and i == 0:
             continue
-        if param.kind in (
+        if param.kind in {
             inspect.Parameter.VAR_POSITIONAL,
             inspect.Parameter.VAR_KEYWORD,
-        ):
+        }:
             continue
 
         param_doc = next(
@@ -726,7 +726,7 @@ def create_schema(
     function_type = _determine_function_type(func)
     return_hint = hints.get("return", Any)
 
-    if function_type in (FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR):
+    if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
         element_type = next(
             (t for t in typing.get_args(return_hint) if t is not type(None)),
             Any,

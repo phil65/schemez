@@ -163,7 +163,7 @@ def _convert_complex_property(
 
         # Get first non-null type or default to string
         first_type = next((t for t in types if t != "null"), "string")
-        if first_type not in ("string", "number", "integer", "boolean"):
+        if first_type not in {"string", "number", "integer", "boolean"}:
             first_type = "string"
 
         return _create_simple_property(
@@ -193,7 +193,7 @@ def _convert_complex_property(
         )
 
     type_str = prop.get("type", "string")
-    if type_str not in ("string", "number", "integer", "boolean"):
+    if type_str not in {"string", "number", "integer", "boolean"}:
         type_str = "string"
 
     return _create_simple_property(
