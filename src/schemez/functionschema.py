@@ -569,7 +569,7 @@ def _resolve_type_annotation(
                 description = f"{description} (IANA timezone name)"
         elif typ is UUID:
             schema["type"] = "string"
-        elif typ in {bytes, bytearray}:
+        elif typ in (bytes, bytearray):
             schema["type"] = "string"
             if description:
                 description = f"{description} (base64 encoded)"
