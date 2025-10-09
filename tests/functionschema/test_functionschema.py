@@ -337,8 +337,8 @@ def test_docstring_parsing() -> None:
 
     schema = create_schema(func)
     assert schema.description == "Main description."
-    assert schema.parameters["properties"]["x"]["description"] == "X parameter"
-    assert schema.parameters["properties"]["y"]["description"] == "Y parameter"
+    assert schema.parameters["properties"]["x"].get("description") == "X parameter"
+    assert schema.parameters["properties"]["y"].get("description") == "Y parameter"
 
 
 def test_openai_schema_format() -> None:
@@ -438,8 +438,8 @@ def test_annotated_types() -> None:
     assert props["y"].get("default") == "default"
 
     # Descriptions should come from docstrings, not Annotated
-    assert props["x"]["description"] == "The number"
-    assert props["y"]["description"] == "The string"
+    assert props["x"].get("description") == "The number"
+    assert props["y"].get("description") == "The string"
 
 
 def test_empty_and_edge_cases() -> None:
@@ -486,7 +486,7 @@ def test_literal_types() -> None:
     props = schema.parameters["properties"]
 
     assert props["mode"]["type"] == "string"
-    assert props["mode"]["enum"] == ["read", "write"]
+    assert props["mode"].get("enum") == ["read", "write"]
     assert props["flag"].get("default") is None
 
 
@@ -636,11 +636,9 @@ def test_datetime_types() -> None:
         "description": "A time (ISO 8601 format)",
     }
     assert props["optional_dt"]["type"] == "string"
-    assert props["optional_dt"]["format"] == "date-time"
+    assert props["optional_dt"].get("format") == "date-time"
 
-    assert schema.returns == {
-        "type": "object",
-    }
+    assert schema.returns == {"type": "object"}
 
 
 def test_extended_basic_types() -> None:
