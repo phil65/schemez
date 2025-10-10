@@ -43,6 +43,7 @@ Source = "https://github.com/phil65/schemez"
 
 [project.optional-dependencies]
 ai = ["llmling-agent", "anyenv>=0.4.14"]
+codegen = ["datamodel-code-generator"]
 tool_execution = ["fastapi>=0.118.2"]
 yaml = ["yamling"]
 
