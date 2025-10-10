@@ -246,19 +246,14 @@ class FunctionSchema(pydantic.BaseModel):
             RuntimeError: If datamodel-codegen is not available
             subprocess.CalledProcessError: If code generation fails
         """
+        import shutil
         import subprocess
         import tempfile
 
-        try:
-            # Check if datamodel-codegen is available
-            subprocess.run(
-                ["datamodel-codegen", "--version"],
-                check=True,
-                capture_output=True,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        # Check if datamodel-codegen is available
+        if not shutil.which("datamodel-codegen"):
             msg = "datamodel-codegen not available"
-            raise RuntimeError(msg) from e
+            raise RuntimeError(msg)
 
         name = class_name or f"{self.name.title()}Response"
 

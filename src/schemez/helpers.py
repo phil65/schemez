@@ -6,6 +6,7 @@ import asyncio
 import importlib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -177,42 +178,6 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
             raise ValueError(msg) from e
 
 
-async def _detect_command(command: str, *, test_flag: str = "--version") -> list[str]:
-    """Detect the correct command prefix for running a command.
-
-    Tries 'uv run' first, then falls back to direct execution.
-
-    Args:
-        command: The command to detect
-        test_flag: Flag to test command availability with
-
-    Returns:
-        Command prefix list (empty for direct execution)
-
-    Raises:
-        RuntimeError: If command is not available
-    """
-    cmd_prefixes = [["uv", "run"], []]
-
-    for prefix in cmd_prefixes:
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *prefix,
-                command,
-                test_flag,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await proc.communicate()
-            if proc.returncode == 0:
-                return prefix
-        except FileNotFoundError:
-            continue
-
-    msg = f"{command} not available (tried both 'uv run' and direct execution)"
-    raise RuntimeError(msg)
-
-
 async def model_to_python_code(
     model: type[BaseModel] | dict[str, Any],
     *,
@@ -236,7 +201,10 @@ async def model_to_python_code(
         RuntimeError: If datamodel-codegen is not available
         subprocess.CalledProcessError: If code generation fails
     """
-    working_prefix = await _detect_command("datamodel-codegen")
+    # Check if datamodel-codegen is available
+    if not shutil.which("datamodel-codegen"):
+        msg = "datamodel-codegen not available"
+        raise RuntimeError(msg)
 
     if isinstance(model, dict):
         schema = model
@@ -271,7 +239,6 @@ async def model_to_python_code(
 
     try:  # Generate model using datamodel-codegen
         proc = await asyncio.create_subprocess_exec(
-            *working_prefix,
             "datamodel-codegen",
             *args,
             stdout=asyncio.subprocess.PIPE,
