@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
+from pydantic_core import from_json
+from upath import UPath
 
 from schemez.functionschema import FunctionSchema
 from schemez.tool_executor.helpers import clean_generated_code, generate_input_model
@@ -61,8 +62,8 @@ class HttpToolExecutor:
                 case dict():
                     loaded_schemas.append(schema)
                 case str() | Path():
-                    with Path(schema).open() as f:
-                        loaded_schemas.append(json.load(f))
+                    text = UPath(schema).read_text("utf-8")
+                    loaded_schemas.append(from_json(text))
                 case _:
                     msg = f"Invalid schema type: {type(schema)}"
                     raise TypeError(msg)
@@ -151,8 +152,6 @@ from datetime import datetime
             # Remove future imports and datamodel-codegen header from individual models
             cleaned_input_code = clean_generated_code(input_code)
             code_parts.append(cleaned_input_code)
-
-            # Generate HTTP wrapper
             wrapper_code = await self._generate_http_wrapper(
                 schema_data, input_class_name
             )
