@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import logging
 import time
 
+from schemez import log
 from schemez.helpers import model_to_python_code
 
 
-logger = logging.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 async def generate_input_model(schema_dict: dict) -> tuple[str, str]:

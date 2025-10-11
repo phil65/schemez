@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any
@@ -12,6 +11,7 @@ from pydantic import BaseModel
 from pydantic_core import from_json
 from upath import UPath
 
+from schemez import log
 from schemez.functionschema import FunctionSchema
 from schemez.tool_executor.helpers import clean_generated_code, generate_input_model
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from schemez.tool_executor.types import ToolHandler
 
 
-logger = logging.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 class HttpToolExecutor:

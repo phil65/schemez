@@ -12,7 +12,6 @@ import decimal
 import enum
 import inspect
 import ipaddress
-import logging
 from pathlib import Path
 import re
 import types
@@ -23,6 +22,7 @@ from uuid import UUID
 import docstring_parser
 import pydantic
 
+from schemez import log
 from schemez.typedefs import (
     OpenAIFunctionDefinition,
     OpenAIFunctionTool,
@@ -34,7 +34,7 @@ if typing.TYPE_CHECKING:
     from schemez.typedefs import Property
 
 
-logger = logging.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 class FunctionType(enum.StrEnum):
