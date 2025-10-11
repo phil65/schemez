@@ -119,6 +119,9 @@ class FunctionSchema(pydantic.BaseModel):
         required = self.parameters.get("required", self.required)
 
         for name, details in properties.items():
+            if name.startswith("_"):  # TODO: kwarg for renaming instead perhaps?
+                logger.debug("Skipping parameter %s due to leading underscore", name)
+                continue
             # Get base type
             if "enum" in details:
                 values = tuple(details["enum"])  # type: ignore
