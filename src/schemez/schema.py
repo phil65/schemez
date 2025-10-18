@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 import anyenv
@@ -15,9 +14,9 @@ if TYPE_CHECKING:
 
     from llmling_agent.agent.agent import AgentType
     from llmling_agent.models.content import BaseContent
+    from upath.types import JoinablePathLike
 
 
-StrPath = str | os.PathLike[str]
 SourceType = Literal["pdf", "image"]
 PythonVersion = Literal["3.13", "3.14", "3.15"]
 
@@ -43,7 +42,9 @@ class Schema(BaseModel):
         return merge_models(self, other)
 
     @classmethod
-    def from_yaml(cls, content: str, inherit_path: StrPath | None = None) -> Self:
+    def from_yaml(
+        cls, content: str, inherit_path: JoinablePathLike | None = None
+    ) -> Self:
         """Create from YAML string."""
         import yamling
 
@@ -233,7 +234,7 @@ class Schema(BaseModel):
         )
         return yamling.dump_yaml(text)
 
-    def save(self, path: StrPath, overwrite: bool = False) -> None:
+    def save(self, path: JoinablePathLike, overwrite: bool = False) -> None:
         """Save configuration to a YAML file.
 
         Args:

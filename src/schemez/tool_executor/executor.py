@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from fastapi import FastAPI
+    from upath.types import JoinablePathLike
 
     from schemez.tool_executor.types import ToolHandler
 
@@ -32,7 +33,7 @@ class HttpToolExecutor:
 
     def __init__(
         self,
-        schemas: Sequence[dict[str, Any] | Path],
+        schemas: Sequence[dict[str, Any] | UPath],
         handler: ToolHandler,
         base_url: str = "http://localhost:8000",
     ):
@@ -61,7 +62,7 @@ class HttpToolExecutor:
             match schema:
                 case dict():
                     loaded_schemas.append(schema)
-                case str() | Path():
+                case str() | Path() | UPath():
                     text = UPath(schema).read_text("utf-8")
                     loaded_schemas.append(from_json(text))
                 case _:
@@ -264,7 +265,7 @@ from datetime import datetime
         uvicorn.run(app, host=host, port=port)
         return None
 
-    async def save_to_files(self, output_dir: Path) -> dict[str, Path]:
+    async def save_to_files(self, output_dir: JoinablePathLike) -> dict[str, UPath]:
         """Save generated code to files.
 
         Args:
@@ -273,7 +274,7 @@ from datetime import datetime
         Returns:
             Dictionary mapping file types to paths
         """
-        output_dir = Path(output_dir)
+        output_dir = UPath(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         saved_files = {}

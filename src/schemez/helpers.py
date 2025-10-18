@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,7 +15,6 @@ from pydantic import BaseModel
 from pydantic_core import to_json
 
 
-StrPath = str | os.PathLike[str]
 PythonVersion = Literal["3.13", "3.14", "3.15"]
 
 if TYPE_CHECKING:
