@@ -1,6 +1,6 @@
 [project]
 name = "schemez"
-version = "1.2.3"
+version = "1.2.4"
 description = "Pydantic shim for config stuff"
 readme = "README.md"
 requires-python = ">=3.13"
