@@ -12,7 +12,6 @@ import upath
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from llmling_agent.agent.agent import AgentType
     from llmling_agent.models.content import BaseContent
     from upath.types import JoinablePathLike
 
@@ -119,7 +118,6 @@ class Schema(BaseModel):
         model: str = "google-gla:gemini-2.0-flash",
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         user_prompt: str = DEFAULT_USER_PROMPT,
-        provider: AgentType = "pydantic_ai",
     ) -> Self:
         """Create a schema model from a document using AI.
 
@@ -129,7 +127,6 @@ class Schema(BaseModel):
             model: The AI model to use for schema extraction
             system_prompt: The system prompt to use for schema extraction
             user_prompt: The user prompt to use for schema extraction
-            provider: The provider to use for schema extraction
 
         Returns:
             A new schema model class based on the document
@@ -140,11 +137,8 @@ class Schema(BaseModel):
             content: BaseContent = PDFBase64Content.from_bytes(file_content)
         else:
             content = ImageBase64Content.from_bytes(file_content)
-        agent = Agent[None](  # type:ignore[var-annotated]
-            model=model,
-            system_prompt=system_prompt.format(name=cls.__name__),
-            provider=provider,
-        ).to_structured(cls)
+        prompt = system_prompt.format(name=cls.__name__)
+        agent = Agent(model=model, system_prompt=prompt, output_type=cls)
         chat_message = await agent.run(user_prompt, content)
         return chat_message.content
 
@@ -155,7 +149,6 @@ class Schema(BaseModel):
         model: str = "google-gla:gemini-2.0-flash",
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         user_prompt: str = DEFAULT_USER_PROMPT,
-        provider: AgentType = "pydantic_ai",
     ) -> Self:
         """Create a schema model from a text snippet using AI.
 
@@ -164,18 +157,14 @@ class Schema(BaseModel):
             model: The AI model to use for schema extraction
             system_prompt: The system prompt to use for schema extraction
             user_prompt: The user prompt to use for schema extraction
-            provider: The provider to use for schema extraction
 
         Returns:
             A new schema model class based on the document
         """
         from llmling_agent import Agent
 
-        agent = Agent[None](  # type:ignore[var-annotated]
-            model=model,
-            system_prompt=system_prompt.format(name=cls.__name__),
-            provider=provider,
-        ).to_structured(cls)
+        prompt = system_prompt.format(name=cls.__name__)
+        agent = Agent(model=model, system_prompt=prompt, output_type=cls)
         chat_message = await agent.run(user_prompt, text)
         return chat_message.content
 
