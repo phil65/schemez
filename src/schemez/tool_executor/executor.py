@@ -33,7 +33,7 @@ class HttpToolExecutor:
 
     def __init__(
         self,
-        schemas: Sequence[dict[str, Any] | UPath],
+        schemas: Sequence[dict[str, Any] | JoinablePathLike],
         handler: ToolHandler,
         base_url: str = "http://localhost:8000",
     ):
