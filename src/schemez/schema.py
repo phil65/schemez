@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Self
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Literal, Optional, Self
 
-import anyenv
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, create_model
 import upath
 
 
@@ -69,41 +69,47 @@ class Schema(BaseModel):
         return get_function_model(func, name=name)
 
     @classmethod
-    def from_vision_llm_sync(
-        cls,
-        file_content: bytes,
-        source_type: SourceType = "pdf",
-        model: str = "google-gla:gemini-2.0-flash",
-        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-        user_prompt: str = DEFAULT_USER_PROMPT,
-        provider: AgentType = "pydantic_ai",
-    ) -> Self:
-        """Create a schema model from a document using AI.
+    def from_json_schema(cls, json_schema: dict[str, Any]) -> type[Schema]:
+        """Create a schema model from a JSON schema.
 
         Args:
-            file_content: The document content to create a schema from
-            source_type: The type of the document
-            model: The AI model to use for schema extraction
-            system_prompt: The system prompt to use for schema extraction
-            user_prompt: The user prompt to use for schema extraction
-            provider: The provider to use for schema extraction
+            json_schema: The JSON schema to create a schema from
 
         Returns:
-            A new schema model class based on the document
+            A new schema model class based on the JSON schema
         """
-        from llmling_agent import Agent, ImageBase64Content, PDFBase64Content
+        from datamodel_code_generator import DataModelType, PythonVersion
+        from datamodel_code_generator.model import get_data_model_types
+        from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
+        from pydantic.v1.main import ModelMetaclass
 
-        if source_type == "pdf":
-            content: BaseContent = PDFBase64Content.from_bytes(file_content)
-        else:
-            content = ImageBase64Content.from_bytes(file_content)
-        agent = Agent[None](  # type:ignore[var-annotated]
-            model=model,
-            system_prompt=system_prompt.format(name=cls.__name__),
-            provider=provider,
-        ).to_structured(cls)
-        chat_message = anyenv.run_sync(agent.run(user_prompt, content))
-        return chat_message.content
+        data_model_types = get_data_model_types(
+            DataModelType.PydanticBaseModel, target_python_version=PythonVersion.PY_312
+        )
+        parser = JsonSchemaParser(
+            f"""{json_schema}""",
+            data_model_type=data_model_types.data_model,
+            data_model_root_type=data_model_types.root_model,
+            data_model_field_type=data_model_types.field_model,
+            data_type_manager_type=data_model_types.data_type_manager,
+            dump_resolve_reference_action=data_model_types.dump_resolve_reference_action,
+        )
+        code_str = (
+            parser.parse()
+            .replace("from pydantic ", "from pydantic.v1 ")  # type: ignore
+            .replace("from __future__ import annotations\n\n", "")
+        )
+        ex_namespace: dict[str, Any] = {}
+        exec(code_str, ex_namespace, ex_namespace)
+        model = None
+        for v in ex_namespace.values():
+            if isinstance(v, ModelMetaclass):
+                model = v
+        if not model:
+            msg = "Class not found in output"
+            raise Exception(msg)  # noqa: TRY002
+        model.__module__ = __name__
+        return model  # type: ignore
 
     @classmethod
     async def from_vision_llm(
@@ -140,37 +146,6 @@ class Schema(BaseModel):
             provider=provider,
         ).to_structured(cls)
         chat_message = await agent.run(user_prompt, content)
-        return chat_message.content
-
-    @classmethod
-    def from_llm_sync(
-        cls,
-        text: str,
-        model: str = "google-gla:gemini-2.0-flash",
-        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-        user_prompt: str = DEFAULT_USER_PROMPT,
-        provider: AgentType = "pydantic_ai",
-    ) -> Self:
-        """Create a schema model from a text snippet using AI.
-
-        Args:
-            text: The text to create a schema from
-            model: The AI model to use for schema extraction
-            system_prompt: The system prompt to use for schema extraction
-            user_prompt: The user prompt to use for schema extraction
-            provider: The provider to use for schema extraction
-
-        Returns:
-            A new schema model class based on the document
-        """
-        from llmling_agent import Agent
-
-        agent = Agent[None](  # type:ignore[var-annotated]
-            model=model,
-            system_prompt=system_prompt.format(name=cls.__name__),
-            provider=provider,
-        ).to_structured(cls)
-        chat_message = anyenv.run_sync(agent.run(user_prompt, text))
         return chat_message.content
 
     @classmethod
@@ -280,3 +255,87 @@ class Schema(BaseModel):
             class_name=class_name,
             target_python_version=target_python_version,
         )
+
+
+def json_schema_to_base_model(
+    schema: dict[str, Any], model_cls: type[BaseModel] = Schema
+) -> type[Schema]:
+    type_mapping: dict[str, type] = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": list,
+        "object": dict,
+    }
+
+    properties = schema.get("properties", {})
+    required_fields = schema.get("required", [])
+    model_fields = {}
+
+    def process_field(field_name: str, field_props: dict[str, Any]) -> tuple:
+        """Recursively processes a field and returns its type and Field instance."""
+        json_type = field_props.get("type", "string")
+        enum_values = field_props.get("enum")
+
+        # Handle Enums
+        if enum_values:
+            enum_name: str = f"{field_name.capitalize()}Enum"
+            field_type: Any = Enum(enum_name, {v: v for v in enum_values})
+        # Handle Nested Objects
+        elif json_type == "object" and "properties" in field_props:
+            # Recursively create submodel
+            field_type = json_schema_to_base_model(field_props)  # type: ignore
+        # Handle Arrays with Nested Objects
+        elif json_type == "array" and "items" in field_props:
+            item_props = field_props["items"]
+            if item_props.get("type") == "object":
+                item_type: Any = json_schema_to_base_model(item_props)  # pyright: ignore[reportRedeclaration]
+            else:
+                item_type = type_mapping.get(item_props.get("type"), Any)  # pyright: ignore[reportAssignmentType]
+            field_type = list[item_type]  # type: ignore
+        else:
+            field_type = type_mapping.get(json_type, Any)  # type: ignore
+
+        # Handle default values and optionality
+        default_value = field_props.get("default", ...)
+        nullable = field_props.get("nullable", False)
+        description = field_props.get("title", "")
+
+        if nullable:
+            field_type = Optional[field_type]  # type: ignore  # noqa: UP045
+
+        if field_name not in required_fields:
+            default_value = field_props.get("default")
+
+        return field_type, Field(default_value, description=description)
+
+    # Process each field
+    for field_name, field_props in properties.items():
+        model_fields[field_name] = process_field(field_name, field_props)
+
+    return create_model(  # type: ignore
+        schema.get("title", "DynamicModel"), **model_fields, __base__=model_cls
+    )
+
+
+if __name__ == "__main__":
+    schema = {
+        "$id": "https://example.com/person.schema.json",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Person",
+        "type": "object",
+        "properties": {
+            "firstName": {"type": "string", "description": "The person's first name."},
+            "lastName": {"type": "string", "description": "The person's last name."},
+            "age": {
+                "description": "Age in years, must be equal to or greater than zero.",
+                "type": "integer",
+                "minimum": 0,
+            },
+        },
+    }
+    model = Schema.from_json_schema(schema)
+    import devtools
+
+    devtools.debug(model.__fields__)
