@@ -35,8 +35,10 @@ from schemez.schema_generators import (
     create_constructor_schema,
 )
 from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool
+from schemez.code_generation import ToolCodeGenerator, ToolsetCodeGenerator
 
 __version__ = version("schemez")
+
 
 __all__ = [
     "ExecutableFunction",
@@ -54,6 +56,8 @@ __all__ = [
     "SchemaDef",
     "SchemaField",
     "TOMLCode",
+    "ToolCodeGenerator",
+    "ToolsetCodeGenerator",
     "YAMLCode",
     "__version__",
     "create_constructor_schema",
