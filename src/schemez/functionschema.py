@@ -73,38 +73,22 @@ class FunctionSchema(pydantic.BaseModel):
     """The name of the function as it will be presented to the OpenAI API."""
 
     description: str | None = None
-    """
-    Optional description of what the function does. This helps the AI understand
-    when and how to use the function.
-    """
+    """Optional description of what the function does."""
 
     parameters: ToolParameters = pydantic.Field(
         default_factory=lambda: ToolParameters(type="object", properties={}),
     )
-    """
-    JSON Schema object describing the function's parameters. Contains type information,
-    descriptions, and constraints for each parameter.
-    """
+    """JSON Schema object describing the function's parameters."""
 
     required: list[str] = pydantic.Field(default_factory=list)
     """
     List of parameter names that are required (do not have default values).
-    These parameters must be provided when calling the function.
     """
 
     returns: dict[str, Any] = pydantic.Field(
         default_factory=lambda: {"type": "object"},
     )
-    """
-    JSON Schema object describing the function's return type. Used for type checking
-    and documentation purposes.
-    """
-
-    function_type: FunctionType = FunctionType.SYNC
-    """
-    The execution pattern of the function (sync, async, generator, or async generator).
-    Used to determine how to properly invoke the function.
-    """
+    """JSON Schema object describing the function's return type."""
 
     model_config = pydantic.ConfigDict(frozen=True)
 
@@ -373,7 +357,6 @@ class FunctionSchema(pydantic.BaseModel):
             parameters=parameters,
             required=required,
             returns={"type": "object"},
-            function_type=FunctionType.SYNC,
         )
 
 
@@ -647,6 +630,11 @@ def create_schema(
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 
+    If an iterator is passed, the schema return type is a list of the iterator's
+    element type.
+    Variable arguments (*args) and keyword arguments (**kwargs) are not
+    supported in OpenAI function schemas and will be ignored with a warning.
+
     Args:
         func: Function to create schema for
         name_override: Optional name override (otherwise the function name)
@@ -658,10 +646,6 @@ def create_schema(
 
     Raises:
         TypeError: If input is not callable
-
-    Note:
-        Variable arguments (*args) and keyword arguments (**kwargs) are not
-        supported in OpenAI function schemas and will be ignored with a warning.
     """
     if not callable(func):
         msg = f"Expected callable, got {type(func)}"
@@ -740,7 +724,6 @@ def create_schema(
         parameters=parameters,  # Now includes required fields
         required=required,
         returns=returns_dct,
-        function_type=function_type,
     )
 
 

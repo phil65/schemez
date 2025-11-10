@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable  # noqa: TC003
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, assert_never, overload
 
 from schemez.functionschema import FunctionType, create_schema
 
@@ -34,8 +34,11 @@ class ExecutableFunction[T_co]:
             schema: OpenAI function schema
             func: The actual function to execute
         """
+        from schemez.functionschema import _determine_function_type
+
         self.schema = schema
         self.func = func
+        self.function_type = _determine_function_type(self.func)
 
     def run(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:  # noqa: PLR0911
         """Run the function synchronously.
@@ -47,7 +50,7 @@ class ExecutableFunction[T_co]:
         Returns:
             Either a single result or list of results for generators
         """
-        match self.schema.function_type:
+        match self.function_type:
             case FunctionType.SYNC:
                 return self.func(*args, **kwargs)  # type: ignore
             case FunctionType.ASYNC:
@@ -86,9 +89,8 @@ class ExecutableFunction[T_co]:
                     return loop.run_until_complete(
                         self._collect_async_gen(*args, **kwargs),
                     )
-            case _:
-                msg = f"Unknown function type: {self.schema.function_type}"
-                raise ValueError(msg)
+            case _ as unreachable:
+                assert_never(unreachable)
 
     async def _collect_async_gen(self, *args: Any, **kwargs: Any) -> list[T_co]:
         """Collect async generator results into a list.
@@ -115,7 +117,7 @@ class ExecutableFunction[T_co]:
         Raises:
             ValueError: If the function type is unknown
         """
-        match self.schema.function_type:
+        match self.function_type:
             case FunctionType.SYNC:
                 return self.func(*args, **kwargs)  # type: ignore
             case FunctionType.ASYNC:
@@ -125,7 +127,7 @@ class ExecutableFunction[T_co]:
             case FunctionType.ASYNC_GENERATOR:
                 return [x async for x in self.func(*args, **kwargs)]  # type: ignore
             case _:
-                msg = f"Unknown function type: {self.schema.function_type}"
+                msg = f"Unknown function type: {self.function_type}"
                 raise ValueError(msg)
 
     async def astream(self, *args: Any, **kwargs: Any) -> AsyncIterator[T_co]:
@@ -141,7 +143,7 @@ class ExecutableFunction[T_co]:
         Raises:
             ValueError: If the function type is unknown
         """
-        match self.schema.function_type:
+        match self.function_type:
             case FunctionType.SYNC_GENERATOR:
                 for x in self.func(*args, **kwargs):  # type: ignore
                     yield x
@@ -153,7 +155,7 @@ class ExecutableFunction[T_co]:
             case FunctionType.ASYNC:
                 yield await self.func(*args, **kwargs)  # type: ignore
             case _:
-                msg = f"Unknown function type: {self.schema.function_type}"
+                msg = f"Unknown function type: {self.function_type}"
                 raise ValueError(msg)
 
 

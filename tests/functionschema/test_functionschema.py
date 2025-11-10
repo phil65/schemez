@@ -17,7 +17,6 @@ from uuid import UUID  # noqa: TC003
 import pytest
 
 from schemez.functionschema import (
-    FunctionType,
     create_schema,
 )
 
@@ -295,7 +294,6 @@ def test_sync_generator() -> None:
         yield from range(n)
 
     schema = create_schema(gen)
-    assert schema.function_type == FunctionType.SYNC_GENERATOR
     assert schema.returns == {
         "type": "array",
         "items": {"type": "integer"},
@@ -315,7 +313,6 @@ async def test_async_generator() -> None:
             yield str(i)
 
     schema = create_schema(agen)
-    assert schema.function_type == FunctionType.ASYNC_GENERATOR
     assert schema.returns == {
         "type": "array",
         "items": {"type": "string"},

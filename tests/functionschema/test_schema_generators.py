@@ -5,7 +5,6 @@ from typing import Any
 
 from schemez.functionschema import (
     FunctionSchema,
-    FunctionType,
     create_schema,
 )
 from schemez.schema_generators import (
@@ -75,7 +74,6 @@ def test_bound_method_schema() -> None:
 
     assert isinstance(schema, FunctionSchema)
     assert schema.name == "simple_method"
-    assert schema.function_type == FunctionType.SYNC
     assert "x" in schema.parameters["properties"]
     assert schema.returns == {"type": "integer"}
 
@@ -86,7 +84,6 @@ def test_class_method_schema() -> None:
 
     assert isinstance(schema, FunctionSchema)
     assert schema.name == "class_method"
-    assert schema.function_type == FunctionType.SYNC
     assert "y" in schema.parameters["properties"]
     assert schema.returns == {"type": "string"}
 
@@ -97,7 +94,6 @@ def test_static_method_schema() -> None:
 
     assert isinstance(schema, FunctionSchema)
     assert schema.name == "static_method"
-    assert schema.function_type == FunctionType.SYNC
     assert "z" in schema.parameters["properties"]
     assert schema.returns == {"type": "number"}
 
@@ -109,7 +105,6 @@ def test_async_method_schema() -> None:
 
     assert isinstance(schema, FunctionSchema)
     assert schema.name == "async_method"
-    assert schema.function_type == FunctionType.ASYNC
     assert "data" in schema.parameters["properties"]
     assert schema.returns == {"type": "object"}
 
@@ -146,13 +141,6 @@ def test_create_schemas_from_class_methods() -> None:
         # Names will differ but contents should be identical
         assert default_schema.parameters == no_prefix_schema.parameters
         assert default_schema.returns == custom_schema.returns
-        assert default_schema.function_type == custom_schema.function_type
-
-    # Verify function types
-    assert schemas["_TestClass.simple_method"].function_type == FunctionType.SYNC
-    assert schemas["_TestClass.class_method"].function_type == FunctionType.SYNC
-    assert schemas["_TestClass.static_method"].function_type == FunctionType.SYNC
-    assert schemas["_TestClass.async_method"].function_type == FunctionType.ASYNC
 
 
 class Color(enum.Enum):
@@ -205,7 +193,6 @@ def test_create_schemas_from_module() -> None:
 
     assert base_schema.parameters == no_prefix_schema.parameters
     assert base_schema.returns == custom_schema.returns
-    assert base_schema.function_type == custom_schema.function_type
 
 
 def test_create_schemas_from_callables() -> None:
