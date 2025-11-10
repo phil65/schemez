@@ -647,12 +647,15 @@ def _determine_function_type(func: Callable[..., Any]) -> FunctionType:
 def create_schema(
     func: Callable[..., Any],
     name_override: str | None = None,
+    description_override: str | None = None,
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 
     Args:
         func: Function to create schema for
         name_override: Optional name override (otherwise the function name)
+        description_override: Optional description override
+                              (otherwise the function docstring)
 
     Returns:
         Schema representing the function
@@ -737,7 +740,7 @@ def create_schema(
 
     return FunctionSchema(
         name=name_override or getattr(func, "__name__", "unknown") or "unknown",
-        description=docstring.short_description,
+        description=description_override or docstring.short_description,
         parameters=parameters,  # Now includes required fields
         required=required,
         returns=returns_dct,
