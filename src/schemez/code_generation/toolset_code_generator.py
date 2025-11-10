@@ -107,7 +107,7 @@ class ToolsetCodeGenerator:
                 if inspect.iscoroutinefunction(generator.callable):
                     sig = inspect.signature(generator.callable)
                     if sig.return_annotation == inspect.Signature.empty:
-                        indented_desc += "\n    \n    Note: This async function should explicitly return a value."
+                        indented_desc += "\n    \n    Note: This async function should explicitly return a value."  # noqa: E501
 
                 parts.append(f'    """{indented_desc}"""')
             parts.append("")

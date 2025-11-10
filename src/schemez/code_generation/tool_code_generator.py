@@ -38,14 +38,14 @@ TYPE_MAP = {
 class ToolCodeGenerator:
     """Generates code artifacts for a single tool."""
 
-    schema: OpenAIFunctionTool
-    """Schema of the tool."""
-
     callable: Callable
     """Tool to generate code for."""
 
+    schema: OpenAIFunctionTool
+    """Schema of the tool."""
+
     name_override: str | None = None
-    """Name of the tool."""
+    """Name override for the function to generate code for."""
 
     @classmethod
     def from_callable(cls, fn: Callable) -> ToolCodeGenerator:

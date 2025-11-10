@@ -23,11 +23,7 @@ import docstring_parser
 import pydantic
 
 from schemez import log
-from schemez.typedefs import (
-    OpenAIFunctionDefinition,
-    OpenAIFunctionTool,
-    ToolParameters,
-)
+from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool, ToolParameters
 
 
 if typing.TYPE_CHECKING:
