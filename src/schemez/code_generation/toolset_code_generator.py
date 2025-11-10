@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
+import inspect
 from typing import TYPE_CHECKING, Any
 
 from schemez.code_generation.namespace_callable import NamespaceCallable
@@ -101,6 +102,13 @@ class ToolsetCodeGenerator:
                 indented_desc = "    " + generator.callable.__doc__.replace(
                     "\n", "\n    "
                 )
+
+                # Add warning for async functions without proper return type hints
+                if inspect.iscoroutinefunction(generator.callable):
+                    sig = inspect.signature(generator.callable)
+                    if sig.return_annotation == inspect.Signature.empty:
+                        indented_desc += "\n    \n    Note: This async function should explicitly return a value."
+
                 parts.append(f'    """{indented_desc}"""')
             parts.append("")
 
