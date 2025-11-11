@@ -116,10 +116,12 @@ def json_schema_to_pydantic_class(
     if isinstance(base_class, str):
         base_class_str = base_class
         namespace: dict[str, Any] = {}
+        original_base_class = None
     else:
         # For class objects, use simple name and add to namespace
         base_class_str = base_class.__name__
         namespace = {base_class.__name__: base_class}
+        original_base_class = base_class
 
     code = json_schema_to_pydantic_code(
         schema_source=json_schema,
@@ -139,8 +141,38 @@ def json_schema_to_pydantic_class(
             cleaned_lines.append(line)
         code = "\n".join(cleaned_lines)
 
-    # Execute the generated code to create the class
-    exec(code, namespace, namespace)
+    # First attempt: try with original base class
+    try:
+        exec(code, namespace, namespace)
+    except TypeError as e:
+        # If it fails due to use_attribute_docstrings, try with modified base class
+        if "built-in class" in str(e) and original_base_class is not None:
+            # Check if base class has use_attribute_docstrings=True
+            config = getattr(original_base_class, "model_config", None)
+            if config and config.get("use_attribute_docstrings", False):
+                # Create a subclass that disables use_attribute_docstrings
+                from pydantic import ConfigDict
+
+                # Handle both dict and ConfigDict types
+                if isinstance(config, dict):
+                    config_copy = config.copy()
+                    config_copy["use_attribute_docstrings"] = False
+                    new_config = ConfigDict(**config_copy)
+                else:
+                    config_dict = config.__dict__.copy()
+                    config_dict["use_attribute_docstrings"] = False
+                    new_config = ConfigDict(**config_dict)
+
+                class FallbackBase(original_base_class):  # type: ignore[valid-type]
+                    model_config = new_config
+
+                # Update namespace and code with fallback base
+                namespace[base_class_str] = FallbackBase
+                exec(code, namespace, namespace)
+            else:
+                raise
+        else:
+            raise
 
     # Find the generated model class by name
     model = namespace.get(class_name)
