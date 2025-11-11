@@ -20,7 +20,7 @@ class MockToolHandler:
     """Mock tool handler for testing."""
 
     def __init__(self):
-        self.calls = []
+        self.calls: list[tuple[str, BaseModel]] = []
 
     async def __call__(self, method_name: str, input_props: BaseModel) -> str:
         """Mock handler that records calls."""
@@ -290,7 +290,7 @@ async def test_simple_manual_schema(mock_handler):
 async def test_invalid_schema_type(mock_handler: MockToolHandler):
     """Test with invalid schema type."""
     executor = HttpToolExecutor(
-        [123],  # pyright: ignore[reportArgumentType]
+        [123],  # type: ignore
         mock_handler,
     )
     with pytest.raises(TypeError, match="Invalid schema type"):
