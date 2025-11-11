@@ -447,47 +447,6 @@ async def {signature_str}:
         structured_code = self.generate_structured_code(base_url, path_prefix)
         return structured_code.get_client_code(args_format, output_type)
 
-    def generate_code_old_mode(
-        self,
-        mode: Literal["models", "simple", "stubs"] = "models",
-        base_url: str = "http://localhost:8000",
-        path_prefix: str = "/tools",
-    ) -> str:
-        """Generate client code using old 3-mode system (deprecated).
-
-        Args:
-            mode: Legacy mode - "models", "simple", or "stubs"
-            base_url: Base URL of the tool server
-            path_prefix: Path prefix for routes
-
-        Returns:
-            Generated client code
-        """
-        import warnings
-
-        warnings.warn(
-            "generate_code_old_mode() is deprecated. "
-            "Use generate_code() with args_format and output_type parameters.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # Map old modes to new 2x2 system
-        match mode:
-            case "models":
-                return self.generate_code(
-                    "model", "implementation", base_url, path_prefix
-                )
-            case "simple":
-                return self.generate_code(
-                    "explicit", "implementation", base_url, path_prefix
-                )
-            case "stubs":
-                return self.generate_code("explicit", "stubs", base_url, path_prefix)
-            case _:
-                msg = f"Unknown mode: {mode}. Use 'models', 'simple', or 'stubs'"
-                raise ValueError(msg)
-
     def _clean_generated_code(self, code: str) -> str:
         """Clean up generated code by removing redundant imports and headers."""
         lines = code.split("\n")

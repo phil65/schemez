@@ -233,7 +233,7 @@ class TestToolCodeGenerator:
 
         # Should have the actual function, not the builtin callable
         assert generator.callable == simple_function
-        assert generator.callable.__name__ == "simple_function"
+        assert generator.callable.__name__ == "simple_function"  # pyright: ignore[reportOptionalMemberAccess]
         assert callable(generator.callable)
 
     @pytest.mark.parametrize(
