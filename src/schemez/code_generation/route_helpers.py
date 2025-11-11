@@ -101,9 +101,10 @@ async def _execute_tool_function(tool_callable: Callable, **kwargs) -> Any:
             result = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: tool_callable(**kwargs)
             )
-        return result
     except Exception as e:  # noqa: BLE001
         return f"Error executing {tool_callable.__name__}: {e!s}"
+    else:
+        return result
 
 
 if __name__ == "__main__":

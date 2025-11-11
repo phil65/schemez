@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import inspect
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from schemez import log
 from schemez.code_generation.namespace_callable import NamespaceCallable
@@ -44,6 +44,77 @@ Usage notes:
         return f'Completed for {name}'
 
 """
+
+
+@dataclass
+class GeneratedCode:
+    """Structured code generation result."""
+
+    models: str
+    """Generated Pydantic input models."""
+
+    http_methods: str
+    """HTTP client methods using models."""
+
+    clean_methods: str
+    """Clean signature methods without models."""
+
+    stubs: str
+    """Function stubs for LLM consumption."""
+
+    imports: str = ""
+    """Common imports."""
+
+    exports: list[str] = field(default_factory=list)
+    """Exported names."""
+
+    def get_client_code(
+        self, mode: Literal["models", "simple", "stubs"] = "models"
+    ) -> str:
+        """Generate client code in specified mode.
+
+        Args:
+            mode: Generation mode - "models" (with Pydantic models),
+                  "simple" (clean signatures), or "stubs" (function stubs)
+
+        Returns:
+            Formatted client code
+        """
+        parts = []
+        if self.imports:
+            parts.append(self.imports)
+
+        if mode == "models":
+            # Complete HTTP client with models
+            if self.models:
+                parts.append(self.models)
+            if self.http_methods:
+                parts.append(self.http_methods)
+            if self.exports:
+                parts.append(f"\n__all__ = {self.exports}\n")
+
+        elif mode == "simple":
+            # Clean client with natural signatures
+            if self.clean_methods:
+                parts.append(self.clean_methods)
+            if self.exports:
+                exports = [name for name in self.exports if not name.endswith("Input")]
+                parts.append(f"\n__all__ = {exports}\n")
+
+        elif mode == "stubs":
+            # Function stubs for LLM consumption
+            if self.models:
+                parts.append(self.models)
+            if self.stubs:
+                parts.append(self.stubs)
+            if self.exports:
+                parts.append(f"\n__all__ = {self.exports}\n")
+
+        else:
+            msg = f"Unknown mode: {mode}. Use 'models', 'simple', or 'stubs'"
+            raise ValueError(msg)
+
+        return "\n".join(parts)
 
 
 @dataclass
@@ -184,6 +255,164 @@ class ToolsetCodeGenerator:
         ]
         return "\n\n".join(model_parts) if model_parts else ""
 
+    def generate_structured_code(
+        self, base_url: str = "http://localhost:8000", path_prefix: str = "/tools"
+    ) -> GeneratedCode:
+        """Generate structured code with all components.
+
+        Args:
+            base_url: Base URL of the tool server
+            path_prefix: Path prefix for routes
+
+        Returns:
+            GeneratedCode with all components separated
+        """
+        start_time = time.time()
+        logger.info("Starting structured code generation")
+
+        # Common imports
+        imports = '''"""Generated tool client code."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Literal, List, Any, Dict
+from datetime import datetime
+import httpx
+
+'''
+
+        # Generate input models
+        models_parts = []
+        http_methods_parts = []
+        clean_methods_parts = []
+        stubs_parts = []
+        all_exports = []
+
+        for generator in self.generators:
+            # Generate input model from schema parameters
+            input_class_name = None
+            try:
+                params_schema = generator.schema.parameters
+                if params_schema.get("properties"):
+                    words = [word.title() for word in generator.name.split("_")]
+                    input_class_name = f"{''.join(words)}Input"
+
+                    model_code = model_to_python_code(
+                        params_schema, class_name=input_class_name
+                    )
+                    if model_code:
+                        cleaned_model = self._clean_generated_code(model_code)
+                        models_parts.append(cleaned_model)
+                        all_exports.append(input_class_name)
+            except (ValueError, TypeError, AttributeError):
+                input_class_name = None
+
+            # Generate HTTP method with model
+            if input_class_name:
+                http_method = f'''
+async def {generator.name}(input: {input_class_name}) -> str:
+    """{generator.schema.description or f"Call {generator.name} tool"}
+
+    Args:
+        input: Function parameters
+
+    Returns:
+        String response from the tool server
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "{base_url}{path_prefix}/{generator.name}",
+            params=input.model_dump() if hasattr(input, 'model_dump') else {{}},
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.text
+'''
+            else:
+                http_method = f'''
+async def {generator.name}() -> str:
+    """{generator.schema.description or f"Call {generator.name} tool"}
+
+    Returns:
+        String response from the tool server
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "{base_url}{path_prefix}/{generator.name}",
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.text
+'''
+            http_methods_parts.append(http_method)
+
+            # Generate clean method with natural signature
+            signature_str = generator.get_function_signature()
+            params_schema = generator.schema.parameters
+            param_names = list(params_schema.get("properties", {}).keys())
+
+            clean_method = f'''
+async def {signature_str}:
+    """{generator.schema.description or f"Call {generator.name} tool"}"""
+    # Build parameters dict
+    params = {{{", ".join(f'"{name}": {name}' for name in param_names)}}}
+    # Remove None values
+    clean_params = {{k: v for k, v in params.items() if v is not None}}
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "{base_url}{path_prefix}/{generator.name}",
+            params=clean_params,
+            timeout=30.0
+        )
+        response.raise_for_status()
+        # Parse JSON response and return the result
+        result = response.json()
+        return result.get("result", response.text)
+'''
+            clean_methods_parts.append(clean_method)
+
+            # Generate stub
+            if input_class_name:
+                stub = f'''
+async def {generator.name}(input: {input_class_name}) -> str:
+    """{generator.schema.description or f"Call {generator.name} tool"}
+
+    Args:
+        input: Function parameters
+
+    Returns:
+        Function result
+    """
+    ...
+'''
+            else:
+                stub = f'''
+async def {generator.name}() -> str:
+    """{generator.schema.description or f"Call {generator.name} tool"}
+
+    Returns:
+        Function result
+    """
+    ...
+'''
+            stubs_parts.append(stub)
+
+            all_exports.append(generator.name)
+
+        elapsed = time.time() - start_time
+        logger.info("Structured code generation completed in %.2fs", elapsed)
+
+        return GeneratedCode(
+            models="\n".join(models_parts),
+            http_methods="\n".join(http_methods_parts),
+            clean_methods="\n".join(clean_methods_parts),
+            stubs="\n".join(stubs_parts),
+            imports=imports,
+            exports=all_exports,
+        )
+
     def add_all_routes(self, app: FastAPI, path_prefix: str = "/tools") -> None:
         """Add FastAPI routes for all tools.
 
@@ -201,204 +430,25 @@ class ToolsetCodeGenerator:
                 raise ValueError(msg)
             generator.add_route_to_app(app, path_prefix)
 
-    def generate_client_code(
-        self, base_url: str = "http://localhost:8000", path_prefix: str = "/tools"
+    def generate_code(
+        self,
+        mode: Literal["models", "simple", "stubs"] = "models",
+        base_url: str = "http://localhost:8000",
+        path_prefix: str = "/tools",
     ) -> str:
-        """Generate HTTP client code for all tools.
-
-        Creates a complete Python module with HTTP wrapper functions that call
-        the corresponding server endpoints. This is the client-side counterpart
-        to the `add_all_routes` method.
+        """Generate client code in the specified mode.
 
         Args:
+            mode: Generation mode - "models" (with Pydantic models),
+                  "simple" (clean signatures), or "stubs" (function stubs)
             base_url: Base URL of the tool server
             path_prefix: Path prefix for routes (must match server-side)
 
         Returns:
-            Complete Python module code with:
-            - Pydantic input models for each tool
-            - Async HTTP wrapper functions
-            - Proper imports and exports
-
-        Example:
-            >>> toolset = ToolsetCodeGenerator.from_callables([greet, add_numbers])
-            >>> client_code = await toolset.generate_client_code()
-            >>> # Save to file or exec() the generated code
+            Generated client code in the specified mode
         """
-        start_time = time.time()
-        logger.info("Starting client code generation")
-
-        code_parts: list[str] = []
-
-        # Module header
-        header = '''"""Generated HTTP client tools."""
-
-from __future__ import annotations
-
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal, List, Any, Dict
-from datetime import datetime
-
-'''
-        code_parts.append(header)
-
-        # Generate models and wrappers for each tool
-        all_exports = []
-        for generator in self.generators:
-            # Generate input model from schema parameters
-            try:
-                # Get parameters schema and generate model if it has properties
-                params_schema = generator.schema.parameters
-                if params_schema.get("properties"):
-                    # Use the same pattern as HttpToolExecutor
-                    words = [word.title() for word in generator.name.split("_")]
-                    input_class_name = f"{''.join(words)}Input"
-
-                    model_code = model_to_python_code(
-                        params_schema, class_name=input_class_name
-                    )
-                    if model_code:
-                        # Clean up the model code (remove duplicate imports)
-                        cleaned_model = self._clean_generated_code(model_code)
-                        code_parts.append(cleaned_model)
-                    else:
-                        # Fallback for tools without parameters
-                        input_class_name = "BaseModel"
-                else:
-                    # No parameters, use BaseModel
-                    input_class_name = "BaseModel"
-            except (ValueError, TypeError, AttributeError):
-                # Fallback input model for schema parsing errors
-                input_class_name = "BaseModel"
-
-            # Generate HTTP wrapper function
-            description = generator.schema.description or f"Call {generator.name} tool"
-            wrapper_code = f'''
-async def {generator.name}(input: {input_class_name}) -> str:
-    """{description}
-
-    Args:
-        input: Function parameters
-
-    Returns:
-        String response from the tool server
-    """
-    import httpx
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "{base_url}{path_prefix}/{generator.name}",
-            params=input.model_dump() if hasattr(input, 'model_dump') else {{}},
-            timeout=30.0
-        )
-        response.raise_for_status()
-        return response.text
-'''
-            code_parts.append(wrapper_code)
-
-            if input_class_name != "BaseModel":
-                all_exports.append(input_class_name)
-            all_exports.append(generator.name)
-
-        # Add exports
-        code_parts.append(f"\n__all__ = {all_exports}\n")
-
-        client_code = "\n".join(code_parts)
-        elapsed = time.time() - start_time
-        logger.info("Client code generation completed in %.2fs", elapsed)
-        return client_code
-
-    def generate_function_stubs(self) -> str:
-        """Generate clean function stubs for LLM consumption.
-
-        Returns Python code with just signatures, docstrings, and input models
-        - no HTTP implementation details. Perfect for showing LLMs what
-        functions are available without implementation noise.
-
-        Returns:
-            Clean Python code with function stubs
-        """
-        start_time = time.time()
-        logger.info("Starting function stubs generation")
-
-        code_parts: list[str] = []
-
-        # Module header
-        header = '''"""Available tool functions."""
-
-from __future__ import annotations
-
-from pydantic import BaseModel, ConfigDict
-from typing import Any
-
-'''
-        code_parts.append(header)
-
-        # Generate models and stubs for each tool
-        all_exports = []
-        for generator in self.generators:
-            # Generate input model from schema parameters
-            try:
-                params_schema = generator.schema.parameters
-                if params_schema.get("properties"):
-                    # Use the same pattern as client code generation
-                    words = [word.title() for word in generator.name.split("_")]
-                    input_class_name = f"{''.join(words)}Input"
-
-                    model_code = model_to_python_code(
-                        params_schema, class_name=input_class_name
-                    )
-                    if model_code:
-                        # Clean up the model code (remove duplicate imports)
-                        cleaned_model = self._clean_generated_code(model_code)
-                        code_parts.append(cleaned_model)
-                    else:
-                        # Fallback for tools without parameters
-                        input_class_name = "BaseModel"
-                else:
-                    # No parameters, use BaseModel
-                    input_class_name = "BaseModel"
-            except (ValueError, TypeError, AttributeError):
-                # Fallback input model for schema parsing errors
-                input_class_name = "BaseModel"
-
-            # Generate function stub
-            description = generator.schema.description or f"Call {generator.name} tool"
-
-            # Get return type hint from schema or default to str
-            try:
-                signature_str = str(generator.schema.to_python_signature())
-                # Extract return type from signature
-                return_hint = (
-                    signature_str.split(" -> ")[1] if " -> " in signature_str else "Any"
-                )
-            except Exception:  # noqa: BLE001
-                return_hint = "Any"
-
-            stub_code = f'''
-async def {generator.name}(input: {input_class_name}) -> {return_hint}:
-    """{description}
-
-    Args:
-        input: Function parameters
-
-    Returns:
-        Function result
-    """
-    ...
-'''
-            code_parts.append(stub_code)
-
-            if input_class_name != "BaseModel":
-                all_exports.append(input_class_name)
-            all_exports.append(generator.name)
-
-        # Add exports
-        code_parts.append(f"\n__all__ = {all_exports}\n")
-
-        stubs_code = "\n".join(code_parts)
-        elapsed = time.time() - start_time
-        logger.info("Function stubs generation completed in %.2fs", elapsed)
-        return stubs_code
+        structured_code = self.generate_structured_code(base_url, path_prefix)
+        return structured_code.get_client_code(mode)
 
     def _clean_generated_code(self, code: str) -> str:
         """Clean up generated code by removing redundant imports and headers."""
@@ -445,7 +495,18 @@ if __name__ == "__main__":
 
     generator = ToolsetCodeGenerator.from_callables([greet, add_numbers])
 
-    # Test client code generation
-    client_code = generator.generate_client_code()
-    print("Generated client code:")
-    print(client_code)
+    # Test new structured code generation
+    print("🚀 MODELS MODE (with Pydantic models):")
+    print("=" * 50)
+    models_code = generator.generate_code(mode="models")
+    print(models_code[:400] + "...\n")
+
+    print("🚀 SIMPLE MODE (clean signatures):")
+    print("=" * 50)
+    simple_code = generator.generate_code(mode="simple")
+    print(simple_code[:400] + "...\n")
+
+    print("🚀 STUBS MODE (for LLM consumption):")
+    print("=" * 50)
+    stubs_code = generator.generate_code(mode="stubs")
+    print(stubs_code[:400] + "...")

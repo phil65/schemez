@@ -154,11 +154,17 @@ from schemez.code_generation import ToolsetCodeGenerator
 functions = [get_weather, search_users]
 generator = ToolsetCodeGenerator.from_callables(functions)
 
-# Generate HTTP client code
-client_code = generator.generate_client_code(
+# Generate HTTP client code (multiple modes available)
+client_code = generator.generate_code(
+    mode="models",  # Rich Pydantic models for validation
     base_url="https://api.example.com",
     path_prefix="/v1/tools"
 )
+
+# Available modes:
+# - "models": Rich Pydantic models with validation
+# - "simple": Clean natural function signatures  
+# - "stubs": Function stubs for LLM consumption
 
 # Generated code includes:
 # - Pydantic input models for each function
@@ -219,20 +225,20 @@ generator.add_all_routes(app, path_prefix="/api/tools")
 Create sandboxed execution environments with tool functions:
 
 ```python
-# Generate execution namespace
-namespace = generator.generate_execution_namespace()
+# Generate different modes of client code
+models_code = generator.generate_code(mode="models")    # With Pydantic models
+simple_code = generator.generate_code(mode="simple")    # Clean signatures
+stubs_code = generator.generate_code(mode="stubs")      # For LLM consumption
 
-# Execute Python code with tools available
-code = """
-async def main():
-    # Tools are available as async functions
-    weather = await get_weather(GetWeatherInput(location="London"))
-    users = await search_users(SearchUsersInput(query="john", limit=5))
-    return {"weather": weather, "users": users}
-"""
+# For advanced use, get structured components
+structured = generator.generate_structured_code()
+print(structured.models)          # Just the Pydantic models
+print(structured.clean_methods)   # Just the clean method signatures
+print(structured.exports)         # List of exported names
 
-exec(code, namespace)
-result = await namespace['main']()
+# Use any mode as needed
+exec(simple_code, globals())
+result = await get_weather(location="London", unit="F")
 ```
 
 ### Schema-Only Code Generation
@@ -249,7 +255,7 @@ schema2 = create_schema(search_users)
 
 # Generate client code from schemas
 generator = ToolsetCodeGenerator.from_schemas([schema1, schema2])
-client_code = generator.generate_client_code()
+client_code = generator.generate_code(mode="models")
 
 # Works for client generation, signatures, models
 # Routes require actual callables for execution
@@ -263,11 +269,93 @@ Generate comprehensive documentation for your tools:
 # Generate tool descriptions with signatures and docstrings
 documentation = generator.generate_tool_description()
 
+# Generate different formats for different needs
+stubs = generator.generate_code(mode="stubs")        # Clean stubs for LLMs
+simple = generator.generate_code(mode="simple")      # Natural signatures
+models = generator.generate_code(mode="models")      # Rich validation
+
 # Includes:
 # - Function signatures with type hints  
 # - Docstrings and parameter descriptions
 # - Usage examples and constraints
 # - Available return type models
+```
+
+## Code Generation Modes
+
+Schemez offers three distinct generation modes to suit different use cases:
+
+### Models Mode (`mode="models"`)
+**Best for**: Production APIs, complex validation, detailed type safety
+
+```python
+client_code = generator.generate_code(mode="models")
+```
+
+Generated code includes:
+- Full Pydantic input models with validation constraints
+- Rich type information (min/max values, string patterns, etc.)
+- HTTP client functions that accept model instances
+- Comprehensive error handling and type checking
+
+Example generated interface:
+```python
+class SearchUsersInput(BaseModel):
+    query: str = Field(min_length=1, description="Search query")
+    limit: int = Field(ge=1, le=100, default=10)
+    
+async def search_users(input: SearchUsersInput) -> str:
+    # HTTP client implementation
+```
+
+### Simple Mode (`mode="simple"`)  
+**Best for**: LLM integration, natural code execution, clean interfaces
+
+```python
+client_code = generator.generate_code(mode="simple")
+```
+
+Generated code features:
+- Clean, natural function signatures
+- Direct parameter passing (no model wrappers)
+- Minimal boilerplate for easy LLM consumption
+- Intuitive function calls
+
+Example generated interface:
+```python
+async def search_users(*, query: str, limit: int = 10, status: str = "active") -> str:
+    # HTTP client implementation with automatic parameter handling
+```
+
+### Stubs Mode (`mode="stubs"`)
+**Best for**: Documentation, LLM prompts, API exploration
+
+```python
+stubs_code = generator.generate_code(mode="stubs")
+```
+
+Generated code provides:
+- Function signatures with type hints
+- Complete docstrings and parameter descriptions  
+- Input models for reference
+- No implementation details (just `...` bodies)
+
+Example generated interface:
+```python
+class SearchUsersInput(BaseModel):
+    query: str
+    limit: int = 10
+    
+async def search_users(input: SearchUsersInput) -> list[dict]:
+    """Search for users with filters.
+    
+    Args:
+        input: Function parameters
+        
+    Returns:
+        List of user dictionaries
+    """
+    ...
 ```
 
 ## Advanced Features
