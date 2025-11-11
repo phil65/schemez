@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import inspect
 from typing import TYPE_CHECKING, Any
-
-from pydantic_ai import RunContext
 
 from schemez import create_schema
 from schemez.code_generation.route_helpers import (
@@ -47,13 +45,20 @@ class ToolCodeGenerator:
     name_override: str | None = None
     """Name override for the function to generate code for."""
 
+    exclude_types: list[type] = field(default_factory=list)
+    """Exclude parameters from generated code (like context types)."""
+
     @classmethod
-    def from_callable(cls, fn: Callable) -> ToolCodeGenerator:
+    def from_callable(
+        cls,
+        fn: Callable,
+        exclude_types: list[type] | None = None,
+    ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a Tool."""
         schema = create_schema(fn).model_dump_openai()
         schema["function"]["name"] = fn.__name__
         schema["function"]["description"] = fn.__doc__ or ""
-        return cls(schema=schema, callable=callable)
+        return cls(schema=schema, callable=callable, exclude_types=exclude_types or [])
 
     @property
     def name(self) -> str:
@@ -162,7 +167,7 @@ class ToolCodeGenerator:
             self.callable
         )
 
-    def _is_context_parameter(self, param_name: str) -> bool:  # noqa: PLR0911
+    def _is_context_parameter(self, param_name: str) -> bool:
         """Check if a parameter is a context parameter that should be hidden."""
         try:
             sig = self._get_callable_signature()
@@ -173,26 +178,13 @@ class ToolCodeGenerator:
             if param.annotation == inspect.Parameter.empty:
                 return False
 
-            # Check if parameter is RunContext or AgentContext
             annotation = param.annotation
             annotation_str = str(annotation)
-
-            # Handle RunContext (including parameterized like RunContext[None])
-            if annotation is RunContext:
-                return True
-
-            # Check for parameterized RunContext using string matching
-            if "RunContext" in annotation_str:
-                return True
-
-            # Handle AgentContext
-            if hasattr(annotation, "__name__") and annotation.__name__ == "AgentContext":
-                return True
-
-            # Check for AgentContext in string representation
-            if "AgentContext" in annotation_str:
-                return True
-
+            for typ in self.exclude_types:
+                if annotation is typ:
+                    return True
+                if typ.__name__ == annotation_str:
+                    return True
         except Exception:  # noqa: BLE001
             pass
 

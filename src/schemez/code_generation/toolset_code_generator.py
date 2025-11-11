@@ -57,6 +57,7 @@ class ToolsetCodeGenerator:
         callables: Sequence[Callable],
         include_signatures: bool = True,
         include_docstrings: bool = True,
+        exclude_types: list[type] | None = None,
     ) -> ToolsetCodeGenerator:
         """Create a ToolsetCodeGenerator from a sequence of Tools.
 
@@ -64,11 +65,16 @@ class ToolsetCodeGenerator:
             callables: Callables to generate code for
             include_signatures: Include function signatures in documentation
             include_docstrings: Include function docstrings in documentation
+            exclude_types: Parameter Types to exclude from the generated code
+                           Often used for context parameters.
 
         Returns:
             ToolsetCodeGenerator instance
         """
-        generators = [ToolCodeGenerator.from_callable(i) for i in callables]
+        generators = [
+            ToolCodeGenerator.from_callable(i, exclude_types=exclude_types)
+            for i in callables
+        ]
         return cls(generators, include_signatures, include_docstrings)
 
     def generate_tool_description(self) -> str:
@@ -150,9 +156,11 @@ class ToolsetCodeGenerator:
 
 
 if __name__ == "__main__":
-    import webbrowser
 
-    generator = ToolsetCodeGenerator.from_callables([webbrowser.open])
+    async def no_annotations_func(test):
+        pass
+
+    generator = ToolsetCodeGenerator.from_callables([no_annotations_func])
     models = generator.generate_return_models()
     print(models)
     namespace = generator.generate_execution_namespace()
