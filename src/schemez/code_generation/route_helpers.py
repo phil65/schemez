@@ -6,7 +6,7 @@ import asyncio
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from schemez.schema import json_schema_to_base_model
+from schemez.schema_to_type.simple_impl import json_schema_to_base_model
 
 
 if TYPE_CHECKING:
