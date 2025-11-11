@@ -179,21 +179,48 @@ class ToolCodeGenerator:
                 return False
 
             annotation = param.annotation
-            annotation_str = str(annotation)
-
-            # Get the origin type for generics (e.g., RunContext from RunContext[T])
-            origin_annotation = get_origin(annotation) or annotation
 
             for typ in self.exclude_types:
-                # Direct type match
-                if annotation is typ:
+                if self._types_match(annotation, typ):
                     return True
-                # Generic type match - check if the origin matches
-                if origin_annotation is typ:
+        except Exception:  # noqa: BLE001
+            pass
+
+        return False
+
+    def _types_match(self, annotation: Any, exclude_type: type) -> bool:
+        """Check if annotation matches exclude_type using various strategies."""
+        try:
+            # Direct type match
+            if annotation is exclude_type:
+                return True
+
+            # Handle generic types - get origin for comparison
+            origin_annotation = get_origin(annotation)
+            if origin_annotation is exclude_type:
+                return True
+
+            # String-based comparison for forward references and __future__.annotations
+            annotation_str = str(annotation)
+            exclude_type_name = exclude_type.__name__
+            exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
+
+            # Check various string representations
+            if (
+                exclude_type_name in annotation_str
+                or exclude_type_full_name in annotation_str
+            ):
+                # Be more specific to avoid false positives
+                # Check if it's the exact type name, not just a substring
+                import re
+
+                patterns = [
+                    rf"\b{re.escape(exclude_type_name)}\b",
+                    rf"\b{re.escape(exclude_type_full_name)}\b",
+                ]
+                if any(re.search(pattern, annotation_str) for pattern in patterns):
                     return True
-                # String-based fallback for edge cases
-                if typ.__name__ == annotation_str:
-                    return True
+
         except Exception:  # noqa: BLE001
             pass
 
