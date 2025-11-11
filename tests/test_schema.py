@@ -17,7 +17,7 @@ class SimpleModel(BaseModel):
 async def test_model_to_python_code():
     """Test converting a BaseModel to Python code."""
     try:
-        code = await model_to_python_code(SimpleModel)
+        code = model_to_python_code(SimpleModel)
 
         # Basic checks for generated code
         assert "class SimpleModel" in code

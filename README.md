@@ -81,7 +81,7 @@ schema = create_schema(search_users)
 
 ### Key Methods
 
-#### OpenAI Integration
+#### schema output
 ```python
 # Get OpenAI-compatible tool definition
 openai_tool = schema.model_dump_openai()
@@ -155,7 +155,7 @@ functions = [get_weather, search_users]
 generator = ToolsetCodeGenerator.from_callables(functions)
 
 # Generate HTTP client code
-client_code = await generator.generate_client_code(
+client_code = generator.generate_client_code(
     base_url="https://api.example.com",
     path_prefix="/v1/tools"
 )
@@ -249,7 +249,7 @@ schema2 = create_schema(search_users)
 
 # Generate client code from schemas
 generator = ToolsetCodeGenerator.from_schemas([schema1, schema2])
-client_code = await generator.generate_client_code()
+client_code = generator.generate_client_code()
 
 # Works for client generation, signatures, models
 # Routes require actual callables for execution

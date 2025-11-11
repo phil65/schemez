@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -170,14 +169,14 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
             raise ValueError(msg) from e
 
 
-async def model_to_python_code(
+def model_to_python_code(
     model: type[BaseModel] | dict[str, Any],
     *,
     class_name: str | None = None,
     target_python_version: PythonVersionStr | None = None,
     model_type: str = "pydantic.BaseModel",
 ) -> str:
-    """Convert a BaseModel or schema dict to Python code asynchronously.
+    """Convert a BaseModel or schema dict to Python code.
 
     Args:
         model: The BaseModel class or schema dictionary to convert
@@ -241,10 +240,5 @@ if __name__ == "__main__":
         test_float: float = 1.1
         test_bool: bool = True
 
-    async def main():
-        code = await model_to_python_code(TestModel)
-        print(code)
-
-    import asyncio
-
-    asyncio.run(main())
+    code = model_to_python_code(TestModel)
+    print(code)

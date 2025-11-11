@@ -201,7 +201,7 @@ class ToolsetCodeGenerator:
                 raise ValueError(msg)
             generator.add_route_to_app(app, path_prefix)
 
-    async def generate_client_code(
+    def generate_client_code(
         self, base_url: str = "http://localhost:8000", path_prefix: str = "/tools"
     ) -> str:
         """Generate HTTP client code for all tools.
@@ -254,7 +254,7 @@ from datetime import datetime
                     words = [word.title() for word in generator.name.split("_")]
                     input_class_name = f"{''.join(words)}Input"
 
-                    model_code = await model_to_python_code(
+                    model_code = model_to_python_code(
                         params_schema, class_name=input_class_name
                     )
                     if model_code:
@@ -307,7 +307,7 @@ async def {generator.name}(input: {input_class_name}) -> str:
         logger.info("Client code generation completed in %.2fs", elapsed)
         return client_code
 
-    async def generate_function_stubs(self) -> str:
+    def generate_function_stubs(self) -> str:
         """Generate clean function stubs for LLM consumption.
 
         Returns Python code with just signatures, docstrings, and input models
@@ -337,7 +337,7 @@ async def {generator.name}(input: {input_class_name}) -> str:
                     words = [word.title() for word in generator.name.split("_")]
                     input_class_name = f"{''.join(words)}Input"
 
-                    model_code = await model_to_python_code(
+                    model_code = model_to_python_code(
                         params_schema, class_name=input_class_name
                     )
                     if model_code:
@@ -359,13 +359,12 @@ async def {generator.name}(input: {input_class_name}) -> str:
 
             # Get return type hint from schema or default to str
             try:
-                signature = generator.schema.to_python_signature()
+                signature_str = str(generator.schema.to_python_signature())
                 # Extract return type from signature
-                if " -> " in signature:
-                    return_hint = signature.split(" -> ")[1]
-                else:
-                    return_hint = "Any"
-            except Exception:
+                return_hint = (
+                    signature_str.split(" -> ")[1] if " -> " in signature_str else "Any"
+                )
+            except Exception:  # noqa: BLE001
                 return_hint = "Any"
 
             stub_code = f'''
@@ -440,8 +439,6 @@ if __name__ == "__main__":
     generator = ToolsetCodeGenerator.from_callables([greet, add_numbers])
 
     # Test client code generation
-    import asyncio
-
-    client_code = asyncio.run(generator.generate_client_code())
+    client_code = generator.generate_client_code()
     print("Generated client code:")
     print(client_code)

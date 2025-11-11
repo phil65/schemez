@@ -239,7 +239,7 @@ class Schema(BaseModel):
         """
         from schemez.helpers import model_to_python_code
 
-        return await model_to_python_code(
+        return model_to_python_code(
             cls,
             class_name=class_name,
             target_python_version=target_python_version,
