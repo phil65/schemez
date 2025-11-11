@@ -698,27 +698,63 @@ def create_schema(
         raise TypeError(msg)
 
     exclude_types = exclude_types or []
-
-    if mode == "openai":
-        return _create_schema_pydantic(
-            func,
-            name_override,
-            description_override,
-            exclude_types,
-            use_openai_format=True,
+    if mode == "original":
+        return _create_schema_original(
+            func, name_override, description_override, exclude_types
         )
-    if mode == "jsonschema":
-        return _create_schema_pydantic(
-            func,
-            name_override,
-            description_override,
-            exclude_types,
-            use_openai_format=False,
-        )
-    # mode == "original" or fallback
-    return _create_schema_original(
-        func, name_override, description_override, exclude_types
+    return _create_schema_pydantic(
+        func,
+        name_override,
+        description_override,
+        exclude_types,
+        use_openai_format=mode == "openai",
     )
+
+
+def _resolve_json_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
+    """Resolve JSON schema $ref references inline.
+
+    Args:
+        schema: JSON schema with potential $defs and $ref references
+
+    Returns:
+        Schema with all references resolved inline
+    """
+    defs = schema.get("$defs", {})
+
+    def resolve_ref(obj: dict[str, Any]) -> dict[str, Any]:
+        """Recursively resolve $ref references in an object."""
+        if "$ref" in obj:
+            ref_path = obj["$ref"]
+            if ref_path.startswith("#/$defs/"):
+                def_name = ref_path.split("/")[-1]
+                if def_name in defs:
+                    # Resolve the reference and recursively resolve any nested refs
+                    resolved = resolve_ref(defs[def_name].copy())
+                    # Preserve other fields from the original object (like description)
+                    result = {k: v for k, v in obj.items() if k != "$ref"}
+                    result.update(resolved)
+                    return result
+            # If reference can't be resolved, return as string type
+            return {"type": "string", "description": f"Unresolved reference: {ref_path}"}
+
+        # Recursively resolve references in nested objects
+        result = {}
+        for key, value in obj.items():
+            if isinstance(value, dict):
+                result[key] = resolve_ref(value)
+            elif isinstance(value, list):
+                result[key] = [
+                    resolve_ref(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                result[key] = value
+        return result
+
+    # Create a copy without $defs and resolve all references
+    resolved_schema = {k: v for k, v in schema.items() if k != "$defs"}
+    return resolve_ref(resolved_schema)
 
 
 def _create_schema_pydantic(
@@ -761,83 +797,150 @@ def _create_schema_pydantic(
 
     type_hints = _typing_extra.get_function_type_hints(func)
 
-    # Parse docstring for parameter descriptions
-    import docstring_parser
-
-    docstring = docstring_parser.parse(func.__doc__ or "")
-    param_descriptions = {
-        p.arg_name: p.description for p in docstring.params if p.description
-    }
-
-    fields: dict[str, core_schema.TypedDictField] = {}
-    required_fields: list[str] = []
-
-    # Process parameters
-    for name, param in sig.parameters.items():
-        # Skip self parameter
-        if name == "self" and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-            continue
-
-        # Skip *args and **kwargs
-        if param.kind in {
-            inspect.Parameter.VAR_POSITIONAL,
-            inspect.Parameter.VAR_KEYWORD,
-        }:
-            continue
-
-        # Get parameter annotation
-        if param.annotation is sig.empty:
-            annotation = Any
-        else:
-            annotation = type_hints.get(name, param.annotation)
-
-        # Skip excluded types
-        if any(_types_match(annotation, exclude_type) for exclude_type in exclude_types):
-            continue
-
-        # Create field info
-        required = param.default is inspect.Parameter.empty
-        if required:
-            field_info = FieldInfo.from_annotation(annotation)
-            required_fields.append(name)
-        else:
-            field_info = FieldInfo.from_annotated_attribute(annotation, param.default)
-
-        # Add description from docstring if available
-        if name in param_descriptions:
-            field_info.description = param_descriptions[name]
-
-        # Generate typed dict field
-        from pydantic._internal import _decorators
-
-        td_field = gen_schema._generate_td_field_schema(
-            name,
-            field_info,
-            _decorators.DecoratorInfos(),
-            required=required,
+    # Use pydantic-ai's approach for robust schema generation
+    try:
+        from pydantic_ai._function_schema import (
+            function_schema as pydantic_ai_function_schema,
         )
-        fields[name] = td_field
 
-    # Create typed dict schema
-    core_config = config_wrapper.core_config(None)
-    core_config["extra_fields_behavior"] = "forbid"
+        # Create a wrapper function without excluded parameters
+        if exclude_types:
+            # Create a new signature without excluded parameters
+            orig_sig = sig
+            filtered_params = []
+            for param in orig_sig.parameters.values():
+                # Get parameter annotation
+                if param.annotation is orig_sig.empty:
+                    annotation = Any
+                else:
+                    annotation = type_hints.get(param.name, param.annotation)
 
-    schema_dict = core_schema.typed_dict_schema(
-        fields,
-        config=core_config,
-    )
+                # Skip excluded types
+                if not any(
+                    _types_match(annotation, exclude_type)
+                    for exclude_type in exclude_types
+                ):
+                    filtered_params.append(param)
 
-    # Generate JSON schema
-    json_schema = schema_generator.generate(schema_dict)
+            # Create new signature
+            new_sig = orig_sig.replace(parameters=filtered_params)
+            func.__signature__ = new_sig
 
-    # Extract parameters
-    parameters: ToolParameters = {
-        "type": "object",
-        "properties": json_schema.get("properties", {}),
-    }
+        # Use pydantic-ai's function_schema
+        pydantic_ai_schema = pydantic_ai_function_schema(
+            func, schema_generator.__class__, takes_ctx=False
+        )
 
-    if required_fields:
-        parameters["required"] = required_fields
+        # Convert to our format
+        json_schema = pydantic_ai_schema.json_schema
+
+        # Resolve $ref references to make it compatible with our type system
+        resolved_schema = _resolve_json_schema_refs(json_schema)
+
+        # Convert complex schema properties using existing conversion function
+        from .typedefs import _convert_complex_property
+
+        converted_properties = {}
+        for prop_name, prop_schema in resolved_schema.get("properties", {}).items():
+            converted_properties[prop_name] = _convert_complex_property(prop_schema)
+
+        parameters: ToolParameters = {
+            "type": "object",
+            "properties": converted_properties,
+        }
+
+        if "required" in resolved_schema:
+            parameters["required"] = resolved_schema["required"]
+
+        required_fields = resolved_schema.get("required", [])
+
+    except ImportError:
+        # Fallback to original approach if pydantic-ai not available
+
+        # Parse docstring for parameter descriptions
+        import docstring_parser
+
+        docstring = docstring_parser.parse(func.__doc__ or "")
+        param_descriptions = {
+            p.arg_name: p.description for p in docstring.params if p.description
+        }
+
+        fields: dict[str, core_schema.TypedDictField] = {}
+        required_fields: list[str] = []
+
+        # Process parameters
+        for name, param in sig.parameters.items():
+            # Skip self parameter
+            if name == "self" and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                continue
+
+            # Skip *args and **kwargs
+            if param.kind in {
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+            }:
+                continue
+
+            # Get parameter annotation
+            if param.annotation is sig.empty:
+                annotation = Any
+            else:
+                annotation = type_hints.get(name, param.annotation)
+
+            # Skip excluded types
+            if any(
+                _types_match(annotation, exclude_type) for exclude_type in exclude_types
+            ):
+                continue
+
+            # Create field info
+            required = param.default is inspect.Parameter.empty
+            if required:
+                field_info = FieldInfo.from_annotation(annotation)
+                required_fields.append(name)
+            else:
+                field_info = FieldInfo.from_annotated_attribute(annotation, param.default)
+
+            # Add description from docstring if available
+            if name in param_descriptions:
+                field_info.description = param_descriptions[name]
+
+            # Generate typed dict field
+            from pydantic._internal import _decorators
+
+            td_field = gen_schema._generate_td_field_schema(
+                name,
+                field_info,
+                _decorators.DecoratorInfos(),
+                required=required,
+            )
+            fields[name] = td_field
+
+        # Create typed dict schema
+        core_config = config_wrapper.core_config(None)
+        core_config["extra_fields_behavior"] = "forbid"
+
+        schema_dict = core_schema.typed_dict_schema(
+            fields,
+            config=core_config,
+        )
+
+        # Generate JSON schema - this may fail for complex types
+        try:
+            json_schema = schema_generator.generate(schema_dict)
+            # Extract parameters
+            parameters: ToolParameters = {
+                "type": "object",
+                "properties": json_schema.get("properties", {}),
+            }
+
+            if required_fields:
+                parameters["required"] = required_fields
+        except Exception:
+            # If JSON schema generation fails, fall back to original implementation
+            return _create_schema_original(
+                func, name_override, description_override, exclude_types
+            )
 
     # Handle return type
     function_type = _determine_function_type(func)
@@ -865,7 +968,7 @@ def _create_schema_pydantic(
         name=name_override or getattr(func, "__name__", "unknown") or "unknown",
         description=description_override or docstring.short_description,
         parameters=parameters,
-        required=required,
+        required=required_fields,
         returns=returns_dct,
         function_type=function_type,
     )
