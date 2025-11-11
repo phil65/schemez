@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import inspect
 import time
 from typing import TYPE_CHECKING, Any, Literal
@@ -71,9 +71,6 @@ class GeneratedCode:
     imports: str = ""
     """Common imports."""
 
-    exports: list[str] = field(default_factory=list)
-    """Exported names."""
-
     def get_client_code(
         self,
         args_format: ArgsFormat = "explicit",
@@ -91,47 +88,46 @@ class GeneratedCode:
             Formatted client code
         """
         parts = []
-        if self.imports:
-            parts.append(self.imports)
+
+        # Get stub imports for LLM consumption
+        stub_imports = '''"""Generated tool stubs for LLM consumption."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+'''
 
         match (args_format, output_type):
             case ("model", "implementation"):
                 # HTTP client with models
+                if self.imports:
+                    parts.append(self.imports)
                 if self.models:
                     parts.append(self.models)
                 if self.http_methods:
                     parts.append(self.http_methods)
-                if self.exports:
-                    parts.append(f"\n__all__ = {self.exports}\n")
 
             case ("explicit", "implementation"):
                 # HTTP client with explicit signatures
+                if self.imports:
+                    parts.append(self.imports)
                 if self.clean_methods:
                     parts.append(self.clean_methods)
-                if self.exports:
-                    exports = [
-                        name for name in self.exports if not name.endswith("Input")
-                    ]
-                    parts.append(f"\n__all__ = {exports}\n")
 
             case ("model", "stubs"):
-                # Model-based stubs for LLM consumption
+                # Model-based stubs for LLM consumption (minimal imports)
+                parts.append(stub_imports)
                 if self.models:
                     parts.append(self.models)
                 if self.model_stubs:
                     parts.append(self.model_stubs)
-                if self.exports:
-                    parts.append(f"\n__all__ = {self.exports}\n")
 
             case ("explicit", "stubs"):
-                # Explicit signature stubs for LLM consumption
+                # Explicit signature stubs for LLM consumption (minimal imports)
+                parts.append(stub_imports)
                 if self.explicit_stubs:
                     parts.append(self.explicit_stubs)
-                if self.exports:
-                    exports = [
-                        name for name in self.exports if not name.endswith("Input")
-                    ]
-                    parts.append(f"\n__all__ = {exports}\n")
 
             case _:
                 msg = (
@@ -314,7 +310,6 @@ import httpx
         clean_methods_parts = []
         model_stubs_parts = []
         explicit_stubs_parts = []
-        all_exports = []
 
         for generator in self.generators:
             # Generate input model from schema parameters
@@ -331,7 +326,6 @@ import httpx
                     if model_code:
                         cleaned_model = self._clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
-                        all_exports.append(input_class_name)
             except (ValueError, TypeError, AttributeError):
                 input_class_name = None
 
@@ -424,8 +418,6 @@ async def {signature_str}:
 '''
             explicit_stubs_parts.append(explicit_stub)
 
-            all_exports.append(generator.name)
-
         elapsed = time.time() - start_time
         logger.info("Structured code generation completed in %.2fs", elapsed)
 
@@ -436,7 +428,6 @@ async def {signature_str}:
             model_stubs="\n".join(model_stubs_parts),
             explicit_stubs="\n".join(explicit_stubs_parts),
             imports=imports,
-            exports=all_exports,
         )
 
     def add_all_routes(self, app: FastAPI, path_prefix: str = "/tools") -> None:

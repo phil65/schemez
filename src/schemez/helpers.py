@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any, Literal, overload
 from pydantic import BaseModel
 
 
-PythonVersionStr = Literal["3.12", "3.13", "3.14", "3.15"]
+PythonVersionStr = Literal["3.12", "3.13", "3.14"]
 
 
 def json_schema_to_pydantic_code(
     schema_source: str | dict,
     *,
     class_name: str = "Model",
-    target_python_version: str | None = None,
+    target_python_version: PythonVersionStr | None = None,
     base_class: str = "pydantic.BaseModel",
 ) -> str:
     """Generate Pydantic model code from a JSON schema using datamodel-codegen.
@@ -49,7 +49,7 @@ def json_schema_to_pydantic_code(
             py = PythonVersion.PY_313
         case "3.14":
             py = PythonVersion.PY_314
-        case _:
+        case None:
             py = PythonVersion.PY_313
 
     # Get model types
