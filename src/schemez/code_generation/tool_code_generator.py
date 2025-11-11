@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import inspect
-from typing import TYPE_CHECKING, Any, get_origin
+from typing import TYPE_CHECKING, Any
 
 from schemez import create_schema
 from schemez.code_generation.route_helpers import (
@@ -57,7 +57,7 @@ class ToolCodeGenerator:
         exclude_types: list[type] | None = None,
     ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a Tool."""
-        schema = create_schema(fn)
+        schema = create_schema(fn, exclude_types=exclude_types)
         return cls(schema=schema, callable=fn, exclude_types=exclude_types or [])
 
     @property
@@ -115,83 +115,10 @@ class ToolCodeGenerator:
         """Extract function signature using FunctionSchema."""
         try:
             sig = self.schema.to_python_signature()
-            # Filter context parameters
-            filtered_params = [
-                p
-                for p in sig.parameters.values()
-                if not self._is_context_parameter(p.name)
-            ]
-            filtered_sig = sig.replace(parameters=filtered_params)
         except Exception:  # noqa: BLE001
             return f"{self.name}(...) -> Any"
         else:
-            return f"{self.name}{filtered_sig}"
-
-    def _get_callable_signature(self) -> inspect.Signature:
-        """Get signature from callable, respecting wrapped signatures."""
-        # Use wrapped signature if available (for context parameter hiding)
-        return getattr(self.callable, "__signature__", None) or inspect.signature(
-            self.callable
-        )
-
-    def _is_context_parameter(self, param_name: str) -> bool:
-        """Check if a parameter is a context parameter that should be hidden."""
-        try:
-            sig = self._get_callable_signature()
-            if param_name not in sig.parameters:
-                return False
-
-            param = sig.parameters[param_name]
-            if param.annotation == inspect.Parameter.empty:
-                return False
-
-            annotation = param.annotation
-
-            for typ in self.exclude_types:
-                if self._types_match(annotation, typ):
-                    return True
-        except Exception:  # noqa: BLE001
-            pass
-
-        return False
-
-    def _types_match(self, annotation: Any, exclude_type: type) -> bool:
-        """Check if annotation matches exclude_type using various strategies."""
-        try:
-            # Direct type match
-            if annotation is exclude_type:
-                return True
-
-            # Handle generic types - get origin for comparison
-            origin_annotation = get_origin(annotation)
-            if origin_annotation is exclude_type:
-                return True
-
-            # String-based comparison for forward references and __future__.annotations
-            annotation_str = str(annotation)
-            exclude_type_name = exclude_type.__name__
-            exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
-
-            # Check various string representations
-            if (
-                exclude_type_name in annotation_str
-                or exclude_type_full_name in annotation_str
-            ):
-                # Be more specific to avoid false positives
-                # Check if it's the exact type name, not just a substring
-                import re
-
-                patterns = [
-                    rf"\b{re.escape(exclude_type_name)}\b",
-                    rf"\b{re.escape(exclude_type_full_name)}\b",
-                ]
-                if any(re.search(pattern, annotation_str) for pattern in patterns):
-                    return True
-
-        except Exception:  # noqa: BLE001
-            pass
-
-        return False
+            return f"{self.name}{sig}"
 
     def generate_return_model(self) -> str | None:
         """Generate Pydantic model code for the tool's return type."""

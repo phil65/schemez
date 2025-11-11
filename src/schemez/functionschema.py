@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 import types
 import typing
-from typing import Annotated, Any, Literal, NotRequired, Required, TypeGuard
+from typing import Annotated, Any, Literal, NotRequired, Required, TypeGuard, get_origin
 from uuid import UUID
 
 import docstring_parser
@@ -386,6 +386,45 @@ def _is_optional_type(typ: type) -> TypeGuard[type]:
     return any(arg is type(None) for arg in args)
 
 
+def _types_match(annotation: Any, exclude_type: type) -> bool:
+    """Check if annotation matches exclude_type using various strategies."""
+    try:
+        # Direct type match
+        if annotation is exclude_type:
+            return True
+
+        # Handle generic types - get origin for comparison
+        origin_annotation = get_origin(annotation)
+        if origin_annotation is exclude_type:
+            return True
+
+        # String-based comparison for forward references and __future__.annotations
+        annotation_str = str(annotation)
+        exclude_type_name = exclude_type.__name__
+        exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
+
+        # Check various string representations
+        if (
+            exclude_type_name in annotation_str
+            or exclude_type_full_name in annotation_str
+        ):
+            # Be more specific to avoid false positives
+            # Check if it's the exact type name, not just a substring
+            import re
+
+            patterns = [
+                rf"\b{re.escape(exclude_type_name)}\b",
+                rf"\b{re.escape(exclude_type_full_name)}\b",
+            ]
+            if any(re.search(pattern, annotation_str) for pattern in patterns):
+                return True
+
+    except Exception:  # noqa: BLE001
+        pass
+
+    return False
+
+
 def _resolve_type_annotation(
     typ: Any,
     description: str | None = None,
@@ -629,6 +668,7 @@ def create_schema(
     func: Callable[..., Any],
     name_override: str | None = None,
     description_override: str | None = None,
+    exclude_types: list[type] | None = None,
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 
@@ -642,6 +682,7 @@ def create_schema(
         name_override: Optional name override (otherwise the function name)
         description_override: Optional description override
                               (otherwise the function docstring)
+        exclude_types: Types to exclude from parameters (e.g., context types)
 
     Returns:
         Schema representing the function
@@ -652,6 +693,8 @@ def create_schema(
     if not callable(func):
         msg = f"Expected callable, got {type(func)}"
         raise TypeError(msg)
+
+    exclude_types = exclude_types or []
 
     # Parse function signature and docstring
     sig = inspect.signature(func)
@@ -685,12 +728,16 @@ def create_schema(
         }:
             continue
 
+        # Skip parameters with excluded types
+        param_type = hints.get(name, Any)
+        if any(_types_match(param_type, exclude_type) for exclude_type in exclude_types):
+            continue
+
         param_doc = next(
             (p.description for p in docstring.params if p.arg_name == name),
             None,
         )
 
-        param_type = hints.get(name, Any)
         parameters["properties"][name] = _resolve_type_annotation(
             param_type,
             description=param_doc,

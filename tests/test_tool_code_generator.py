@@ -215,28 +215,6 @@ class TestToolCodeGenerator:
         # Data parameter should be present
         assert "data: str" in signature
 
-    def test_is_context_parameter_with_generics(self):
-        """Test the _is_context_parameter method with generic types."""
-        generator = ToolCodeGenerator.from_callable(
-            function_with_generic_context, exclude_types=[RunContext]
-        )
-
-        # Should identify generic context parameter correctly
-        assert generator._is_context_parameter("context")
-        assert not generator._is_context_parameter("name")
-        assert not generator._is_context_parameter("optional_param")
-
-    def test_is_context_parameter_with_multi_generics(self):
-        """Test _is_context_parameter with multi-parameter generics."""
-        generator = ToolCodeGenerator.from_callable(
-            function_with_multi_generic_context, exclude_types=[RequestContext]
-        )
-
-        # Should identify multi-parameter generic correctly
-        assert generator._is_context_parameter("ctx")
-        assert not generator._is_context_parameter("query")
-        assert not generator._is_context_parameter("limit")
-
     def test_no_exclude_types_specified(self):
         """Test behavior when no exclude_types are specified."""
         generator = ToolCodeGenerator.from_callable(function_with_generic_context)
