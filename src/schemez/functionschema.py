@@ -12,11 +12,20 @@ import decimal
 import enum
 import inspect
 import ipaddress
+import json
 from pathlib import Path
 import re
 import types
 import typing
-from typing import Annotated, Any, Literal, NotRequired, Required, TypeGuard, get_origin
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Required,
+    TypeGuard,
+    get_origin,
+)
 from uuid import UUID
 
 import pydantic
@@ -228,62 +237,41 @@ class FunctionSchema(pydantic.BaseModel):
 
         Args:
             class_name: Name for the generated class (default: {name}Response)
-            model_type: Output model type for datamodel-codegen
 
         Returns:
             Generated Python code string
 
         Raises:
-            RuntimeError: If datamodel-codegen is not available
-            subprocess.CalledProcessError: If code generation fails
+            ValueError: If schema parsing fails
         """
-        import shutil
-        import subprocess
-        import tempfile
-
-        # Check if datamodel-codegen is available
-        if not shutil.which("datamodel-codegen"):
-            msg = "datamodel-codegen not available"
-            raise RuntimeError(msg)
+        from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+        from datamodel_code_generator.model import get_data_model_types
+        from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
 
         name = class_name or f"{self.name.title()}Response"
 
-        # Create temporary file with returns schema
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(self.returns, f)
-            schema_file = Path(f.name)
+        model_types = get_data_model_types(
+            DataModelType.PydanticV2BaseModel,
+            target_python_version=PythonVersion.PY_313,
+        )
 
-        try:
-            # Generate model using datamodel-codegen
-            result = subprocess.run(
-                [
-                    "datamodel-codegen",
-                    "--input",
-                    str(schema_file),
-                    "--input-file-type",
-                    "jsonschema",
-                    "--output-model-type",
-                    "pydantic.BaseModel",
-                    "--class-name",
-                    name,
-                    "--disable-timestamp",
-                    "--use-union-operator",
-                    "--use-schema-description",
-                    "--enum-field-as-literal",
-                    "all",
-                    "--target-python-version",
-                    "3.12",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+        parser = JsonSchemaParser(
+            source=json.dumps(self.returns),
+            data_model_type=model_types.data_model,
+            data_model_root_type=model_types.root_model,
+            data_model_field_type=model_types.field_model,
+            data_type_manager_type=model_types.data_type_manager,
+            dump_resolve_reference_action=model_types.dump_resolve_reference_action,
+            class_name=name,
+            base_class="pydantic.BaseModel",
+            use_union_operator=True,
+            use_schema_description=True,
+            enum_field_as_literal=LiteralType.All,
+        )
 
-            return result.stdout.strip()
-
-        finally:
-            # Cleanup temp file
-            schema_file.unlink(missing_ok=True)
+        result = parser.parse()
+        assert isinstance(result, str)
+        return result
 
     def get_annotations(self, return_type: Any = str) -> dict[str, type[Any]]:
         """Get a dictionary of parameter names to their Python types.

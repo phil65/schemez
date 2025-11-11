@@ -4,18 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-import tempfile
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel
-from pydantic_core import to_json
 
 
-PythonVersion = Literal["3.13", "3.14", "3.15"]
+PythonVersionStr = Literal["3.12", "3.13", "3.14", "3.15"]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -180,7 +174,7 @@ async def model_to_python_code(
     model: type[BaseModel] | dict[str, Any],
     *,
     class_name: str | None = None,
-    target_python_version: PythonVersion | None = None,
+    target_python_version: PythonVersionStr | None = None,
     model_type: str = "pydantic.BaseModel",
 ) -> str:
     """Convert a BaseModel or schema dict to Python code asynchronously.
@@ -196,59 +190,61 @@ async def model_to_python_code(
         Generated Python code as string
 
     Raises:
-        RuntimeError: If datamodel-codegen is not available
-        subprocess.CalledProcessError: If code generation fails
+        ValueError: If schema parsing fails
     """
-    # Check if datamodel-codegen is available
-    if not shutil.which("datamodel-codegen"):
-        msg = "datamodel-codegen not available"
-        raise RuntimeError(msg)
-
     if isinstance(model, dict):
         schema = model
         name = class_name or "GeneratedModel"
     else:
         schema = model.model_json_schema()
         name = class_name or model.__name__
-    py = target_python_version or f"{sys.version_info.major}.{sys.version_info.minor}"
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        # Use pydantic_core.to_json for proper schema serialization
-        schema_json = to_json(schema, indent=2).decode()
-        f.write(schema_json)
-        schema_file = Path(f.name)
 
-    args = [
-        "--input",
-        str(schema_file),
-        "--input-file-type",
-        "jsonschema",
-        "--output-model-type",
-        model_type,
-        "--class-name",
-        name,
-        "--disable-timestamp",
-        "--use-union-operator",
-        "--use-schema-description",
-        "--enum-field-as-literal",
-        "all",
-        "--target-python-version",
-        py,
-    ]
+    """Generate Pydantic model code from a JSON schema."""
+    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator.model import get_data_model_types
+    from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
 
-    try:  # Generate model using datamodel-codegen
-        proc = await asyncio.create_subprocess_exec(
-            "datamodel-codegen",
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _stderr = await proc.communicate()
+    match target_python_version:
+        case "3.12":
+            py = PythonVersion.PY_312
+        case "3.13" | None:
+            py = PythonVersion.PY_313
+        case "3.14":
+            py = PythonVersion.PY_314
+    model_types = get_data_model_types(
+        DataModelType.PydanticV2BaseModel,
+        target_python_version=py,
+    )
+    parser = JsonSchemaParser(
+        source=str(schema),
+        data_model_type=model_types.data_model,
+        data_model_root_type=model_types.root_model,
+        data_model_field_type=model_types.field_model,
+        data_type_manager_type=model_types.data_type_manager,
+        dump_resolve_reference_action=model_types.dump_resolve_reference_action,
+        class_name=name,
+        base_class=model_type,
+        use_union_operator=True,
+        use_schema_description=True,
+        enum_field_as_literal=LiteralType.All,
+    )
+    result = parser.parse()
+    assert isinstance(result, str)
+    return result
 
-        if proc.returncode != 0:
-            code = proc.returncode or -1
-            raise subprocess.CalledProcessError(code, "datamodel-codegen")
 
-        return stdout.decode().strip()
+if __name__ == "__main__":
 
-    finally:  # Cleanup temp file
-        schema_file.unlink(missing_ok=True)
+    class TestModel(BaseModel):
+        test_int: int = 1
+        test_str: str = "test"
+        test_float: float = 1.1
+        test_bool: bool = True
+
+    async def main():
+        code = await model_to_python_code(TestModel)
+        print(code)
+
+    import asyncio
+
+    asyncio.run(main())
