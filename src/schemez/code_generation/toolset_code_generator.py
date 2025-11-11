@@ -5,16 +5,22 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 import inspect
+import time
 from typing import TYPE_CHECKING, Any
 
+from schemez import log
 from schemez.code_generation.namespace_callable import NamespaceCallable
 from schemez.code_generation.tool_code_generator import ToolCodeGenerator
+from schemez.helpers import model_to_python_code
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from fastapi import FastAPI
+
+
+logger = log.get_logger(__name__)
 
 
 USAGE = """\
@@ -154,14 +160,160 @@ class ToolsetCodeGenerator:
         for generator in self.generators:
             generator.add_route_to_app(app, path_prefix)
 
+    async def generate_client_code(
+        self, base_url: str = "http://localhost:8000", path_prefix: str = "/tools"
+    ) -> str:
+        """Generate HTTP client code for all tools.
+
+        Creates a complete Python module with HTTP wrapper functions that call
+        the corresponding server endpoints. This is the client-side counterpart
+        to the `add_all_routes` method.
+
+        Args:
+            base_url: Base URL of the tool server
+            path_prefix: Path prefix for routes (must match server-side)
+
+        Returns:
+            Complete Python module code with:
+            - Pydantic input models for each tool
+            - Async HTTP wrapper functions
+            - Proper imports and exports
+
+        Example:
+            >>> toolset = ToolsetCodeGenerator.from_callables([greet, add_numbers])
+            >>> client_code = await toolset.generate_client_code()
+            >>> # Save to file or exec() the generated code
+        """
+        start_time = time.time()
+        logger.info("Starting client code generation")
+
+        code_parts: list[str] = []
+
+        # Module header
+        header = '''"""Generated HTTP client tools."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+from typing import Literal, List, Any, Dict
+from datetime import datetime
+
+'''
+        code_parts.append(header)
+
+        # Generate models and wrappers for each tool
+        all_exports = []
+        for generator in self.generators:
+            # Generate input model from schema parameters
+            try:
+                # Get parameters schema and generate model if it has properties
+                params_schema = generator.schema.parameters
+                if params_schema.get("properties"):
+                    # Use the same pattern as HttpToolExecutor
+                    words = [word.title() for word in generator.name.split("_")]
+                    input_class_name = f"{''.join(words)}Input"
+
+                    model_code = await model_to_python_code(
+                        params_schema, class_name=input_class_name
+                    )
+                    if model_code:
+                        # Clean up the model code (remove duplicate imports)
+                        cleaned_model = self._clean_generated_code(model_code)
+                        code_parts.append(cleaned_model)
+                    else:
+                        # Fallback for tools without parameters
+                        input_class_name = "BaseModel"
+                else:
+                    # No parameters, use BaseModel
+                    input_class_name = "BaseModel"
+            except Exception:
+                # Fallback input model
+                input_class_name = "BaseModel"
+
+            # Generate HTTP wrapper function
+            description = generator.schema.description or f"Call {generator.name} tool"
+            wrapper_code = f'''
+async def {generator.name}(input: {input_class_name}) -> str:
+    """{description}
+
+    Args:
+        input: Function parameters
+
+    Returns:
+        String response from the tool server
+    """
+    import httpx
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "{base_url}{path_prefix}/{generator.name}",
+            params=input.model_dump() if hasattr(input, 'model_dump') else {{}},
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.text
+'''
+            code_parts.append(wrapper_code)
+
+            if input_class_name != "BaseModel":
+                all_exports.append(input_class_name)
+            all_exports.append(generator.name)
+
+        # Add exports
+        code_parts.append(f"\n__all__ = {all_exports}\n")
+
+        client_code = "\n".join(code_parts)
+        elapsed = time.time() - start_time
+        logger.info(f"Client code generation completed in {elapsed:.2f}s")
+        return client_code
+
+    def _clean_generated_code(self, code: str) -> str:
+        """Clean up generated code by removing redundant imports and headers."""
+        lines = code.split("\n")
+        cleaned_lines = []
+        skip_until_class = True
+
+        for line in lines:
+            # Skip lines until we find a class or other meaningful content
+            if skip_until_class:
+                if line.strip().startswith("class ") or (
+                    line.strip()
+                    and not line.startswith("#")
+                    and not line.startswith("from __future__")
+                    and not line.startswith("from pydantic import")
+                    and not line.startswith("from typing import")
+                    and not line.startswith("from datetime import")
+                ):
+                    skip_until_class = False
+                    cleaned_lines.append(line)
+                continue
+            # Skip redundant imports that are already in the header
+            if (
+                line.strip().startswith("from __future__")
+                or line.strip().startswith("from pydantic import")
+                or line.strip().startswith("from typing import")
+                or line.strip().startswith("from datetime import")
+            ):
+                continue
+            cleaned_lines.append(line)
+
+        return "\n".join(cleaned_lines)
+
 
 if __name__ == "__main__":
 
-    async def no_annotations_func(test):
-        pass
+    def greet(name: str, greeting: str = "Hello") -> str:
+        """Greet someone with a custom message."""
+        return f"{greeting}, {name}!"
 
-    generator = ToolsetCodeGenerator.from_callables([no_annotations_func])
-    models = generator.generate_return_models()
-    print(models)
-    namespace = generator.generate_execution_namespace()
-    print(namespace)
+    def add_numbers(a: int, b: int) -> int:
+        """Add two numbers together."""
+        return a + b
+
+    generator = ToolsetCodeGenerator.from_callables([greet, add_numbers])
+
+    # Test client code generation
+    import asyncio
+
+    client_code = asyncio.run(generator.generate_client_code())
+    print("Generated client code:")
+    print(client_code)
