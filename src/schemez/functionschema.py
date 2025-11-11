@@ -12,7 +12,6 @@ import decimal
 import enum
 import inspect
 import ipaddress
-import json
 from pathlib import Path
 import re
 import types
@@ -234,8 +233,8 @@ class FunctionSchema(pydantic.BaseModel):
         param_type = type_map.get(self.returns.get("type", "string"), Any)
         return inspect.Signature(parameters=parameters, return_annotation=param_type)
 
-    def to_pydantic_model_code(self, class_name: str | None = None) -> str:
-        """Generate Pydantic model code using datamodel-codegen.
+    def to_return_model_code(self, class_name: str | None = None) -> str:
+        """Generate Pydantic model code for return type using datamodel-codegen.
 
         Args:
             class_name: Name for the generated class (default: {name}Response)
@@ -246,34 +245,35 @@ class FunctionSchema(pydantic.BaseModel):
         Raises:
             ValueError: If schema parsing fails
         """
-        from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
-        from datamodel_code_generator.model import get_data_model_types
-        from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
+        from schemez.helpers import json_schema_to_pydantic_code
 
         name = class_name or f"{self.name.title()}Response"
-
-        model_types = get_data_model_types(
-            DataModelType.PydanticV2BaseModel,
-            target_python_version=PythonVersion.PY_313,
-        )
-
-        parser = JsonSchemaParser(
-            source=json.dumps(self.returns),
-            data_model_type=model_types.data_model,
-            data_model_root_type=model_types.root_model,
-            data_model_field_type=model_types.field_model,
-            data_type_manager_type=model_types.data_type_manager,
-            dump_resolve_reference_action=model_types.dump_resolve_reference_action,
+        return json_schema_to_pydantic_code(
+            schema_source=self.returns,
             class_name=name,
-            base_class="pydantic.BaseModel",
-            use_union_operator=True,
-            use_schema_description=True,
-            enum_field_as_literal=LiteralType.All,
+            target_python_version="3.13",
         )
 
-        result = parser.parse()
-        assert isinstance(result, str)
-        return result
+    def to_parameter_model_code(self, class_name: str | None = None) -> str:
+        """Generate Pydantic model code for parameters using datamodel-codegen.
+
+        Args:
+            class_name: Name for the generated class (default: {name}Params)
+
+        Returns:
+            Generated Python code string
+
+        Raises:
+            ValueError: If schema parsing fails
+        """
+        from schemez.helpers import json_schema_to_pydantic_code
+
+        name = class_name or f"{self.name.title()}Params"
+        return json_schema_to_pydantic_code(
+            schema_source=self.parameters,
+            class_name=name,
+            target_python_version="3.13",
+        )
 
     def get_annotations(self, return_type: Any = str) -> dict[str, type[Any]]:
         """Get a dictionary of parameter names to their Python types.
@@ -1072,7 +1072,6 @@ def _create_schema_simple(
 
 
 if __name__ == "__main__":
-    import json
 
     def get_weather(
         location: str,

@@ -10,6 +10,120 @@ from pydantic import BaseModel
 
 PythonVersionStr = Literal["3.12", "3.13", "3.14", "3.15"]
 
+
+def json_schema_to_pydantic_code(
+    schema_source: str | dict,
+    *,
+    class_name: str = "Model",
+    target_python_version: str | None = None,
+    base_class: str = "pydantic.BaseModel",
+) -> str:
+    """Generate Pydantic model code from a JSON schema using datamodel-codegen.
+
+    Args:
+        schema_source: JSON schema as string or dict
+        class_name: Name for the generated class
+        target_python_version: Python version target (3.12, 3.13, 3.14)
+        base_class: Base class for generated model
+
+    Returns:
+        Generated Python code string
+    """
+    import json
+
+    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator.model import get_data_model_types
+    from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
+
+    # Convert schema to JSON string if needed
+    if isinstance(schema_source, dict):
+        source = json.dumps(schema_source)
+    else:
+        source = str(schema_source)
+
+    # Determine Python version
+    match target_python_version:
+        case "3.12":
+            py = PythonVersion.PY_312
+        case "3.13" | None:
+            py = PythonVersion.PY_313
+        case "3.14":
+            py = PythonVersion.PY_314
+        case _:
+            py = PythonVersion.PY_313
+
+    # Get model types
+    model_types = get_data_model_types(
+        DataModelType.PydanticV2BaseModel,
+        target_python_version=py,
+    )
+
+    # Create parser with standard configuration
+    parser = JsonSchemaParser(
+        source=source,
+        data_model_type=model_types.data_model,
+        data_model_root_type=model_types.root_model,
+        data_model_field_type=model_types.field_model,
+        data_type_manager_type=model_types.data_type_manager,
+        dump_resolve_reference_action=model_types.dump_resolve_reference_action,
+        class_name=class_name,
+        base_class=base_class,
+        use_union_operator=True,
+        use_schema_description=True,
+        enum_field_as_literal=LiteralType.All,
+    )
+
+    result = parser.parse()
+    assert isinstance(result, str)
+    return result
+
+
+def json_schema_to_pydantic_class(
+    json_schema: str | dict, class_name: str = "DynamicModel"
+) -> type[BaseModel]:
+    """Create a Pydantic v2 model class from a JSON schema.
+
+    Args:
+        json_schema: The JSON schema to create a model from
+        class_name: Name for the generated class
+
+    Returns:
+        A new Pydantic v2 model class based on the JSON schema
+    """
+    # Generate code and create class dynamically
+    code = json_schema_to_pydantic_code(
+        schema_source=json_schema,
+        class_name=class_name,
+        target_python_version="3.13",
+    )
+
+    # Execute the generated code to create the class
+    namespace: dict[str, Any] = {}
+    exec(code, namespace, namespace)
+
+    # Find the generated model class by name
+    model = namespace.get(class_name)
+    if model and isinstance(model, type) and issubclass(model, BaseModel):
+        model.__module__ = __name__
+        return model
+
+    # Fallback: find any BaseModel subclass
+    for v in namespace.values():
+        if isinstance(v, type) and issubclass(v, BaseModel) and v != BaseModel:
+            model = v
+            break
+
+    if not model:
+        msg = (
+            f"Could not find generated model class '{class_name}' "
+            f"in: {list(namespace.keys())}"
+        )
+        raise Exception(msg)  # noqa: TRY002
+
+    model.__module__ = __name__
+    return model
+
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -198,38 +312,12 @@ def model_to_python_code(
         schema = model.model_json_schema()
         name = class_name or model.__name__
 
-    """Generate Pydantic model code from a JSON schema."""
-    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
-    from datamodel_code_generator.model import get_data_model_types
-    from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
-
-    match target_python_version:
-        case "3.12":
-            py = PythonVersion.PY_312
-        case "3.13" | None:
-            py = PythonVersion.PY_313
-        case "3.14":
-            py = PythonVersion.PY_314
-    model_types = get_data_model_types(
-        DataModelType.PydanticV2BaseModel,
-        target_python_version=py,
-    )
-    parser = JsonSchemaParser(
-        source=str(schema),
-        data_model_type=model_types.data_model,
-        data_model_root_type=model_types.root_model,
-        data_model_field_type=model_types.field_model,
-        data_type_manager_type=model_types.data_type_manager,
-        dump_resolve_reference_action=model_types.dump_resolve_reference_action,
+    return json_schema_to_pydantic_code(
+        schema_source=schema,
         class_name=name,
+        target_python_version=target_python_version,
         base_class=model_type,
-        use_union_operator=True,
-        use_schema_description=True,
-        enum_field_as_literal=LiteralType.All,
     )
-    result = parser.parse()
-    assert isinstance(result, str)
-    return result
 
 
 if __name__ == "__main__":

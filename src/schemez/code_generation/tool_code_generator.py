@@ -99,7 +99,20 @@ class ToolCodeGenerator:
                 return None
 
             class_name = f"{self.name.title()}Response"
-            model_code = self.schema.to_pydantic_model_code(class_name=class_name)
+            model_code = self.schema.to_return_model_code(class_name=class_name)
+            return model_code.strip() or None
+
+        except Exception:  # noqa: BLE001
+            return None
+
+    def generate_parameter_model(self) -> str | None:
+        """Generate Pydantic model code for the tool's parameters."""
+        try:
+            if not self.schema.parameters.get("properties"):
+                return None
+
+            class_name = f"{self.name.title()}Params"
+            model_code = self.schema.to_parameter_model_code(class_name=class_name)
             return model_code.strip() or None
 
         except Exception:  # noqa: BLE001

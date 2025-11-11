@@ -79,38 +79,9 @@ class Schema(BaseModel):
         Returns:
             A new schema model class based on the JSON schema
         """
-        from datamodel_code_generator import DataModelType, PythonVersion
-        from datamodel_code_generator.model import get_data_model_types
-        from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
-        from pydantic.v1.main import ModelMetaclass
+        from schemez.helpers import json_schema_to_pydantic_class
 
-        data_model_types = get_data_model_types(
-            DataModelType.PydanticBaseModel, target_python_version=PythonVersion.PY_312
-        )
-        parser = JsonSchemaParser(
-            f"""{json_schema}""",
-            data_model_type=data_model_types.data_model,
-            data_model_root_type=data_model_types.root_model,
-            data_model_field_type=data_model_types.field_model,
-            data_type_manager_type=data_model_types.data_type_manager,
-            dump_resolve_reference_action=data_model_types.dump_resolve_reference_action,
-        )
-        code_str = (
-            parser.parse()
-            .replace("from pydantic ", "from pydantic.v1 ")  # type: ignore
-            .replace("from __future__ import annotations\n\n", "")
-        )
-        ex_namespace: dict[str, Any] = {}
-        exec(code_str, ex_namespace, ex_namespace)
-        model = None
-        for v in ex_namespace.values():
-            if isinstance(v, ModelMetaclass):
-                model = v
-        if not model:
-            msg = "Class not found in output"
-            raise Exception(msg)  # noqa: TRY002
-        model.__module__ = __name__
-        return model  # type: ignore
+        return json_schema_to_pydantic_class(json_schema, class_name="GeneratedSchema")
 
     @classmethod
     async def from_vision_llm(
