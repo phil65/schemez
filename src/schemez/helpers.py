@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from pydantic import BaseModel
 
@@ -78,27 +78,68 @@ def json_schema_to_pydantic_code(
     return result
 
 
+@overload
+def json_schema_to_pydantic_class[TBaseModel: BaseModel](
+    json_schema: str | dict,
+    class_name: str = "DynamicModel",
+    *,
+    base_class: type[TBaseModel],
+) -> type[TBaseModel]: ...
+
+
+@overload
 def json_schema_to_pydantic_class(
-    json_schema: str | dict, class_name: str = "DynamicModel"
+    json_schema: str | dict,
+    class_name: str = "DynamicModel",
+    *,
+    base_class: str = "pydantic.BaseModel",
+) -> type[BaseModel]: ...
+
+
+def json_schema_to_pydantic_class(
+    json_schema: str | dict,
+    class_name: str = "DynamicModel",
+    *,
+    base_class: type[BaseModel] | str = "pydantic.BaseModel",
 ) -> type[BaseModel]:
     """Create a Pydantic v2 model class from a JSON schema.
 
     Args:
         json_schema: The JSON schema to create a model from
         class_name: Name for the generated class
+        base_class: Base class for the generated model
 
     Returns:
         A new Pydantic v2 model class based on the JSON schema
     """
     # Generate code and create class dynamically
+    if isinstance(base_class, str):
+        base_class_str = base_class
+        namespace: dict[str, Any] = {}
+    else:
+        # For class objects, use simple name and add to namespace
+        base_class_str = base_class.__name__
+        namespace = {base_class.__name__: base_class}
+
     code = json_schema_to_pydantic_code(
         schema_source=json_schema,
         class_name=class_name,
         target_python_version="3.13",
+        base_class=base_class_str,
     )
 
+    # Clean up generated code for custom base classes
+    if not isinstance(base_class, str):
+        # Remove import lines for custom base classes
+        lines = code.split("\n")
+        cleaned_lines = []
+        for line in lines:
+            if line.strip().startswith(f"import {base_class.__name__}"):
+                continue  # Skip the import line
+            cleaned_lines.append(line)
+        code = "\n".join(cleaned_lines)
+
     # Execute the generated code to create the class
-    namespace: dict[str, Any] = {}
     exec(code, namespace, namespace)
 
     # Find the generated model class by name

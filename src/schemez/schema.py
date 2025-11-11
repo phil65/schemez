@@ -81,7 +81,9 @@ class Schema(BaseModel):
         """
         from schemez.helpers import json_schema_to_pydantic_class
 
-        return json_schema_to_pydantic_class(json_schema, class_name="GeneratedSchema")
+        return json_schema_to_pydantic_class(
+            json_schema, class_name="GeneratedSchema", base_class=cls
+        )
 
     @classmethod
     async def from_vision_llm(
