@@ -213,7 +213,16 @@ class FunctionSchema(pydantic.BaseModel):
                 default=default,
             )
             parameters.append(param)
-        return inspect.Signature(parameters=parameters, return_annotation=Any)
+        type_map = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "array": list[Any],  # type: ignore
+            "object": dict[str, Any],  # type: ignore
+        }
+        param_type = type_map.get(self.returns.get("type", "string"), Any)
+        return inspect.Signature(parameters=parameters, return_annotation=param_type)
 
     def to_pydantic_model_code(self, class_name: str | None = None) -> str:
         """Generate Pydantic model code using datamodel-codegen.
@@ -746,7 +755,7 @@ if __name__ == "__main__":
 
     # Create schema and executable function
     schema = create_schema(get_weather)
-
-    # Print the schema
-    print("OpenAI Function Schema:")
-    print(json.dumps(schema.model_dump_openai(), indent=2))
+    signature = schema.to_python_signature()
+    print(signature)
+    text = signature.format()
+    print(text)
