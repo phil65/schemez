@@ -615,14 +615,7 @@ def _resolve_type_annotation(
 
 
 def _determine_function_type(func: Callable[..., Any]) -> FunctionType:
-    """Determine the type of the function.
-
-    Args:
-        func: Function to check
-
-    Returns:
-        FunctionType indicating the function's type
-    """
+    """Determine the type of the function."""
     if inspect.isasyncgenfunction(func):
         return FunctionType.ASYNC_GENERATOR
     if inspect.isgeneratorfunction(func):
