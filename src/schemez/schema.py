@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Self
 from pydantic import BaseModel, ConfigDict, Field, create_model
 import upath
 
+from schemez.helpers import model_to_python_code
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -222,27 +224,28 @@ class Schema(BaseModel):
             raise ValueError(msg) from exc
 
     @classmethod
-    async def to_python_code(
+    def to_python_code(
         cls,
         *,
         class_name: str | None = None,
         target_python_version: PythonVersion | None = None,
+        model_type: str = "pydantic.BaseModel",
     ) -> str:
         """Convert this model to Python code asynchronously.
 
         Args:
             class_name: Optional custom class name for the generated code
             target_python_version: Target Python version for code generation
+            model_type: Type of model to generate
 
         Returns:
             Generated Python code as string
         """
-        from schemez.helpers import model_to_python_code
-
         return model_to_python_code(
             cls,
             class_name=class_name,
             target_python_version=target_python_version,
+            model_type=model_type,
         )
 
 

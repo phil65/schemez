@@ -27,14 +27,14 @@ from schemez.schemadef.schemadef import (
 from schemez.pydantic_types import ModelIdentifier, ModelTemperature, MimeType
 
 from schemez.executable import create_executable, ExecutableFunction
-from schemez.functionschema import FunctionType, create_schema
+from schemez.functionschema import FunctionType, create_schema, FunctionSchema
 from schemez.schema_generators import (
     create_schemas_from_callables,
     create_schemas_from_module,
     create_schemas_from_class,
     create_constructor_schema,
 )
-from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool
+from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool, Property
 from schemez.code_generation import ToolCodeGenerator, ToolsetCodeGenerator
 
 __version__ = version("schemez")
@@ -42,6 +42,7 @@ __version__ = version("schemez")
 
 __all__ = [
     "ExecutableFunction",
+    "FunctionSchema",
     "FunctionType",
     "ImportedSchemaDef",
     "InlineSchemaDef",
@@ -51,6 +52,7 @@ __all__ = [
     "ModelTemperature",
     "OpenAIFunctionDefinition",
     "OpenAIFunctionTool",
+    "Property",
     "PythonCode",
     "Schema",
     "SchemaDef",

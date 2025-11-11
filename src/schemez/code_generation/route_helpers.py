@@ -89,11 +89,19 @@ async def _execute_tool_function(tool_callable: Callable, **kwargs) -> Any:
     Returns:
         Tool execution result
     """
+    import asyncio
+    import inspect
+
     try:
-        # For now, just simulate execution
-        # In real implementation, this would call the actual tool
-        # potentially through sandbox providers
-        return f"Executed {tool_callable.__name__} with params: {kwargs}"
+        # Actually call the tool function
+        if inspect.iscoroutinefunction(tool_callable):
+            result = await tool_callable(**kwargs)
+        else:
+            # Run synchronous function in thread pool to avoid blocking
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: tool_callable(**kwargs)
+            )
+        return result
     except Exception as e:  # noqa: BLE001
         return f"Error executing {tool_callable.__name__}: {e!s}"
 

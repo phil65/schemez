@@ -235,7 +235,7 @@ class ToolsetCodeGenerator:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Any, Dict
 from datetime import datetime
 
@@ -323,7 +323,14 @@ async def {generator.name}(input: {input_class_name}) -> str:
         code_parts: list[str] = []
 
         # Module header
-        header = '"""Available tool functions."""\n\n'
+        header = '''"""Available tool functions."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict
+from typing import Any
+
+'''
         code_parts.append(header)
 
         # Generate models and stubs for each tool

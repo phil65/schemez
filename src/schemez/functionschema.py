@@ -29,6 +29,8 @@ from typing import (
 from uuid import UUID
 
 import pydantic
+from pydantic.fields import FieldInfo
+from pydantic.json_schema import GenerateJsonSchema
 
 from schemez import log
 from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool, ToolParameters
@@ -725,7 +727,7 @@ def create_schema(
     name_override: str | None = None,
     description_override: str | None = None,
     exclude_types: list[type] | None = None,
-    mode: Literal["jsonschema", "openai", "original"] = "original",
+    mode: Literal["jsonschema", "openai", "simple"] = "simple",
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 
@@ -740,9 +742,10 @@ def create_schema(
         description_override: Optional description override
                               (otherwise the function docstring)
         exclude_types: Types to exclude from parameters (e.g., context types)
-        mode: Schema generation mode - "original" (default) uses current implementation,
-              "openai" for OpenAI function calling via Pydantic,
-              "jsonschema" for standard JSON schema via Pydantic
+        mode: Schema generation mode
+              - simple" (default) uses custom simple implementation,
+              - "openai" for OpenAI function calling via Pydantic,
+              - "jsonschema" for standard JSON schema via Pydantic
 
     Returns:
         Schema representing the function
@@ -755,8 +758,8 @@ def create_schema(
         raise TypeError(msg)
 
     exclude_types = exclude_types or []
-    if mode == "original":
-        return _create_schema_original(
+    if mode == "simple":
+        return _create_schema_simple(
             func, name_override, description_override, exclude_types
         )
     return _create_schema_pydantic(
@@ -776,11 +779,8 @@ def _create_schema_pydantic(
     use_openai_format: bool,
 ) -> FunctionSchema:
     """Create schema using Pydantic's internal schema generation."""
-    from pydantic import ConfigDict
     from pydantic._internal import _generate_schema, _typing_extra
     from pydantic._internal._config import ConfigWrapper
-    from pydantic.fields import FieldInfo
-    from pydantic.json_schema import GenerateJsonSchema
     from pydantic_core import core_schema
 
     # Try to use pydantic-ai's OpenAI-compatible generator if available
@@ -797,7 +797,7 @@ def _create_schema_pydantic(
         schema_generator = GenerateJsonSchema()
 
     # Set up Pydantic schema generation
-    config = ConfigDict(title=func.__name__ or "unknown")
+    config = pydantic.ConfigDict(title=func.__name__ or "unknown")
     config_wrapper = ConfigWrapper(config)
     gen_schema = _generate_schema.GenerateSchema(config_wrapper)
 
@@ -947,7 +947,7 @@ def _create_schema_pydantic(
             parameters = fallback_parameters
         except Exception:  # noqa: BLE001
             # If JSON schema generation fails, fall back to original implementation
-            return _create_schema_original(
+            return _create_schema_simple(
                 func, name_override, description_override, exclude_types
             )
 
@@ -982,7 +982,7 @@ def _create_schema_pydantic(
     )
 
 
-def _create_schema_original(
+def _create_schema_simple(
     func: Callable[..., Any],
     name_override: str | None,
     description_override: str | None,
