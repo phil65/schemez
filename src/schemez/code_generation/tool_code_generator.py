@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import inspect
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_origin
 
 from schemez import create_schema
 from schemez.code_generation.route_helpers import (
@@ -58,7 +58,7 @@ class ToolCodeGenerator:
         schema = create_schema(fn).model_dump_openai()
         schema["function"]["name"] = fn.__name__
         schema["function"]["description"] = fn.__doc__ or ""
-        return cls(schema=schema, callable=callable, exclude_types=exclude_types or [])
+        return cls(schema=schema, callable=fn, exclude_types=exclude_types or [])
 
     @property
     def name(self) -> str:
@@ -180,9 +180,18 @@ class ToolCodeGenerator:
 
             annotation = param.annotation
             annotation_str = str(annotation)
+
+            # Get the origin type for generics (e.g., RunContext from RunContext[T])
+            origin_annotation = get_origin(annotation) or annotation
+
             for typ in self.exclude_types:
+                # Direct type match
                 if annotation is typ:
                     return True
+                # Generic type match - check if the origin matches
+                if origin_annotation is typ:
+                    return True
+                # String-based fallback for edge cases
                 if typ.__name__ == annotation_str:
                     return True
         except Exception:  # noqa: BLE001
