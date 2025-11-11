@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-    from schemez.functionschema import FunctionSchema
-    from schemez.typedefs import ToolParameters
+    from schemez.functionschema import FunctionSchema, SchemaType
+    from schemez.functionschema.typedefs import ToolParameters
 
 
 @dataclass
@@ -43,9 +43,10 @@ class ToolCodeGenerator:
         cls,
         fn: Callable,
         exclude_types: list[type] | None = None,
+        schema_type: SchemaType = "simple",
     ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a callable."""
-        schema = create_schema(fn, exclude_types=exclude_types, mode="openai")
+        schema = create_schema(fn, exclude_types=exclude_types, mode=schema_type)
         return cls(schema=schema, callable=fn)
 
     @classmethod

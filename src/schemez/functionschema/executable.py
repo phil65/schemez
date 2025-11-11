@@ -34,11 +34,11 @@ class ExecutableFunction[T_co]:
             schema: OpenAI function schema
             func: The actual function to execute
         """
-        from schemez.functionschema import _determine_function_type
+        from schemez.functionschema import determine_function_type
 
         self.schema = schema
         self.func = func
-        self.function_type = _determine_function_type(self.func)
+        self.function_type = determine_function_type(self.func)
 
     def run(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:  # noqa: PLR0911
         """Run the function synchronously.

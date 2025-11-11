@@ -112,7 +112,7 @@ print(schema.get_annotations())       # Python type annotations
 ### Bulk Schema Generation
 
 ```python
-from schemez.schema_generators import (
+from schemez.functionschema import (
     create_schemas_from_module,
     create_schemas_from_class,
     create_schemas_from_callables

@@ -7,7 +7,7 @@ from typing import Literal
 
 import pydantic
 
-from schemez.schema_generators import create_constructor_schema
+from schemez.functionschema import create_constructor_schema
 
 
 def test_regular_class_constructor_schema() -> None:
@@ -61,12 +61,7 @@ def test_dataclass_constructor_schema() -> None:
 
     assert schema.name == "create_Product"
     assert schema.description == "A product class for testing."
-    assert set(schema.parameters["properties"]) == {
-        "name",
-        "price",
-        "in_stock",
-        "tags",
-    }
+    assert set(schema.parameters["properties"]) == {"name", "price", "in_stock", "tags"}
     assert set(schema.required) == {"name", "price"}
 
     # Check specific property details
@@ -95,12 +90,7 @@ def test_pydantic_model_constructor_schema() -> None:
 
     assert schema.name == "create_Order"
     assert schema.description == "An order class for testing."
-    assert set(schema.parameters["properties"]) == {
-        "id",
-        "items",
-        "status",
-        "notes",
-    }
+    assert set(schema.parameters["properties"]) == {"id", "items", "status", "notes"}
     assert set(schema.required) == {"id", "items"}
 
     # Check specific property details

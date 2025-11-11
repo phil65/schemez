@@ -3,11 +3,8 @@
 import enum
 from typing import Any
 
-from schemez.functionschema import (
-    FunctionSchema,
-    create_schema,
-)
-from schemez.schema_generators import (
+from schemez.functionschema import FunctionSchema, create_schema
+from schemez.functionschema.schema_generators import (
     create_schemas_from_callables,
     create_schemas_from_class,
     create_schemas_from_module,
@@ -159,13 +156,18 @@ def test_create_schemas_from_class() -> None:
 
 def test_create_schemas_from_module() -> None:
     """Test schema generation from modules with different prefix options."""
-    import schemez.schema_generators as schema_module
+    import schemez.functionschema.schema_generators as schema_module
 
     # Test default prefix (module name)
     schemas = create_schemas_from_module(schema_module)
-    assert "schemez.schema_generators.create_schemas_from_callables" in schemas
-    assert "schemez.schema_generators.create_schemas_from_class" in schemas
-    assert "schemez.schema_generators.create_schemas_from_module" in schemas
+    assert (
+        "schemez.functionschema.schema_generators.create_schemas_from_callables"
+        in schemas
+    )
+    assert "schemez.functionschema.schema_generators.create_schemas_from_class" in schemas
+    assert (
+        "schemez.functionschema.schema_generators.create_schemas_from_module" in schemas
+    )
 
     # Test with no prefix
     no_prefix = create_schemas_from_module(schema_module, prefix=False)
@@ -187,7 +189,9 @@ def test_create_schemas_from_module() -> None:
     assert "API.create_schemas_from_callables" in included
 
     # Verify schemas are identical regardless of prefix
-    base_schema = schemas["schemez.schema_generators.create_schemas_from_callables"]
+    base_schema = schemas[
+        "schemez.functionschema.schema_generators.create_schemas_from_callables"
+    ]
     no_prefix_schema = no_prefix["create_schemas_from_callables"]
     custom_schema = custom["API.create_schemas_from_callables"]
 

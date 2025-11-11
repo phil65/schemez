@@ -32,11 +32,15 @@ from pydantic.fields import FieldInfo
 from pydantic.json_schema import GenerateJsonSchema
 
 from schemez import log
-from schemez.typedefs import OpenAIFunctionDefinition, OpenAIFunctionTool, ToolParameters
+from schemez.functionschema.typedefs import (
+    OpenAIFunctionDefinition,
+    OpenAIFunctionTool,
+    ToolParameters,
+)
 
 
 if typing.TYPE_CHECKING:
-    from schemez.typedefs import Property
+    from schemez.functionschema.typedefs import Property
 
 
 logger = log.get_logger(__name__)
@@ -307,7 +311,7 @@ class FunctionSchema(pydantic.BaseModel):
         Raises:
             ValueError: If schema format is invalid or missing required fields
         """
-        from schemez.typedefs import _convert_complex_property
+        from schemez.functionschema.typedefs import _convert_complex_property
 
         # Handle tool wrapper format
         if isinstance(schema, dict):
@@ -417,7 +421,7 @@ def _types_match(annotation: Any, exclude_type: type) -> bool:
     return False
 
 
-def _resolve_type_annotation(
+def resolve_type_annotation(
     typ: Any,
     description: str | None = None,
     default: Any = inspect.Parameter.empty,
@@ -431,7 +435,7 @@ def _resolve_type_annotation(
         default: Default value if any
         is_parameter: Whether this is for a parameter (affects dict schema)
     """
-    from schemez.typedefs import _create_simple_property
+    from schemez.functionschema.typedefs import _create_simple_property
 
     schema: dict[str, Any] = {}
 
@@ -454,7 +458,7 @@ def _resolve_type_annotation(
     if typing.get_origin(typ) is Annotated:
         # Get the underlying type (first argument)
         base_type = typing.get_args(typ)[0]
-        return _resolve_type_annotation(
+        return resolve_type_annotation(
             base_type,
             description=description,
             default=default,
@@ -469,7 +473,7 @@ def _resolve_type_annotation(
         # For Optional (union with None), filter out None type
         non_none_types = [t for t in args if t is not type(None)]
         if non_none_types:
-            prop = _resolve_type_annotation(
+            prop = resolve_type_annotation(
                 non_none_types[0],
                 description=description,
                 default=default,
@@ -485,7 +489,7 @@ def _resolve_type_annotation(
         properties = {}
         required = []
         for field in fields:
-            properties[field.name] = _resolve_type_annotation(
+            properties[field.name] = resolve_type_annotation(
                 field.type,
                 is_parameter=is_parameter,
             )
@@ -517,7 +521,7 @@ def _resolve_type_annotation(
                     typ, "__required_keys__", {field_name}
                 )
 
-            properties[field_name] = _resolve_type_annotation(
+            properties[field_name] = resolve_type_annotation(
                 field_type,
                 is_parameter=is_parameter,
             )
@@ -544,7 +548,7 @@ def _resolve_type_annotation(
                 if value_type is Any:
                     schema["additionalProperties"] = True
                 else:
-                    schema["additionalProperties"] = _resolve_type_annotation(
+                    schema["additionalProperties"] = resolve_type_annotation(
                         value_type,
                         is_parameter=is_parameter,
                     )
@@ -566,7 +570,7 @@ def _resolve_type_annotation(
     ):
         schema["type"] = "array"
         item_type = args[0] if args else Any
-        schema["items"] = _resolve_type_annotation(
+        schema["items"] = resolve_type_annotation(
             item_type,
             is_parameter=is_parameter,
         )
@@ -643,7 +647,7 @@ def _resolve_type_annotation(
                     required = []
                     for field_name, field_info in fields.items():
                         field_type = field_info.annotation
-                        properties[field_name] = _resolve_type_annotation(
+                        properties[field_name] = resolve_type_annotation(
                             field_type,
                             is_parameter=is_parameter,
                         )
@@ -656,7 +660,7 @@ def _resolve_type_annotation(
                     required = []
                     for field_name, field_info in fields.items():
                         field_type = field_info.type_
-                        properties[field_name] = _resolve_type_annotation(
+                        properties[field_name] = resolve_type_annotation(
                             field_type,
                             is_parameter=is_parameter,
                         )
@@ -684,7 +688,7 @@ def _resolve_type_annotation(
     if default is not inspect.Parameter.empty:
         schema["default"] = default
 
-    from schemez.typedefs import (
+    from schemez.functionschema.typedefs import (
         _create_array_property,
         _create_object_property,
         _create_simple_property,
@@ -714,7 +718,7 @@ def _resolve_type_annotation(
     )
 
 
-def _determine_function_type(func: Callable[..., Any]) -> FunctionType:
+def determine_function_type(func: Callable[..., Any]) -> FunctionType:
     """Determine the type of the function."""
     if inspect.isasyncgenfunction(func):
         return FunctionType.ASYNC_GENERATOR
@@ -955,7 +959,7 @@ def _create_schema_pydantic(
             )
 
     # Handle return type
-    function_type = _determine_function_type(func)
+    function_type = determine_function_type(func)
     return_hint = type_hints.get("return", Any)
 
     if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
@@ -965,10 +969,10 @@ def _create_schema_pydantic(
         )
         returns_dct = {
             "type": "array",
-            "items": _resolve_type_annotation(element_type, is_parameter=False),
+            "items": resolve_type_annotation(element_type, is_parameter=False),
         }
     else:
-        returns = _resolve_type_annotation(return_hint, is_parameter=False)
+        returns = resolve_type_annotation(return_hint, is_parameter=False)
         returns_dct = dict(returns)  # type: ignore
 
     # Get description
@@ -1036,7 +1040,7 @@ def _create_schema_simple(
             None,
         )
 
-        parameters["properties"][name] = _resolve_type_annotation(
+        parameters["properties"][name] = resolve_type_annotation(
             param_type,
             description=param_doc,
             default=param.default,
@@ -1051,7 +1055,7 @@ def _create_schema_simple(
         parameters["required"] = required
 
     # Handle return type with is_parameter=False
-    function_type = _determine_function_type(func)
+    function_type = determine_function_type(func)
     return_hint = hints.get("return", Any)
 
     if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
@@ -1059,10 +1063,10 @@ def _create_schema_simple(
             (t for t in typing.get_args(return_hint) if t is not type(None)),
             Any,
         )
-        prop = _resolve_type_annotation(element_type, is_parameter=False)
+        prop = resolve_type_annotation(element_type, is_parameter=False)
         returns_dct = {"type": "array", "items": prop}
     else:
-        returns = _resolve_type_annotation(return_hint, is_parameter=False)
+        returns = resolve_type_annotation(return_hint, is_parameter=False)
         returns_dct = dict(returns)  # type: ignore
 
     return FunctionSchema(

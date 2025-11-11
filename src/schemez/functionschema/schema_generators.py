@@ -9,12 +9,8 @@ from typing import Any, Literal, get_type_hints
 
 import pydantic
 
-from schemez.functionschema import (
-    FunctionSchema,
-    _resolve_type_annotation,
-    create_schema,
-)
-from schemez.typedefs import ToolParameters
+from schemez.functionschema import FunctionSchema, create_schema, resolve_type_annotation
+from schemez.functionschema.typedefs import ToolParameters
 
 
 def create_schemas_from_callables(
@@ -42,16 +38,12 @@ def create_schemas_from_callables(
         >>> print(schemas['math.foo'])
     """
     schemas = {}
-
     for name, callable_obj in callables.items():
-        # Skip private members if requested
-        if exclude_private and name.startswith("_"):
+        if exclude_private and name.startswith("_"):  # Skip private members if requested
             continue
-
         # Generate schema key based on prefix setting
         key = name if prefix is False else f"{prefix}.{name}" if prefix else name
         schemas[key] = create_schema(callable_obj)
-
     return schemas
 
 
@@ -78,9 +70,7 @@ def create_schemas_from_class(
     """
     callables: dict[str, Callable[..., Any]] = {}
 
-    # Get all attributes of the class
-    for name, attr in inspect.getmembers(cls):
-        # Handle different method types
+    for name, attr in inspect.getmembers(cls):  # Get all attributes of the class
         if inspect.isfunction(attr) or inspect.ismethod(attr):
             callables[name] = attr
         elif isinstance(attr, classmethod | staticmethod):
@@ -105,7 +95,7 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
         required = []
         for name, field in cls.model_fields.items():
             param_type = field.annotation
-            properties[name] = _resolve_type_annotation(
+            properties[name] = resolve_type_annotation(
                 param_type,
                 description=field.description,
                 default=field.default,
@@ -122,7 +112,7 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
 
         for dc_field in dc_fields:
             param_type = hints[dc_field.name]
-            properties[dc_field.name] = _resolve_type_annotation(
+            properties[dc_field.name] = resolve_type_annotation(
                 param_type, default=dc_field.default
             )
             if (
@@ -143,7 +133,7 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
                 continue
 
             param_type = hints.get(name, Any)
-            properties[name] = _resolve_type_annotation(
+            properties[name] = resolve_type_annotation(
                 param_type,
                 default=param.default,
             )
