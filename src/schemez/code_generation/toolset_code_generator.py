@@ -307,6 +307,93 @@ async def {generator.name}(input: {input_class_name}) -> str:
         logger.info("Client code generation completed in %.2fs", elapsed)
         return client_code
 
+    async def generate_function_stubs(self) -> str:
+        """Generate clean function stubs for LLM consumption.
+
+        Returns Python code with just signatures, docstrings, and input models
+        - no HTTP implementation details. Perfect for showing LLMs what
+        functions are available without implementation noise.
+
+        Returns:
+            Clean Python code with function stubs
+        """
+        start_time = time.time()
+        logger.info("Starting function stubs generation")
+
+        code_parts: list[str] = []
+
+        # Module header
+        header = '"""Available tool functions."""\n\n'
+        code_parts.append(header)
+
+        # Generate models and stubs for each tool
+        all_exports = []
+        for generator in self.generators:
+            # Generate input model from schema parameters
+            try:
+                params_schema = generator.schema.parameters
+                if params_schema.get("properties"):
+                    # Use the same pattern as client code generation
+                    words = [word.title() for word in generator.name.split("_")]
+                    input_class_name = f"{''.join(words)}Input"
+
+                    model_code = await model_to_python_code(
+                        params_schema, class_name=input_class_name
+                    )
+                    if model_code:
+                        # Clean up the model code (remove duplicate imports)
+                        cleaned_model = self._clean_generated_code(model_code)
+                        code_parts.append(cleaned_model)
+                    else:
+                        # Fallback for tools without parameters
+                        input_class_name = "BaseModel"
+                else:
+                    # No parameters, use BaseModel
+                    input_class_name = "BaseModel"
+            except (ValueError, TypeError, AttributeError):
+                # Fallback input model for schema parsing errors
+                input_class_name = "BaseModel"
+
+            # Generate function stub
+            description = generator.schema.description or f"Call {generator.name} tool"
+
+            # Get return type hint from schema or default to str
+            try:
+                signature = generator.schema.to_python_signature()
+                # Extract return type from signature
+                if " -> " in signature:
+                    return_hint = signature.split(" -> ")[1]
+                else:
+                    return_hint = "Any"
+            except Exception:
+                return_hint = "Any"
+
+            stub_code = f'''
+async def {generator.name}(input: {input_class_name}) -> {return_hint}:
+    """{description}
+
+    Args:
+        input: Function parameters
+
+    Returns:
+        Function result
+    """
+    ...
+'''
+            code_parts.append(stub_code)
+
+            if input_class_name != "BaseModel":
+                all_exports.append(input_class_name)
+            all_exports.append(generator.name)
+
+        # Add exports
+        code_parts.append(f"\n__all__ = {all_exports}\n")
+
+        stubs_code = "\n".join(code_parts)
+        elapsed = time.time() - start_time
+        logger.info("Function stubs generation completed in %.2fs", elapsed)
+        return stubs_code
+
     def _clean_generated_code(self, code: str) -> str:
         """Clean up generated code by removing redundant imports and headers."""
         lines = code.split("\n")
