@@ -211,12 +211,8 @@ from datetime import datetime
 
         start_time = time.time()
         logger.info("Starting tool functions generation")
-
-        # Generate and execute the tools code
         tools_code = await self.generate_tools_code()
         logger.debug("Generated %s characters of code", len(tools_code))
-
-        # Create namespace and execute
         namespace = {
             "BaseModel": BaseModel,
             "Field": BaseModel.model_fields_set,
@@ -224,7 +220,6 @@ from datetime import datetime
             "List": list,
             "datetime": __import__("datetime").datetime,
         }
-
         logger.debug("Executing generated tools code...")
         exec_start = time.time()
         exec(tools_code, namespace)
