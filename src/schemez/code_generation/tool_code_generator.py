@@ -12,6 +12,7 @@ from schemez.code_generation.route_helpers import (
     create_route_handler,
     generate_func_code,
 )
+from schemez.functionschema import FunctionSchema
 
 
 if TYPE_CHECKING:
@@ -19,7 +20,8 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-    from schemez.typedefs import OpenAIFunctionTool, Property
+    from schemez.functionschema import FunctionSchema
+    from schemez.typedefs import Property, ToolParameters
 
 
 TYPE_MAP = {
@@ -39,7 +41,7 @@ class ToolCodeGenerator:
     callable: Callable
     """Tool to generate code for."""
 
-    schema: OpenAIFunctionTool
+    schema: FunctionSchema
     """Schema of the tool."""
 
     name_override: str | None = None
@@ -55,9 +57,7 @@ class ToolCodeGenerator:
         exclude_types: list[type] | None = None,
     ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a Tool."""
-        schema = create_schema(fn).model_dump_openai()
-        schema["function"]["name"] = fn.__name__
-        schema["function"]["description"] = fn.__doc__ or ""
+        schema = create_schema(fn)
         return cls(schema=schema, callable=fn, exclude_types=exclude_types or [])
 
     @property
@@ -65,34 +65,9 @@ class ToolCodeGenerator:
         """Name of the tool."""
         return self.name_override or self.callable.__name__
 
-    def _extract_basic_signature(self, return_type: str = "Any") -> str:
-        """Fallback signature extraction from tool schema."""
-        schema = self.schema["function"]
-        params = schema.get("parameters", {}).get("properties", {})
-        required = set(schema.get("parameters", {}).get("required", []))
-
-        param_strs = []
-        for name, param_info in params.items():
-            # Skip context parameters that should be hidden from users
-            if self._is_context_parameter(name):
-                continue
-
-            type_hint = self._infer_parameter_type(name, param_info)
-
-            if name not in required:
-                # Check for actual default value in schema
-                default_value = param_info.get("default")
-                if default_value is not None:
-                    if isinstance(default_value, str):
-                        param_strs.append(f"{name}: {type_hint} = {default_value!r}")
-                    else:
-                        param_strs.append(f"{name}: {type_hint} = {default_value}")
-                else:
-                    param_strs.append(f"{name}: {type_hint} = None")
-            else:
-                param_strs.append(f"{name}: {type_hint}")
-
-        return f"{self.name}({', '.join(param_strs)}) -> {return_type}"
+    def _get_schema_params(self) -> ToolParameters:
+        """Get parameters from the schema."""
+        return self.schema.parameters
 
     def _infer_parameter_type(self, param_name: str, param_info: Property) -> str:
         """Infer parameter type from schema and function inspection."""
@@ -126,11 +101,7 @@ class ToolCodeGenerator:
                     if default_type in ["int", "float", "str", "bool"]:
                         return default_type
                 # If no default and it's required, assume str for web-like functions
-                required = set(
-                    self.schema.get("function", {})
-                    .get("parameters", {})
-                    .get("required", [])
-                )
+                required = set(self.schema.parameters.get("required", []))
                 if param_name in required:
                     return "str"
 
@@ -140,25 +111,21 @@ class ToolCodeGenerator:
         # Fallback to Any for unresolved object types
         return "Any"
 
-    def _get_return_model_name(self) -> str:
-        """Get the return model name for a tool."""
-        try:
-            schema = create_schema(self.callable)
-            if schema.returns.get("type") == "object":
-                return f"{self.name.title()}Response"
-            if schema.returns.get("type") == "array":
-                return f"list[{self.name.title()}Item]"
-            return TYPE_MAP.get(schema.returns.get("type", "string"), "Any")
-        except Exception:  # noqa: BLE001
-            return "Any"
-
     def get_function_signature(self) -> str:
-        """Extract function signature using schemez."""
+        """Extract function signature using FunctionSchema."""
         try:
-            return_model_name = self._get_return_model_name()
-            return self._extract_basic_signature(return_model_name)
+            sig = self.schema.to_python_signature()
+            # Filter context parameters
+            filtered_params = [
+                p
+                for p in sig.parameters.values()
+                if not self._is_context_parameter(p.name)
+            ]
+            filtered_sig = sig.replace(parameters=filtered_params)
         except Exception:  # noqa: BLE001
-            return self._extract_basic_signature("Any")
+            return f"{self.name}(...) -> Any"
+        else:
+            return f"{self.name}{filtered_sig}"
 
     def _get_callable_signature(self) -> inspect.Signature:
         """Get signature from callable, respecting wrapped signatures."""
@@ -229,12 +196,11 @@ class ToolCodeGenerator:
     def generate_return_model(self) -> str | None:
         """Generate Pydantic model code for the tool's return type."""
         try:
-            schema = create_schema(self.callable)
-            if schema.returns.get("type") not in {"object", "array"}:
+            if self.schema.returns.get("type") not in {"object", "array"}:
                 return None
 
             class_name = f"{self.name.title()}Response"
-            model_code = schema.to_pydantic_model_code(class_name=class_name)
+            model_code = self.schema.to_pydantic_model_code(class_name=class_name)
             return model_code.strip() or None
 
         except Exception:  # noqa: BLE001
@@ -247,14 +213,7 @@ class ToolCodeGenerator:
         Returns:
             Async route handler function
         """
-        # Extract parameter schema
-        schema = self.schema["function"]
-        parameters_schema = schema.get("parameters", {})
-
-        # Create parameter model
-        param_cls = create_param_model(dict(parameters_schema))
-
-        # Create route handler
+        param_cls = create_param_model(dict(self.schema.parameters))
         return create_route_handler(self.callable, param_cls)
 
     def add_route_to_app(self, app: FastAPI, path_prefix: str = "/tools") -> None:
@@ -264,16 +223,8 @@ class ToolCodeGenerator:
             app: FastAPI application instance
             path_prefix: Path prefix for the route
         """
-        # Extract parameter schema
-        schema = self.schema["function"]
-        parameters_schema = schema.get("parameters", {})
-
-        # Create parameter model
-        param_cls = create_param_model(dict(parameters_schema))
-
-        # Create the route handler
+        param_cls = create_param_model(dict(self.schema.parameters))
         route_handler = self.generate_route_handler()
-
         # Set up the route with proper parameter annotations for FastAPI
         if param_cls:
             # Get field information from the generated model
