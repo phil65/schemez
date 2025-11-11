@@ -43,6 +43,9 @@ class NamespaceCallable:
         Returns:
             NamespaceCallable instance
         """
+        if generator.callable is None:
+            msg = f"Callable required for NamespaceCallable {generator.name!r}. "
+            raise ValueError(msg)
         return cls(generator.callable, generator.name_override)
 
     async def __call__(self, *args, **kwargs) -> Any:

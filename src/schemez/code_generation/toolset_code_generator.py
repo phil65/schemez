@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
+    from schemez.functionschema import FunctionSchema
+
 
 logger = log.get_logger(__name__)
 
@@ -65,7 +67,7 @@ class ToolsetCodeGenerator:
         include_docstrings: bool = True,
         exclude_types: list[type] | None = None,
     ) -> ToolsetCodeGenerator:
-        """Create a ToolsetCodeGenerator from a sequence of Tools.
+        """Create a ToolsetCodeGenerator from a sequence of callables.
 
         Args:
             callables: Callables to generate code for
@@ -81,6 +83,28 @@ class ToolsetCodeGenerator:
             ToolCodeGenerator.from_callable(i, exclude_types=exclude_types)
             for i in callables
         ]
+        return cls(generators, include_signatures, include_docstrings)
+
+    @classmethod
+    def from_schemas(
+        cls,
+        schemas: Sequence[FunctionSchema],
+        include_signatures: bool = True,
+        include_docstrings: bool = True,
+    ) -> ToolsetCodeGenerator:
+        """Create a ToolsetCodeGenerator from schemas only (no execution capability).
+
+        This approach still allows generating client code.
+
+        Args:
+            schemas: FunctionSchemas to generate code for
+            include_signatures: Include function signatures in documentation
+            include_docstrings: Include function docstrings in documentation
+
+        Returns:
+            ToolsetCodeGenerator instance
+        """
+        generators = [ToolCodeGenerator.from_schema(schema) for schema in schemas]
         return cls(generators, include_signatures, include_docstrings)
 
     def generate_tool_description(self) -> str:
@@ -110,13 +134,19 @@ class ToolsetCodeGenerator:
             else:
                 parts.append(f"async def {generator.name}(...):")
 
-            if self.include_docstrings and generator.callable.__doc__:
-                indented_desc = "    " + generator.callable.__doc__.replace(
-                    "\n", "\n    "
-                )
+            # Use schema description or callable docstring if available
+            docstring = None
+            if self.include_docstrings:
+                if generator.schema.description:
+                    docstring = generator.schema.description
+                elif generator.callable and generator.callable.__doc__:
+                    docstring = generator.callable.__doc__
+
+            if docstring:
+                indented_desc = "    " + docstring.replace("\n", "\n    ")
 
                 # Add warning for async functions without proper return type hints
-                if inspect.iscoroutinefunction(generator.callable):
+                if generator.callable and inspect.iscoroutinefunction(generator.callable):
                     sig = inspect.signature(generator.callable)
                     if sig.return_annotation == inspect.Signature.empty:
                         indented_desc += "\n    \n    Note: This async function should explicitly return a value."  # noqa: E501
@@ -129,10 +159,14 @@ class ToolsetCodeGenerator:
         return "\n".join(parts)
 
     def generate_execution_namespace(self) -> dict[str, Any]:
-        """Build Python namespace with tool functions and generated models."""
+        """Build Python namespace with tool functions and generated models.
+
+        Raises:
+            ValueError: If any generator lacks a callable
+        """
         namespace: dict[str, Any] = {"__builtins__": __builtins__, "_result": None}
 
-        # Add tool functions
+        # Add tool functions - all generators must have callables for execution
         for generator in self.generators:
             namespace[generator.name] = NamespaceCallable.from_generator(generator)
 
@@ -158,6 +192,13 @@ class ToolsetCodeGenerator:
             path_prefix: Path prefix for routes
         """
         for generator in self.generators:
+            if generator.callable is None:
+                tool_name = generator.name
+                msg = (
+                    f"Callable required for route generation for tool '{tool_name}'. "
+                    "Use from_callables() or provide callable when creating generator."
+                )
+                raise ValueError(msg)
             generator.add_route_to_app(app, path_prefix)
 
     async def generate_client_code(
@@ -226,8 +267,8 @@ from datetime import datetime
                 else:
                     # No parameters, use BaseModel
                     input_class_name = "BaseModel"
-            except Exception:
-                # Fallback input model
+            except (ValueError, TypeError, AttributeError):
+                # Fallback input model for schema parsing errors
                 input_class_name = "BaseModel"
 
             # Generate HTTP wrapper function
@@ -263,7 +304,7 @@ async def {generator.name}(input: {input_class_name}) -> str:
 
         client_code = "\n".join(code_parts)
         elapsed = time.time() - start_time
-        logger.info(f"Client code generation completed in {elapsed:.2f}s")
+        logger.info("Client code generation completed in %.2fs", elapsed)
         return client_code
 
     def _clean_generated_code(self, code: str) -> str:

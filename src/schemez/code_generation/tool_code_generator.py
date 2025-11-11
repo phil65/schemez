@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import inspect
 from typing import TYPE_CHECKING, Any
 
 from schemez import create_schema
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from schemez.functionschema import FunctionSchema
-    from schemez.typedefs import Property, ToolParameters
+    from schemez.typedefs import ToolParameters
 
 
 TYPE_MAP = {
@@ -38,11 +37,13 @@ TYPE_MAP = {
 class ToolCodeGenerator:
     """Generates code artifacts for a single tool."""
 
-    callable: Callable
-    """Tool to generate code for."""
-
     schema: FunctionSchema
-    """Schema of the tool."""
+    """Schema of the tool (primary source of truth)."""
+
+    callable: Callable | None = None
+    """Optional callable for actual execution. Required only for FastAPI route generation
+    and Python namespace execution. All other operations (client code generation,
+    signatures, models) work purely from the schema."""
 
     name_override: str | None = None
     """Name override for the function to generate code for."""
@@ -56,60 +57,31 @@ class ToolCodeGenerator:
         fn: Callable,
         exclude_types: list[type] | None = None,
     ) -> ToolCodeGenerator:
-        """Create a ToolCodeGenerator from a Tool."""
+        """Create a ToolCodeGenerator from a callable."""
         schema = create_schema(fn, exclude_types=exclude_types)
         return cls(schema=schema, callable=fn, exclude_types=exclude_types or [])
+
+    @classmethod
+    def from_schema(
+        cls,
+        schema: FunctionSchema,
+        name_override: str | None = None,
+    ) -> ToolCodeGenerator:
+        """Create a ToolCodeGenerator from a schema only (no execution capability)."""
+        return cls(schema=schema, callable=None, name_override=name_override)
 
     @property
     def name(self) -> str:
         """Name of the tool."""
-        return self.name_override or self.callable.__name__
+        if self.name_override:
+            return self.name_override
+        if self.callable:
+            return self.callable.__name__
+        return self.schema.name
 
     def _get_schema_params(self) -> ToolParameters:
         """Get parameters from the schema."""
         return self.schema.parameters
-
-    def _infer_parameter_type(self, param_name: str, param_info: Property) -> str:
-        """Infer parameter type from schema and function inspection."""
-        schema_type = param_info.get("type", "Any")
-
-        # If schema has a specific type, use it
-        if schema_type != "object":
-            return TYPE_MAP.get(schema_type, "Any")
-
-        # For 'object' type, try to infer from function signature
-        try:
-            callable_func = self.callable
-            # Use wrapped signature if available (for context parameter hiding)
-            sig = getattr(callable_func, "__signature__", None) or inspect.signature(
-                callable_func
-            )
-
-            if param_name in sig.parameters:
-                param = sig.parameters[param_name]
-
-                # Try annotation first
-                if param.annotation != inspect.Parameter.empty:
-                    if hasattr(param.annotation, "__name__"):
-                        return param.annotation.__name__
-                    return str(param.annotation)
-
-                # Infer from default value
-                if param.default != inspect.Parameter.empty:
-                    default_type = type(param.default).__name__
-                    # Map common types
-                    if default_type in ["int", "float", "str", "bool"]:
-                        return default_type
-                # If no default and it's required, assume str for web-like functions
-                required = set(self.schema.parameters.get("required", []))
-                if param_name in required:
-                    return "str"
-
-        except Exception:  # noqa: BLE001
-            pass
-
-        # Fallback to Any for unresolved object types
-        return "Any"
 
     def get_function_signature(self) -> str:
         """Extract function signature using FunctionSchema."""
@@ -139,7 +111,13 @@ class ToolCodeGenerator:
 
         Returns:
             Async route handler function
+
+        Raises:
+            ValueError: If callable is not provided
         """
+        if self.callable is None:
+            msg = f"Callable required for route generation for tool '{self.name}'"
+            raise ValueError(msg)
         param_cls = create_param_model(dict(self.schema.parameters))
         return create_route_handler(self.callable, param_cls)
 
@@ -149,7 +127,13 @@ class ToolCodeGenerator:
         Args:
             app: FastAPI application instance
             path_prefix: Path prefix for the route
+
+        Raises:
+            ValueError: If callable is not provided
         """
+        if self.callable is None:
+            msg = f"Callable required for route generation for tool '{self.name}'"
+            raise ValueError(msg)
         param_cls = create_param_model(dict(self.schema.parameters))
         route_handler = self.generate_route_handler()
         # Set up the route with proper parameter annotations for FastAPI
