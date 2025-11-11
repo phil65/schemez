@@ -19,7 +19,6 @@ import typing
 from typing import Annotated, Any, Literal, NotRequired, Required, TypeGuard, get_origin
 from uuid import UUID
 
-import docstring_parser
 import pydantic
 
 from schemez import log
@@ -669,6 +668,7 @@ def create_schema(
     name_override: str | None = None,
     description_override: str | None = None,
     exclude_types: list[type] | None = None,
+    mode: Literal["jsonschema", "openai", "original"] = "original",
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 
@@ -683,6 +683,9 @@ def create_schema(
         description_override: Optional description override
                               (otherwise the function docstring)
         exclude_types: Types to exclude from parameters (e.g., context types)
+        mode: Schema generation mode - "original" (default) uses current implementation,
+              "openai" for OpenAI function calling via Pydantic,
+              "jsonschema" for standard JSON schema via Pydantic
 
     Returns:
         Schema representing the function
@@ -695,6 +698,187 @@ def create_schema(
         raise TypeError(msg)
 
     exclude_types = exclude_types or []
+
+    if mode == "openai":
+        return _create_schema_pydantic(
+            func,
+            name_override,
+            description_override,
+            exclude_types,
+            use_openai_format=True,
+        )
+    if mode == "jsonschema":
+        return _create_schema_pydantic(
+            func,
+            name_override,
+            description_override,
+            exclude_types,
+            use_openai_format=False,
+        )
+    # mode == "original" or fallback
+    return _create_schema_original(
+        func, name_override, description_override, exclude_types
+    )
+
+
+def _create_schema_pydantic(
+    func: Callable[..., Any],
+    name_override: str | None,
+    description_override: str | None,
+    exclude_types: list[type],
+    use_openai_format: bool,
+) -> FunctionSchema:
+    """Create schema using Pydantic's internal schema generation."""
+    from pydantic import ConfigDict
+    from pydantic._internal import _generate_schema, _typing_extra
+    from pydantic._internal._config import ConfigWrapper
+    from pydantic.fields import FieldInfo
+    from pydantic.json_schema import GenerateJsonSchema
+    from pydantic_core import core_schema
+
+    # Try to use pydantic-ai's OpenAI-compatible generator if available
+    schema_generator: Any
+    if use_openai_format:
+        try:
+            from pydantic_ai.tools import GenerateToolJsonSchema
+
+            schema_generator = GenerateToolJsonSchema()
+        except ImportError:
+            # Fallback to standard generator
+            schema_generator = GenerateJsonSchema()
+    else:
+        schema_generator = GenerateJsonSchema()
+
+    # Set up Pydantic schema generation
+    config = ConfigDict(title=func.__name__ or "unknown")
+    config_wrapper = ConfigWrapper(config)
+    gen_schema = _generate_schema.GenerateSchema(config_wrapper)
+
+    try:
+        sig = inspect.signature(func)
+    except ValueError:
+        sig = inspect.signature(lambda: None)
+
+    type_hints = _typing_extra.get_function_type_hints(func)
+
+    # Parse docstring for parameter descriptions
+    import docstring_parser
+
+    docstring = docstring_parser.parse(func.__doc__ or "")
+    param_descriptions = {
+        p.arg_name: p.description for p in docstring.params if p.description
+    }
+
+    fields: dict[str, core_schema.TypedDictField] = {}
+    required_fields: list[str] = []
+
+    # Process parameters
+    for name, param in sig.parameters.items():
+        # Skip self parameter
+        if name == "self" and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            continue
+
+        # Skip *args and **kwargs
+        if param.kind in {
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        }:
+            continue
+
+        # Get parameter annotation
+        if param.annotation is sig.empty:
+            annotation = Any
+        else:
+            annotation = type_hints.get(name, param.annotation)
+
+        # Skip excluded types
+        if any(_types_match(annotation, exclude_type) for exclude_type in exclude_types):
+            continue
+
+        # Create field info
+        required = param.default is inspect.Parameter.empty
+        if required:
+            field_info = FieldInfo.from_annotation(annotation)
+            required_fields.append(name)
+        else:
+            field_info = FieldInfo.from_annotated_attribute(annotation, param.default)
+
+        # Add description from docstring if available
+        if name in param_descriptions:
+            field_info.description = param_descriptions[name]
+
+        # Generate typed dict field
+        from pydantic._internal import _decorators
+
+        td_field = gen_schema._generate_td_field_schema(
+            name,
+            field_info,
+            _decorators.DecoratorInfos(),
+            required=required,
+        )
+        fields[name] = td_field
+
+    # Create typed dict schema
+    core_config = config_wrapper.core_config(None)
+    core_config["extra_fields_behavior"] = "forbid"
+
+    schema_dict = core_schema.typed_dict_schema(
+        fields,
+        config=core_config,
+    )
+
+    # Generate JSON schema
+    json_schema = schema_generator.generate(schema_dict)
+
+    # Extract parameters
+    parameters: ToolParameters = {
+        "type": "object",
+        "properties": json_schema.get("properties", {}),
+    }
+
+    if required_fields:
+        parameters["required"] = required_fields
+
+    # Handle return type
+    function_type = _determine_function_type(func)
+    return_hint = type_hints.get("return", Any)
+
+    if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
+        element_type = next(
+            (t for t in typing.get_args(return_hint) if t is not type(None)),
+            Any,
+        )
+        returns_dct = {
+            "type": "array",
+            "items": _resolve_type_annotation(element_type, is_parameter=False),
+        }
+    else:
+        returns = _resolve_type_annotation(return_hint, is_parameter=False)
+        returns_dct = dict(returns)  # type: ignore
+
+    # Get description
+    import docstring_parser
+
+    docstring = docstring_parser.parse(func.__doc__ or "")
+
+    return FunctionSchema(
+        name=name_override or getattr(func, "__name__", "unknown") or "unknown",
+        description=description_override or docstring.short_description,
+        parameters=parameters,
+        required=required,
+        returns=returns_dct,
+        function_type=function_type,
+    )
+
+
+def _create_schema_original(
+    func: Callable[..., Any],
+    name_override: str | None,
+    description_override: str | None,
+    exclude_types: list[type],
+) -> FunctionSchema:
+    """Original schema creation implementation."""
+    import docstring_parser
 
     # Parse function signature and docstring
     sig = inspect.signature(func)
@@ -770,9 +954,10 @@ def create_schema(
     return FunctionSchema(
         name=name_override or getattr(func, "__name__", "unknown") or "unknown",
         description=description_override or docstring.short_description,
-        parameters=parameters,  # Now includes required fields
+        parameters=parameters,
         required=required,
         returns=returns_dct,
+        function_type=function_type,
     )
 
 
