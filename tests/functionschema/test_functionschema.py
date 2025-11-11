@@ -159,7 +159,15 @@ def test_custom_types() -> None:
         "enum": ["red", "blue"],
         "description": "An enum",
     }
-    assert props["dc"] == {"type": "object", "description": "A dataclass"}
+    assert props["dc"] == {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "string"},
+        },
+        "required": ["name", "age"],
+        "description": "A dataclass",
+    }
 
 
 def test_typing_variants() -> None:
@@ -218,12 +226,12 @@ def test_typing_variants() -> None:
     # Dict variants should produce object
     assert props["builtin_dict"] == {
         "type": "object",
-        "additionalProperties": True,
+        "additionalProperties": {"type": "integer"},
         "description": "Python 3.9+ dict",
     }
     assert props["typing_dict"] == {
         "type": "object",
-        "additionalProperties": True,
+        "additionalProperties": {"type": "integer"},
         "description": "Traditional typing.Dict",
     }
 

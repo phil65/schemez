@@ -488,7 +488,24 @@ def _resolve_type_annotation(
 
     # Handle dataclasses
     elif dataclasses.is_dataclass(typ):
-        schema["type"] = "object"
+        fields = dataclasses.fields(typ)
+        properties = {}
+        required = []
+        for field in fields:
+            properties[field.name] = _resolve_type_annotation(
+                field.type,
+                is_parameter=is_parameter,
+            )
+            # Field is required if it has no default value and no default_factory
+            if (
+                field.default is dataclasses.MISSING
+                and field.default_factory is dataclasses.MISSING
+            ):
+                required.append(field.name)
+
+        schema = {"type": "object", "properties": properties}
+        if required:
+            schema["required"] = required
     elif typing.is_typeddict(typ):
         properties = {}
         required = []
@@ -524,7 +541,22 @@ def _resolve_type_annotation(
     ):
         schema["type"] = "object"
         if is_parameter:  # Only add additionalProperties for parameters
-            schema["additionalProperties"] = True
+            # Dict[K, V] should have at least 2 type arguments for key and value
+            min_dict_args = 2
+            if (
+                len(args) >= min_dict_args
+            ):  # Dict[K, V] - use value type for additionalProperties
+                value_type = args[1]
+                # Special case: Any should remain as True for backward compatibility
+                if value_type is Any:
+                    schema["additionalProperties"] = True
+                else:
+                    schema["additionalProperties"] = _resolve_type_annotation(
+                        value_type,
+                        is_parameter=is_parameter,
+                    )
+            else:
+                schema["additionalProperties"] = True
 
     # Handle sequences
     elif origin in {
@@ -607,6 +639,43 @@ def _resolve_type_annotation(
                     "imag": {"type": "number"},
                 },
             })
+        # Check for Pydantic BaseModel
+        elif hasattr(typ, "__pydantic_fields__") or hasattr(typ, "model_fields"):
+            # It's a Pydantic v1 or v2 model
+            try:
+                # Try Pydantic v2 first
+                if hasattr(typ, "model_fields"):
+                    fields = typ.model_fields
+                    properties = {}
+                    required = []
+                    for field_name, field_info in fields.items():
+                        field_type = field_info.annotation
+                        properties[field_name] = _resolve_type_annotation(
+                            field_type,
+                            is_parameter=is_parameter,
+                        )
+                        if field_info.is_required():
+                            required.append(field_name)
+                # Fallback to Pydantic v1
+                elif hasattr(typ, "__fields__"):
+                    fields = typ.__fields__
+                    properties = {}
+                    required = []
+                    for field_name, field_info in fields.items():
+                        field_type = field_info.type_
+                        properties[field_name] = _resolve_type_annotation(
+                            field_type,
+                            is_parameter=is_parameter,
+                        )
+                        if field_info.is_required():
+                            required.append(field_name)
+
+                schema = {"type": "object", "properties": properties}
+                if required:
+                    schema["required"] = required
+            except (AttributeError, TypeError, ValueError):
+                # If introspection fails, fall back to generic object
+                schema["type"] = "object"
         # Default to object for unknown types
         else:
             schema["type"] = "object"
