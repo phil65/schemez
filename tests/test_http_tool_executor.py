@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -46,7 +46,7 @@ class MockToolHandler:
 
 
 @pytest.fixture
-def weather_schema():
+def weather_schema() -> dict[str, Any]:
     """Simple weather tool schema."""
     return {
         "type": "function",
@@ -70,7 +70,7 @@ def weather_schema():
 
 
 @pytest.fixture
-def calendar_schema():
+def calendar_schema() -> dict[str, Any]:
     """Calendar event tool schema."""
     return {
         "type": "function",
@@ -90,7 +90,7 @@ def calendar_schema():
 
 
 @pytest.fixture
-def mock_handler():
+def mock_handler() -> MockToolHandler:
     """Mock tool handler."""
     return MockToolHandler()
 
@@ -98,209 +98,234 @@ def mock_handler():
 class TestHttpToolExecutor:
     """Tests for HttpToolExecutor class."""
 
-    def test_init(self, weather_schema, mock_handler):
-        """Test executor initialization."""
-        executor = HttpToolExecutor(
-            schemas=[weather_schema], handler=mock_handler, base_url="http://test:8000"
-        )
 
-        assert executor.schemas == [weather_schema]
-        assert executor.handler == mock_handler
-        assert executor.base_url == "http://test:8000"
-        assert executor._tool_mappings is None
-        assert executor._tools_code is None
+def test_init(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
+    """Test executor initialization."""
+    executor = HttpToolExecutor(
+        schemas=[weather_schema], handler=mock_handler, base_url="http://test:8000"
+    )
 
-    @pytest.mark.asyncio
-    async def test_load_schemas_from_dicts(self, weather_schema, mock_handler):
-        """Test loading schemas from dictionaries."""
-        executor = HttpToolExecutor([weather_schema], mock_handler)
+    assert executor.schemas == [weather_schema]
+    assert executor.handler == mock_handler
+    assert executor.base_url == "http://test:8000"
+    assert executor._tool_mappings is None
+    assert executor._tools_code is None
 
+
+async def test_load_schemas_from_dicts(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test loading schemas from dictionaries."""
+    executor = HttpToolExecutor([weather_schema], mock_handler)
+
+    schemas = await executor._load_schemas()
+
+    assert len(schemas) == 1
+    assert schemas[0] == weather_schema
+
+
+async def test_load_schemas_from_files(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test loading schemas from files."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        schema_file = Path(temp_dir) / "weather.json"
+        schema_file.write_text(json.dumps(weather_schema))
+
+        executor = HttpToolExecutor([schema_file], mock_handler)
         schemas = await executor._load_schemas()
 
         assert len(schemas) == 1
         assert schemas[0] == weather_schema
 
-    @pytest.mark.asyncio
-    async def test_load_schemas_from_files(self, weather_schema, mock_handler):
-        """Test loading schemas from files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            schema_file = Path(temp_dir) / "weather.json"
-            schema_file.write_text(json.dumps(weather_schema))
 
-            executor = HttpToolExecutor([schema_file], mock_handler)
-            schemas = await executor._load_schemas()
+async def test_get_tool_mappings(
+    weather_schema: dict[str, Any],
+    calendar_schema: dict[str, Any],
+    mock_handler: MockToolHandler,
+):
+    """Test tool name to input class mappings."""
+    executor = HttpToolExecutor([weather_schema, calendar_schema], mock_handler)
 
-            assert len(schemas) == 1
-            assert schemas[0] == weather_schema
+    mappings = await executor._get_tool_mappings()
 
-    @pytest.mark.asyncio
-    async def test_get_tool_mappings(self, weather_schema, calendar_schema, mock_handler):
-        """Test tool name to input class mappings."""
-        executor = HttpToolExecutor([weather_schema, calendar_schema], mock_handler)
+    assert "get_weather" in mappings
+    assert "create_calendar_event" in mappings
+    assert mappings["get_weather"] == "GetWeatherInput"
+    assert mappings["create_calendar_event"] == "CreateCalendarEventInput"
 
-        mappings = await executor._get_tool_mappings()
 
-        assert "get_weather" in mappings
-        assert "create_calendar_event" in mappings
-        assert mappings["get_weather"] == "GetWeatherInput"
-        assert mappings["create_calendar_event"] == "CreateCalendarEventInput"
+async def test_generate_tools_code(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test generating HTTP wrapper tools code."""
+    executor = HttpToolExecutor([weather_schema], mock_handler)
 
-    @pytest.mark.asyncio
-    async def test_generate_tools_code(self, weather_schema, mock_handler):
-        """Test generating HTTP wrapper tools code."""
+    tools_code = await executor.generate_tools_code()
+
+    assert isinstance(tools_code, str)
+    assert len(tools_code) > 0
+    assert "GetWeatherInput" in tools_code
+    assert "async def get_weather" in tools_code
+    assert "httpx.AsyncClient" in tools_code
+    assert "__all__" in tools_code
+
+
+async def test_generate_tools_code_caching(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test that tools code generation is cached."""
+    executor = HttpToolExecutor([weather_schema], mock_handler)
+
+    code1 = await executor.generate_tools_code()
+    code2 = await executor.generate_tools_code()
+
+    # Should be the same object (cached)
+    assert code1 is code2
+
+
+async def test_generate_server_app(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test generating FastAPI server."""
+    pytest.importorskip("fastapi")  # Skip if FastAPI not available
+
+    executor = HttpToolExecutor([weather_schema], mock_handler)
+
+    app = await executor.generate_server_app()
+
+    assert app.title == "Tool Server"
+    assert app.version == "1.0.0"
+
+
+async def test_get_tool_functions(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test getting ready-to-use tool functions."""
+    executor = HttpToolExecutor([weather_schema], mock_handler)
+
+    tools = await executor.get_tool_functions()
+
+    assert "get_weather" in tools
+    assert callable(tools["get_weather"])
+
+
+async def test_save_to_files(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test saving generated code to files."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir) / "output"
+
         executor = HttpToolExecutor([weather_schema], mock_handler)
+        saved_files = await executor.save_to_files(output_dir)
 
-        tools_code = await executor.generate_tools_code()
+        assert "tools" in saved_files
+        assert "server_example" in saved_files
 
-        assert isinstance(tools_code, str)
-        assert len(tools_code) > 0
-        assert "GetWeatherInput" in tools_code
-        assert "async def get_weather" in tools_code
-        assert "httpx.AsyncClient" in tools_code
-        assert "__all__" in tools_code
+        tools_file = saved_files["tools"]
+        server_file = saved_files["server_example"]
 
-    @pytest.mark.asyncio
-    async def test_generate_tools_code_caching(self, weather_schema, mock_handler):
-        """Test that tools code generation is cached."""
-        executor = HttpToolExecutor([weather_schema], mock_handler)
+        assert tools_file.exists()
+        assert server_file.exists()
 
-        code1 = await executor.generate_tools_code()
-        code2 = await executor.generate_tools_code()
+        tools_content = tools_file.read_text()
+        assert "GetWeatherInput" in tools_content
+        assert "async def get_weather" in tools_content
 
-        # Should be the same object (cached)
-        assert code1 is code2
 
-    @pytest.mark.asyncio
-    async def test_generate_server_app(self, weather_schema, mock_handler):
-        """Test generating FastAPI server."""
-        pytest.importorskip("fastapi")  # Skip if FastAPI not available
+async def test_multiple_schemas(
+    weather_schema: dict[str, Any], calendar_schema, mock_handler: MockToolHandler
+):
+    """Test with multiple tool schemas."""
+    executor = HttpToolExecutor([weather_schema, calendar_schema], mock_handler)
 
-        executor = HttpToolExecutor([weather_schema], mock_handler)
+    # Test tool mappings
+    mappings = await executor._get_tool_mappings()
+    assert len(mappings) == 2  # noqa: PLR2004
 
-        app = await executor.generate_server_app()
+    # Test code generation
+    code = await executor.generate_tools_code()
+    assert "GetWeatherInput" in code
+    assert "CreateCalendarEventInput" in code
+    assert "async def get_weather" in code
+    assert "async def create_calendar_event" in code
 
-        assert app.title == "Tool Server"
-        assert app.version == "1.0.0"
+    # Test tool functions
+    tools = await executor.get_tool_functions()
+    assert len(tools) == 2  # noqa: PLR2004
+    assert "get_weather" in tools
+    assert "create_calendar_event" in tools
 
-    @pytest.mark.asyncio
-    async def test_get_tool_functions(self, weather_schema, mock_handler):
-        """Test getting ready-to-use tool functions."""
-        executor = HttpToolExecutor([weather_schema], mock_handler)
 
-        tools = await executor.get_tool_functions()
-
-        assert "get_weather" in tools
-        assert callable(tools["get_weather"])
-
-    @pytest.mark.asyncio
-    async def test_save_to_files(self, weather_schema, mock_handler):
-        """Test saving generated code to files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_dir = Path(temp_dir) / "output"
-
-            executor = HttpToolExecutor([weather_schema], mock_handler)
-            saved_files = await executor.save_to_files(output_dir)
-
-            assert "tools" in saved_files
-            assert "server_example" in saved_files
-
-            tools_file = saved_files["tools"]
-            server_file = saved_files["server_example"]
-
-            assert tools_file.exists()
-            assert server_file.exists()
-
-            tools_content = tools_file.read_text()
-            assert "GetWeatherInput" in tools_content
-            assert "async def get_weather" in tools_content
-
-    @pytest.mark.asyncio
-    async def test_multiple_schemas(self, weather_schema, calendar_schema, mock_handler):
-        """Test with multiple tool schemas."""
-        executor = HttpToolExecutor([weather_schema, calendar_schema], mock_handler)
-
-        # Test tool mappings
-        mappings = await executor._get_tool_mappings()
-        assert len(mappings) == 2  # noqa: PLR2004
-
-        # Test code generation
-        code = await executor.generate_tools_code()
-        assert "GetWeatherInput" in code
-        assert "CreateCalendarEventInput" in code
-        assert "async def get_weather" in code
-        assert "async def create_calendar_event" in code
-
-        # Test tool functions
-        tools = await executor.get_tool_functions()
-        assert len(tools) == 2  # noqa: PLR2004
-        assert "get_weather" in tools
-        assert "create_calendar_event" in tools
-
-    @pytest.mark.asyncio
-    async def test_simple_manual_schema(self, mock_handler):
-        """Test with a simple manually created schema."""
-        simple_schema = {
-            "type": "function",
-            "function": {
-                "name": "simple_tool",
-                "description": "A simple test tool",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "message": {"type": "string", "description": "Input message"}
-                    },
-                    "required": ["message"],
+async def test_simple_manual_schema(mock_handler):
+    """Test with a simple manually created schema."""
+    simple_schema = {
+        "type": "function",
+        "function": {
+            "name": "simple_tool",
+            "description": "A simple test tool",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "Input message"}
                 },
+                "required": ["message"],
             },
-        }
+        },
+    }
 
-        executor = HttpToolExecutor([simple_schema], mock_handler)
+    executor = HttpToolExecutor([simple_schema], mock_handler)
 
-        # Test generation
-        code = await executor.generate_tools_code()
-        assert "SimpleToolInput" in code
-        assert "async def simple_tool" in code
+    # Test generation
+    code = await executor.generate_tools_code()
+    assert "SimpleToolInput" in code
+    assert "async def simple_tool" in code
 
-        # Test tool functions
-        tools = await executor.get_tool_functions()
-        assert "simple_tool" in tools
+    # Test tool functions
+    tools = await executor.get_tool_functions()
+    assert "simple_tool" in tools
 
-    @pytest.mark.asyncio
-    async def test_invalid_schema_type(self, mock_handler):
-        """Test with invalid schema type."""
-        executor = HttpToolExecutor(
-            [123],  # pyright: ignore[reportArgumentType]
-            mock_handler,
-        )
-        with pytest.raises(TypeError, match="Invalid schema type"):
-            await executor._load_schemas()
 
-    @pytest.mark.asyncio
-    async def test_nonexistent_file(self, mock_handler):
-        """Test with nonexistent schema file."""
-        nonexistent_file = Path("nonexistent.json")
-        executor = HttpToolExecutor([nonexistent_file], mock_handler)
+async def test_invalid_schema_type(mock_handler: MockToolHandler):
+    """Test with invalid schema type."""
+    executor = HttpToolExecutor(
+        [123],  # pyright: ignore[reportArgumentType]
+        mock_handler,
+    )
+    with pytest.raises(TypeError, match="Invalid schema type"):
+        await executor._load_schemas()
 
-        with pytest.raises(FileNotFoundError):
-            await executor._load_schemas()
 
-    @pytest.mark.asyncio
-    async def test_base_url_customization(self, weather_schema, mock_handler):
-        """Test custom base URL in generated code."""
-        custom_url = "http://custom:9000"
-        executor = HttpToolExecutor([weather_schema], mock_handler, base_url=custom_url)
+async def test_nonexistent_file(mock_handler):
+    """Test with nonexistent schema file."""
+    nonexistent_file = Path("nonexistent.json")
+    executor = HttpToolExecutor([nonexistent_file], mock_handler)
 
-        code = await executor.generate_tools_code()
+    with pytest.raises(FileNotFoundError):
+        await executor._load_schemas()
 
-        assert custom_url in code
 
-    @pytest.mark.asyncio
-    async def test_tool_mappings_caching(self, weather_schema, mock_handler):
-        """Test that tool mappings are cached."""
-        executor = HttpToolExecutor([weather_schema], mock_handler)
+async def test_base_url_customization(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test custom base URL in generated code."""
+    custom_url = "http://custom:9000"
+    executor = HttpToolExecutor([weather_schema], mock_handler, base_url=custom_url)
 
-        mappings1 = await executor._get_tool_mappings()
-        mappings2 = await executor._get_tool_mappings()
+    code = await executor.generate_tools_code()
 
-        # Should be the same object (cached)
-        assert mappings1 is mappings2
+    assert custom_url in code
+
+
+async def test_tool_mappings_caching(
+    weather_schema: dict[str, Any], mock_handler: MockToolHandler
+):
+    """Test that tool mappings are cached."""
+    executor = HttpToolExecutor([weather_schema], mock_handler)
+
+    mappings1 = await executor._get_tool_mappings()
+    mappings2 = await executor._get_tool_mappings()
+
+    # Should be the same object (cached)
+    assert mappings1 is mappings2
