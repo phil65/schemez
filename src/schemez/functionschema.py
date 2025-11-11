@@ -75,7 +75,7 @@ class FunctionSchema(pydantic.BaseModel):
     """Optional description of what the function does."""
 
     parameters: ToolParameters = pydantic.Field(
-        default_factory=lambda: ToolParameters(type="object", properties={}),
+        default_factory=lambda: ToolParameters(type="object", properties={}, required=[]),
     )
     """JSON Schema object describing the function's parameters."""
 
@@ -711,52 +711,6 @@ def create_schema(
     )
 
 
-def _resolve_json_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
-    """Resolve JSON schema $ref references inline.
-
-    Args:
-        schema: JSON schema with potential $defs and $ref references
-
-    Returns:
-        Schema with all references resolved inline
-    """
-    defs = schema.get("$defs", {})
-
-    def resolve_ref(obj: dict[str, Any]) -> dict[str, Any]:
-        """Recursively resolve $ref references in an object."""
-        if "$ref" in obj:
-            ref_path = obj["$ref"]
-            if ref_path.startswith("#/$defs/"):
-                def_name = ref_path.split("/")[-1]
-                if def_name in defs:
-                    # Resolve the reference and recursively resolve any nested refs
-                    resolved = resolve_ref(defs[def_name].copy())
-                    # Preserve other fields from the original object (like description)
-                    result = {k: v for k, v in obj.items() if k != "$ref"}
-                    result.update(resolved)
-                    return result
-            # If reference can't be resolved, return as string type
-            return {"type": "string", "description": f"Unresolved reference: {ref_path}"}
-
-        # Recursively resolve references in nested objects
-        result = {}
-        for key, value in obj.items():
-            if isinstance(value, dict):
-                result[key] = resolve_ref(value)
-            elif isinstance(value, list):
-                result[key] = [
-                    resolve_ref(item) if isinstance(item, dict) else item
-                    for item in value
-                ]
-            else:
-                result[key] = value
-        return result
-
-    # Create a copy without $defs and resolve all references
-    resolved_schema = {k: v for k, v in schema.items() if k != "$defs"}
-    return resolve_ref(resolved_schema)
-
-
 def _create_schema_pydantic(
     func: Callable[..., Any],
     name_override: str | None,
@@ -824,35 +778,32 @@ def _create_schema_pydantic(
 
             # Create new signature
             new_sig = orig_sig.replace(parameters=filtered_params)
-            func.__signature__ = new_sig
+            # Type ignore for dynamic signature modification
+            func.__signature__ = new_sig  # type: ignore[attr-defined]
 
         # Use pydantic-ai's function_schema
         pydantic_ai_schema = pydantic_ai_function_schema(
             func, schema_generator.__class__, takes_ctx=False
         )
 
-        # Convert to our format
+        # Convert to our format - now we can use the rich JSON schema directly
         json_schema = pydantic_ai_schema.json_schema
 
-        # Resolve $ref references to make it compatible with our type system
-        resolved_schema = _resolve_json_schema_refs(json_schema)
-
-        # Convert complex schema properties using existing conversion function
-        from .typedefs import _convert_complex_property
-
-        converted_properties = {}
-        for prop_name, prop_schema in resolved_schema.get("properties", {}).items():
-            converted_properties[prop_name] = _convert_complex_property(prop_schema)
-
+        # Create ToolParameters directly from the rich JSON schema
         parameters: ToolParameters = {
             "type": "object",
-            "properties": converted_properties,
+            "properties": json_schema.get("properties", {}),
         }
 
-        if "required" in resolved_schema:
-            parameters["required"] = resolved_schema["required"]
+        if "required" in json_schema:
+            parameters["required"] = json_schema["required"]
 
-        required_fields = resolved_schema.get("required", [])
+        # Copy over any extra fields like $defs
+        for key, value in json_schema.items():
+            if key not in {"type", "properties", "required"}:
+                parameters[key] = value
+
+        required_fields = json_schema.get("required", [])
 
     except ImportError:
         # Fallback to original approach if pydantic-ai not available
@@ -866,7 +817,7 @@ def _create_schema_pydantic(
         }
 
         fields: dict[str, core_schema.TypedDictField] = {}
-        required_fields: list[str] = []
+        fallback_required_fields: list[str] = []
 
         # Process parameters
         for name, param in sig.parameters.items():
@@ -897,7 +848,7 @@ def _create_schema_pydantic(
             required = param.default is inspect.Parameter.empty
             if required:
                 field_info = FieldInfo.from_annotation(annotation)
-                required_fields.append(name)
+                fallback_required_fields.append(name)
             else:
                 field_info = FieldInfo.from_annotated_attribute(annotation, param.default)
 
@@ -905,7 +856,7 @@ def _create_schema_pydantic(
             if name in param_descriptions:
                 field_info.description = param_descriptions[name]
 
-            # Generate typed dict field
+            # Create typed dict field
             from pydantic._internal import _decorators
 
             td_field = gen_schema._generate_td_field_schema(
@@ -929,14 +880,15 @@ def _create_schema_pydantic(
         try:
             json_schema = schema_generator.generate(schema_dict)
             # Extract parameters
-            parameters: ToolParameters = {
+            fallback_parameters: ToolParameters = {
                 "type": "object",
                 "properties": json_schema.get("properties", {}),
             }
 
-            if required_fields:
-                parameters["required"] = required_fields
-        except Exception:
+            if fallback_required_fields:
+                fallback_parameters["required"] = fallback_required_fields
+            parameters = fallback_parameters
+        except Exception:  # noqa: BLE001
             # If JSON schema generation fails, fall back to original implementation
             return _create_schema_original(
                 func, name_override, description_override, exclude_types

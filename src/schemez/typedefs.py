@@ -40,12 +40,8 @@ class ObjectProperty(PropertyBase):
 Property = ArrayProperty | ObjectProperty | SimpleProperty
 
 
-class ToolParameters(TypedDict):
-    """Schema for function parameters."""
-
-    type: Literal["object"]
-    properties: dict[str, Property]
-    required: NotRequired[list[str]]
+# Use dict[str, Any] for maximum flexibility with JSON schemas
+ToolParameters = dict[str, Any]
 
 
 class OpenAIFunctionDefinition(TypedDict):
