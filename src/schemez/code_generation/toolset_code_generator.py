@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 logger = log.get_logger(__name__)
 
+ArgsFormat = Literal["model", "explicit"]
+OutputType = Literal["stubs", "implementation"]
+
 
 USAGE = """\
 Usage notes:
@@ -59,8 +62,11 @@ class GeneratedCode:
     clean_methods: str
     """Clean signature methods without models."""
 
-    stubs: str
-    """Function stubs for LLM consumption."""
+    model_stubs: str
+    """Model-based function stubs for LLM consumption."""
+
+    explicit_stubs: str
+    """Explicit signature function stubs for LLM consumption."""
 
     imports: str = ""
     """Common imports."""
@@ -69,13 +75,17 @@ class GeneratedCode:
     """Exported names."""
 
     def get_client_code(
-        self, mode: Literal["models", "simple", "stubs"] = "models"
+        self,
+        args_format: ArgsFormat = "explicit",
+        output_type: OutputType = "implementation",
     ) -> str:
-        """Generate client code in specified mode.
+        """Generate client code with specified format and type.
 
         Args:
-            mode: Generation mode - "models" (with Pydantic models),
-                  "simple" (clean signatures), or "stubs" (function stubs)
+            args_format: Argument format - "model" (with Pydantic models) or
+                "explicit" (function signatures)
+            output_type: Output type - "stubs" (type stubs) or
+                "implementation" (working HTTP client)
 
         Returns:
             Formatted client code
@@ -84,35 +94,51 @@ class GeneratedCode:
         if self.imports:
             parts.append(self.imports)
 
-        if mode == "models":
-            # Complete HTTP client with models
-            if self.models:
-                parts.append(self.models)
-            if self.http_methods:
-                parts.append(self.http_methods)
-            if self.exports:
-                parts.append(f"\n__all__ = {self.exports}\n")
+        match (args_format, output_type):
+            case ("model", "implementation"):
+                # HTTP client with models
+                if self.models:
+                    parts.append(self.models)
+                if self.http_methods:
+                    parts.append(self.http_methods)
+                if self.exports:
+                    parts.append(f"\n__all__ = {self.exports}\n")
 
-        elif mode == "simple":
-            # Clean client with natural signatures
-            if self.clean_methods:
-                parts.append(self.clean_methods)
-            if self.exports:
-                exports = [name for name in self.exports if not name.endswith("Input")]
-                parts.append(f"\n__all__ = {exports}\n")
+            case ("explicit", "implementation"):
+                # HTTP client with explicit signatures
+                if self.clean_methods:
+                    parts.append(self.clean_methods)
+                if self.exports:
+                    exports = [
+                        name for name in self.exports if not name.endswith("Input")
+                    ]
+                    parts.append(f"\n__all__ = {exports}\n")
 
-        elif mode == "stubs":
-            # Function stubs for LLM consumption
-            if self.models:
-                parts.append(self.models)
-            if self.stubs:
-                parts.append(self.stubs)
-            if self.exports:
-                parts.append(f"\n__all__ = {self.exports}\n")
+            case ("model", "stubs"):
+                # Model-based stubs for LLM consumption
+                if self.models:
+                    parts.append(self.models)
+                if self.model_stubs:
+                    parts.append(self.model_stubs)
+                if self.exports:
+                    parts.append(f"\n__all__ = {self.exports}\n")
 
-        else:
-            msg = f"Unknown mode: {mode}. Use 'models', 'simple', or 'stubs'"
-            raise ValueError(msg)
+            case ("explicit", "stubs"):
+                # Explicit signature stubs for LLM consumption
+                if self.explicit_stubs:
+                    parts.append(self.explicit_stubs)
+                if self.exports:
+                    exports = [
+                        name for name in self.exports if not name.endswith("Input")
+                    ]
+                    parts.append(f"\n__all__ = {exports}\n")
+
+            case _:
+                msg = (
+                    f"Unknown combination: args_format={args_format}, "
+                    f"output_type={output_type}"
+                )
+                raise ValueError(msg)
 
         return "\n".join(parts)
 
@@ -286,7 +312,8 @@ import httpx
         models_parts = []
         http_methods_parts = []
         clean_methods_parts = []
-        stubs_parts = []
+        model_stubs_parts = []
+        explicit_stubs_parts = []
         all_exports = []
 
         for generator in self.generators:
@@ -373,9 +400,9 @@ async def {signature_str}:
 '''
             clean_methods_parts.append(clean_method)
 
-            # Generate stub
+            # Generate model-based stub
             if input_class_name:
-                stub = f'''
+                model_stub = f'''
 async def {generator.name}(input: {input_class_name}) -> str:
     """{generator.schema.description or f"Call {generator.name} tool"}
 
@@ -387,17 +414,15 @@ async def {generator.name}(input: {input_class_name}) -> str:
     """
     ...
 '''
-            else:
-                stub = f'''
-async def {generator.name}() -> str:
-    """{generator.schema.description or f"Call {generator.name} tool"}
+                model_stubs_parts.append(model_stub)
 
-    Returns:
-        Function result
-    """
+            # Generate explicit signature stub
+            explicit_stub = f'''
+async def {signature_str}:
+    """{generator.schema.description or f"Call {generator.name} tool"}"""
     ...
 '''
-            stubs_parts.append(stub)
+            explicit_stubs_parts.append(explicit_stub)
 
             all_exports.append(generator.name)
 
@@ -408,7 +433,8 @@ async def {generator.name}() -> str:
             models="\n".join(models_parts),
             http_methods="\n".join(http_methods_parts),
             clean_methods="\n".join(clean_methods_parts),
-            stubs="\n".join(stubs_parts),
+            model_stubs="\n".join(model_stubs_parts),
+            explicit_stubs="\n".join(explicit_stubs_parts),
             imports=imports,
             exports=all_exports,
         )
@@ -432,23 +458,67 @@ async def {generator.name}() -> str:
 
     def generate_code(
         self,
-        mode: Literal["models", "simple", "stubs"] = "models",
+        args_format: ArgsFormat = "explicit",
+        output_type: OutputType = "implementation",
         base_url: str = "http://localhost:8000",
         path_prefix: str = "/tools",
     ) -> str:
-        """Generate client code in the specified mode.
+        """Generate client code with specified format and type.
 
         Args:
-            mode: Generation mode - "models" (with Pydantic models),
-                  "simple" (clean signatures), or "stubs" (function stubs)
+            args_format: Argument format - "model" (with Pydantic models) or
+                "explicit" (function signatures)
+            output_type: Output type - "stubs" (type stubs) or
+                "implementation" (working HTTP client)
             base_url: Base URL of the tool server
             path_prefix: Path prefix for routes (must match server-side)
 
         Returns:
-            Generated client code in the specified mode
+            Generated client code
         """
         structured_code = self.generate_structured_code(base_url, path_prefix)
-        return structured_code.get_client_code(mode)
+        return structured_code.get_client_code(args_format, output_type)
+
+    def generate_code_old_mode(
+        self,
+        mode: Literal["models", "simple", "stubs"] = "models",
+        base_url: str = "http://localhost:8000",
+        path_prefix: str = "/tools",
+    ) -> str:
+        """Generate client code using old 3-mode system (deprecated).
+
+        Args:
+            mode: Legacy mode - "models", "simple", or "stubs"
+            base_url: Base URL of the tool server
+            path_prefix: Path prefix for routes
+
+        Returns:
+            Generated client code
+        """
+        import warnings
+
+        warnings.warn(
+            "generate_code_old_mode() is deprecated. "
+            "Use generate_code() with args_format and output_type parameters.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        # Map old modes to new 2x2 system
+        match mode:
+            case "models":
+                return self.generate_code(
+                    "model", "implementation", base_url, path_prefix
+                )
+            case "simple":
+                return self.generate_code(
+                    "explicit", "implementation", base_url, path_prefix
+                )
+            case "stubs":
+                return self.generate_code("explicit", "stubs", base_url, path_prefix)
+            case _:
+                msg = f"Unknown mode: {mode}. Use 'models', 'simple', or 'stubs'"
+                raise ValueError(msg)
 
     def _clean_generated_code(self, code: str) -> str:
         """Clean up generated code by removing redundant imports and headers."""
@@ -496,17 +566,28 @@ if __name__ == "__main__":
     generator = ToolsetCodeGenerator.from_callables([greet, add_numbers])
 
     # Test new structured code generation
-    print("🚀 MODELS MODE (with Pydantic models):")
+    print("🚀 MODEL IMPLEMENTATION (HTTP client with Pydantic models):")
     print("=" * 50)
-    models_code = generator.generate_code(mode="models")
-    print(models_code[:400] + "...\n")
+    model_impl_code = generator.generate_code(
+        args_format="model", output_type="implementation"
+    )
+    print(model_impl_code[:400] + "...\n")
 
-    print("🚀 SIMPLE MODE (clean signatures):")
+    print("🚀 EXPLICIT IMPLEMENTATION (HTTP client with explicit signatures):")
     print("=" * 50)
-    simple_code = generator.generate_code(mode="simple")
-    print(simple_code[:400] + "...\n")
+    explicit_impl_code = generator.generate_code(
+        args_format="explicit", output_type="implementation"
+    )
+    print(explicit_impl_code[:400] + "...\n")
 
-    print("🚀 STUBS MODE (for LLM consumption):")
+    print("🚀 MODEL STUBS (Pydantic model stubs for LLM):")
     print("=" * 50)
-    stubs_code = generator.generate_code(mode="stubs")
-    print(stubs_code[:400] + "...")
+    model_stubs_code = generator.generate_code(args_format="model", output_type="stubs")
+    print(model_stubs_code[:400] + "...\n")
+
+    print("🚀 EXPLICIT STUBS (Function signature stubs for LLM):")
+    print("=" * 50)
+    explicit_stubs_code = generator.generate_code(
+        args_format="explicit", output_type="stubs"
+    )
+    print(explicit_stubs_code[:400] + "...")
