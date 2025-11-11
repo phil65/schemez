@@ -28,27 +28,6 @@ ArgsFormat = Literal["model", "explicit"]
 OutputType = Literal["stubs", "implementation"]
 
 
-USAGE = """\
-Usage notes:
-- Write your code inside an 'async def main():' function
-- All tool functions are async, use 'await'
-- Use 'return' statements to return values from main()
-- Generated model classes are available for type checking
-- Use 'await report_progress(current, total, message)' for long-running operations
-- DO NOT call asyncio.run() or try to run the main function yourself
-- DO NOT import asyncio or other modules - tools are already available
-- Example:
-    async def main():
-        for i in range(5):
-            await report_progress(i, 5, f'Step {i+1} for {name}')
-            should_continue = await ask_user('Continue?', 'bool')
-            if not should_continue:
-                break
-        return f'Completed for {name}'
-
-"""
-
-
 @dataclass
 class GeneratedCode:
     """Structured code generation result."""
@@ -246,8 +225,6 @@ class ToolsetCodeGenerator:
 
                 parts.append(f'    """{indented_desc}"""')
             parts.append("")
-
-        parts.append(USAGE)
 
         return "\n".join(parts)
 
