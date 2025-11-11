@@ -25,11 +25,7 @@
 
 [Read the documentation!](https://phil65.github.io/schemez/)
 
-
-
-# OpenAI Function Schema Generator
-
-Convert Python functions to OpenAI-compatible function schemas automatically.
+A powerful toolkit for Python function schema generation and code generation. Extract schemas from functions, generate OpenAI-compatible tools, create HTTP clients, and set up FastAPI routes - all from your function signatures.
 
 ## Installation
 
@@ -37,260 +33,328 @@ Convert Python functions to OpenAI-compatible function schemas automatically.
 pip install schemez
 ```
 
-## Basic Usage
+## Quick Start
+
+```python
+from schemez import create_schema
+
+def get_weather(location: str, unit: str = "C") -> dict:
+    """Get weather for a location."""
+    return {"temp": 22, "location": location}
+
+# Create schema from function
+schema = create_schema(get_weather)
+print(schema.name)          # "get_weather"
+print(schema.description)   # "Get weather for a location."
+print(schema.parameters)    # Full parameter schema
+```
+
+## FunctionSchema - The Core
+
+The `FunctionSchema` class is the heart of schemez, providing a rich representation of Python functions with powerful methods for introspection and code generation.
+
+### Schema Creation
 
 ```python
 from schemez import create_schema
 from typing import Literal
 
-def get_weather(
-    location: str,
-    unit: Literal["C", "F"] = "C",
-    detailed: bool = False,
-) -> dict[str, str | float]:
-    """Get the weather for a location.
-
+def search_users(
+    query: str,
+    limit: int = 10,
+    status: Literal["active", "inactive"] = "active",
+    include_details: bool = False
+) -> list[dict]:
+    """Search for users with filters.
+    
     Args:
-        location: City or address to get weather for
-        unit: Temperature unit (Celsius or Fahrenheit)
-        detailed: Include extended forecast
+        query: Search query string
+        limit: Maximum number of results
+        status: User status filter
+        include_details: Include detailed user information
     """
-    return {"temp": 22.5, "conditions": "sunny"}
+    return []
 
 # Create schema
-schema = create_schema(get_weather)
+schema = create_schema(search_users)
+```
 
-# The schema.model_dump_openai() returns a TypedDict with the complete OpenAI tool definition:
-# OpenAIFunctionTool = TypedDict({
-#     "type": Literal["function"],
-#     "function": OpenAIFunctionDefinition
-# })
+### Key Methods
 
-# Use with OpenAI
-from openai import OpenAI
+#### OpenAI Integration
+```python
+# Get OpenAI-compatible tool definition
+openai_tool = schema.model_dump_openai()
+# Returns: {"type": "function", "function": {...}}
+```
 
-client = OpenAI()
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": "What's the weather in London?"}],
-    tools=[schema.model_dump_openai()],  # Schema includes the type: "function" wrapper
-    tool_choice="auto"
+#### Code Generation
+```python
+# Generate Python function signature
+signature = schema.to_python_signature()
+# Returns: "(*, query: str, limit: int = 10, status: Literal['active', 'inactive'] = 'active', include_details: bool = False) -> list[dict]"
+
+# Generate Pydantic model for return type
+model_code = schema.to_pydantic_model_code("SearchResponse")
+# Returns Python code string for a Pydantic model
+```
+
+#### Schema Inspection
+```python
+# Access schema components
+print(schema.name)                    # Function name
+print(schema.description)             # Function docstring
+print(schema.parameters)              # Parameter schema dict
+print(schema.returns)                 # Return type schema
+print(schema.get_annotations())       # Python type annotations
+```
+
+### Bulk Schema Generation
+
+```python
+from schemez.schema_generators import (
+    create_schemas_from_module,
+    create_schemas_from_class,
+    create_schemas_from_callables
 )
+
+# From module
+import math
+schemas = create_schemas_from_module(math, include_functions=['sin', 'cos'])
+
+# From class
+class Calculator:
+    def add(self, x: int, y: int) -> int:
+        """Add two numbers."""
+        return x + y
+    
+    def multiply(self, x: int, y: int) -> int:
+        """Multiply two numbers."""
+        return x * y
+
+schemas = create_schemas_from_class(Calculator)
+
+# From callable list
+functions = [get_weather, search_users]
+schemas = create_schemas_from_callables({"weather": get_weather, "search": search_users})
 ```
 
-> **Note**: This library supports the OpenAI API v1 format (openai>=1.0.0). For older
-> versions of the OpenAI package that use the legacy functions API, you'll need to
-> unwrap the function definition using `schema.model_dump_openai()["function"]`.
-```
+## Code Generation - Powerful Automation
 
-## Supported Types
+Transform your schemas into executable code for different contexts: HTTP clients, FastAPI routes, and Python execution environments.
 
-### Basic Types
+### HTTP Client Generation
+
+Generate complete HTTP client code from schemas:
+
 ```python
-def func(
-    text: str,              # -> "type": "string"
-    number: int,            # -> "type": "integer"
-    amount: float,          # -> "type": "number"
-    enabled: bool,          # -> "type": "boolean"
-    anything: Any,          # -> "type": "string"
-) -> None: ...
+from schemez.code_generation import ToolsetCodeGenerator
+
+# Create from functions
+functions = [get_weather, search_users]
+generator = ToolsetCodeGenerator.from_callables(functions)
+
+# Generate HTTP client code
+client_code = await generator.generate_client_code(
+    base_url="https://api.example.com",
+    path_prefix="/v1/tools"
+)
+
+# Generated code includes:
+# - Pydantic input models for each function
+# - Async HTTP wrapper functions
+# - Type-safe parameter validation
+# - Complete module with imports and exports
 ```
 
-### Container Types
+Example generated client:
 ```python
-def func(
-    items: list[str],                    # -> "type": "array", "items": {"type": "string"}
-    numbers: set[int],                   # -> same as list
-    mapping: dict[str, Any],            # -> "type": "object", "additionalProperties": true
-    nested: list[dict[str, int]],       # -> nested array/object types
-    sequence: Sequence[str],            # -> "type": "array"
-    collection: Collection[int],        # -> "type": "array"
-) -> None: ...
+"""Generated HTTP client tools."""
+
+from __future__ import annotations
+from pydantic import BaseModel
+import httpx
+
+class GetWeatherInput(BaseModel):
+    location: str
+    unit: str | None = 'C'
+
+async def get_weather(input: GetWeatherInput) -> str:
+    """Get weather for a location."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.example.com/v1/tools/get_weather",
+            params=input.model_dump(),
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.text
+
+__all__ = ['GetWeatherInput', 'get_weather', ...]
 ```
 
-### Enums and Literals
-```python
-class Color(Enum):
-    RED = "red"
-    BLUE = "blue"
+### FastAPI Route Setup
 
-def func(
-    color: Color,                       # -> "type": "string", "enum": ["red", "blue"]
-    mode: Literal["fast", "slow"],      # -> "type": "string", "enum": ["fast", "slow"]
-) -> None: ...
+Automatically create FastAPI routes from your functions:
+
+```python
+from fastapi import FastAPI
+from schemez.code_generation import ToolsetCodeGenerator
+
+app = FastAPI()
+
+# Create generator with actual callables for execution
+generator = ToolsetCodeGenerator.from_callables([get_weather, search_users])
+
+# Add all routes automatically
+generator.add_all_routes(app, path_prefix="/api/tools")
+
+# Creates routes:
+# GET /api/tools/get_weather
+# GET /api/tools/search_users
 ```
 
-### Optional and Union Types
+### Python Execution Environment
+
+Create sandboxed execution environments with tool functions:
+
 ```python
-def func(
-    opt1: str | None,                   # -> "type": "string"
-    opt2: int | None,                   # -> "type": "integer"
-    union: str | int,                   # -> "type": "string" (first type)
-) -> None: ...
+# Generate execution namespace
+namespace = generator.generate_execution_namespace()
+
+# Execute Python code with tools available
+code = """
+async def main():
+    # Tools are available as async functions
+    weather = await get_weather(GetWeatherInput(location="London"))
+    users = await search_users(SearchUsersInput(query="john", limit=5))
+    return {"weather": weather, "users": users}
+"""
+
+exec(code, namespace)
+result = await namespace['main']()
 ```
 
-### Custom Types
+### Schema-Only Code Generation
+
+Generate code without needing actual function implementations:
+
 ```python
+from schemez import create_schema
+from schemez.code_generation import ToolsetCodeGenerator
+
+# Create schemas from function signatures only
+schema1 = create_schema(get_weather)
+schema2 = create_schema(search_users)
+
+# Generate client code from schemas
+generator = ToolsetCodeGenerator.from_schemas([schema1, schema2])
+client_code = await generator.generate_client_code()
+
+# Works for client generation, signatures, models
+# Routes require actual callables for execution
+```
+
+### Tool Documentation
+
+Generate comprehensive documentation for your tools:
+
+```python
+# Generate tool descriptions with signatures and docstrings
+documentation = generator.generate_tool_description()
+
+# Includes:
+# - Function signatures with type hints  
+# - Docstrings and parameter descriptions
+# - Usage examples and constraints
+# - Available return type models
+```
+
+## Advanced Features
+
+### Type Support
+
+Schemez handles complex Python types:
+
+```python
+from typing import Literal, Optional, Union
+from enum import Enum
+from dataclasses import dataclass
+
+class Status(Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
 @dataclass
 class User:
     name: str
-    age: int
+    email: str
 
-def func(
-    user: User,                         # -> "type": "object"
-    data: JsonDict,                     # -> "type": "object"
-) -> None: ...
+def complex_function(
+    users: list[User],                    # -> Nested object arrays
+    status: Status,                       # -> Enum values
+    mode: Literal["fast", "detailed"],    # -> String literals
+    metadata: dict[str, Any],             # -> Objects with any properties
+    optional: Optional[str] = None,       # -> Optional parameters
+) -> Union[dict, list]:                   # -> Union return types
+    """Handle complex types."""
+    pass
+
+schema = create_schema(complex_function)
 ```
 
-### Type Aliases
-```python
-JsonValue = dict[str, Any] | list[Any] | str | int | float | bool | None
-JsonDict = dict[str, JsonValue]
+### Configuration
 
-def func(
-    data: JsonDict,                     # -> "type": "object"
-    values: list[JsonValue],            # -> "type": "array"
-) -> None: ...
-```
-
-### Recursive Types
-```python
-def func(
-    tree: dict[str, "dict[str, Any] | str"],  # -> "type": "object"
-    nested: dict[str, list["dict[str, Any]"]], # -> "type": "object"
-) -> None: ...
-```
-
-## Generated Schema Example
+Fine-tune schema generation:
 
 ```python
-{
-    "type": "function",
-    "function": {
-        "name": "get_weather",
-        "description": "Get the weather for a location.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "City or address to get weather for"
-                },
-                "unit": {
-                    "type": "string",
-                    "enum": ["C", "F"],
-                    "description": "Temperature unit (Celsius or Fahrenheit)",
-                    "default": "C"
-                },
-                "detailed": {
-                    "type": "boolean",
-                    "description": "Include extended forecast",
-                    "default": false
-                }
-            },
-            "required": ["location"]
-        }
-    }
-}
+# Exclude specific parameter types (e.g., context objects)
+schema = create_schema(my_function, exclude_types=[Context, Session])
+
+# Override names and descriptions
+schema = create_schema(
+    my_function,
+    name_override="custom_name",
+    description_override="Custom description"
+)
 ```
 
-## Schema Generators
+### Error Handling
 
-### Module Schemas
-
-You can generate schemas for all public functions in a module using `create_schemas_from_module`:
+Robust error handling throughout:
 
 ```python
-from schemez import create_schemas_from_module
-import math
+from schemez.code_generation import ToolCodeGenerator
 
-# Generate schemas for all public functions
-schemas = create_schemas_from_module(math)
+# Schema-only generator (no execution capability)
+generator = ToolCodeGenerator.from_schema(schema)
 
-# Generate schemas for specific functions only
-schemas = create_schemas_from_module(math, include_functions=['sin', 'cos'])
-
-# Import module by string name
-schemas = create_schemas_from_module('math')
+try:
+    # This will fail with clear error message
+    generator.add_route_to_app(app)
+except ValueError as e:
+    print(e)  # "Callable required for route generation for tool 'my_function'"
 ```
 
-### Class Schemas
+## Use Cases
 
-Generate schemas for all public methods in a class using `create_schemas_from_class`:
+- **AI Tool Integration**: Convert functions to OpenAI-compatible tools
+- **API Client Generation**: Create type-safe HTTP clients from schemas  
+- **FastAPI Automation**: Auto-generate routes with validation
+- **Documentation**: Generate comprehensive API docs
+- **Testing**: Create mock implementations and test data
+- **Code Analysis**: Extract and analyze function signatures
+- **Dynamic Execution**: Build sandboxed Python environments
 
-```python
-from schemez import create_schemas_from_class
+## Differences from Pydantic
 
-class Calculator:
-    def add(self, x: int, y: int) -> int:
-        """Add two numbers.
+While Pydantic focuses on detailed type preservation, schemez optimizes for practical AI interaction:
 
-        Args:
-            x: First number
-            y: Second number
+- **Simplified unions**: Takes first type instead of complex anyOf schemas
+- **Enum flattening**: Extracts enum values as simple string arrays
+- **AI-optimized**: Generates schemas that work well with LLM function calling
+- **Code generation focus**: Built for generating executable code, not just validation
 
-        Returns:
-            Sum of x and y
-        """
-        return x + y
+## Contributing
 
-    @classmethod
-    def multiply(cls, x: int, y: int) -> int:
-        """Multiply two numbers.
-
-        Args:
-            x: First number
-            y: Second number
-
-        Returns:
-            Product of x and y
-        """
-        return x * y
-
-    @staticmethod
-    def divide(x: float, y: float) -> float:
-        """Divide two numbers.
-
-        Args:
-            x: Numerator
-            y: Denominator
-
-        Returns:
-            Result of x divided by y
-        """
-        return x / y
-
-# Generate schemas for all public methods
-schemas = create_schemas_from_class(Calculator)
-
-# Access individual method schemas
-add_schema = schemas['Calculator.add']
-multiply_schema = schemas['Calculator.multiply']
-divide_schema = schemas['Calculator.divide']
-```
-
-The schema generators support:
-
-- Regular functions
-- Regular instance methods (bound and unbound)
-- Class methods
-- Static methods
-- Decorated functions / methods
-- Async functions / methods
-- Property methods
-- Basically all stdlib typing features as well as many stdlib types
-- Method docstrings for descriptions
-- Default values
-- Return type hints
-
-
-## Diferences to pydantic schema generation
-
-While Pydantics schema generation preserves detailed type information, `schema.model_dump_openai()`
-simplifies types to match OpenAI's function calling format. Most special types
-(datetime, UUID, Path, etc.) are handled similarly by both (we only strip unused information), but we handle enums
-differently: Instead of preserving enum class information, we extract just the values
-as a string enum. Union types and Optionals are also handled differently - we typically
-pick the first type to keep the schema simple and practical for AI interaction.
-This ensures compatibility with OpenAI's function calling API while maintaining enough
-type information for the AI to understand the function signature.
+Contributions welcome! This library consolidates schema and type utilities from multiple projects into a unified toolkit.
