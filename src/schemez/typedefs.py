@@ -42,6 +42,7 @@ Property = ArrayProperty | ObjectProperty | SimpleProperty
 
 # Use dict[str, Any] for maximum flexibility with JSON schemas
 ToolParameters = dict[str, Any]
+"""Schema for tool parameters."""
 
 
 class OpenAIFunctionDefinition(TypedDict):

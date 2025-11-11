@@ -23,16 +23,6 @@ if TYPE_CHECKING:
     from schemez.typedefs import ToolParameters
 
 
-TYPE_MAP = {
-    "string": "str",
-    "integer": "int",
-    "number": "float",
-    "boolean": "bool",
-    "array": "list",
-    "null": "None",
-}
-
-
 @dataclass
 class ToolCodeGenerator:
     """Generates code artifacts for a single tool."""
@@ -118,7 +108,6 @@ class ToolCodeGenerator:
         except Exception:  # noqa: BLE001
             return None
 
-    # Route generation methods
     def generate_route_handler(self) -> Callable:
         """Generate FastAPI route handler for this tool.
 
