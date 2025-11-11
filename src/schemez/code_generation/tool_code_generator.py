@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemez import create_schema
@@ -38,9 +38,6 @@ class ToolCodeGenerator:
     name_override: str | None = None
     """Name override for the function to generate code for."""
 
-    exclude_types: list[type] = field(default_factory=list)
-    """Exclude parameters from generated code (like context types)."""
-
     @classmethod
     def from_callable(
         cls,
@@ -49,7 +46,7 @@ class ToolCodeGenerator:
     ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a callable."""
         schema = create_schema(fn, exclude_types=exclude_types)
-        return cls(schema=schema, callable=fn, exclude_types=exclude_types or [])
+        return cls(schema=schema, callable=fn)
 
     @classmethod
     def from_schema(
