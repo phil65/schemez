@@ -707,7 +707,7 @@ def _resolve_type_annotation(
         if "properties" in schema:
             prop["properties"] = schema["properties"]
         if "additionalProperties" in schema:
-            prop["additionalProperties"] = schema["additionalProperties"]
+            prop["additionalProperties"] = schema["additionalProperties"]  # pyright: ignore[reportGeneralTypeIssues]
         if "required" in schema:
             prop["required"] = schema["required"]
         return prop
@@ -916,10 +916,10 @@ def _create_schema_pydantic(
             # Create field info
             required = param.default is inspect.Parameter.empty
             if required:
-                field_info = FieldInfo.from_annotation(annotation)
+                field_info = FieldInfo.from_annotation(annotation)  # pyright: ignore[reportArgumentType]
                 fallback_required_fields.append(name)
             else:
-                field_info = FieldInfo.from_annotated_attribute(annotation, param.default)
+                field_info = FieldInfo.from_annotated_attribute(annotation, param.default)  # pyright: ignore[reportArgumentType]
 
             # Add description from docstring if available
             if name in param_descriptions:
@@ -991,7 +991,6 @@ def _create_schema_pydantic(
         parameters=parameters,
         required=required_fields,
         returns=returns_dct,
-        function_type=function_type,
     )
 
 
@@ -1081,7 +1080,6 @@ def _create_schema_original(
         parameters=parameters,
         required=required,
         returns=returns_dct,
-        function_type=function_type,
     )
 
 
