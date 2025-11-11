@@ -51,6 +51,9 @@ class FunctionType(enum.StrEnum):
     ASYNC_GENERATOR = "async_generator"
 
 
+SchemaType = Literal["jsonschema", "openai", "simple"]
+
+
 def get_param_type(param_details: Property) -> type[Any]:
     """Get the Python type for a parameter based on its schema details."""
     if "enum" in param_details:
@@ -249,7 +252,7 @@ class FunctionSchema(pydantic.BaseModel):
 
         name = class_name or f"{self.name.title()}Response"
         return json_schema_to_pydantic_code(
-            schema_source=self.returns,
+            self.returns,
             class_name=name,
             target_python_version="3.13",
         )
@@ -270,7 +273,7 @@ class FunctionSchema(pydantic.BaseModel):
 
         name = class_name or f"{self.name.title()}Params"
         return json_schema_to_pydantic_code(
-            schema_source=self.parameters,
+            self.parameters,
             class_name=name,
             target_python_version="3.13",
         )
@@ -727,7 +730,7 @@ def create_schema(
     name_override: str | None = None,
     description_override: str | None = None,
     exclude_types: list[type] | None = None,
-    mode: Literal["jsonschema", "openai", "simple"] = "simple",
+    mode: SchemaType = "simple",
 ) -> FunctionSchema:
     """Create an OpenAI function schema from a Python function.
 

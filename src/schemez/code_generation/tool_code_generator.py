@@ -45,7 +45,7 @@ class ToolCodeGenerator:
         exclude_types: list[type] | None = None,
     ) -> ToolCodeGenerator:
         """Create a ToolCodeGenerator from a callable."""
-        schema = create_schema(fn, exclude_types=exclude_types)
+        schema = create_schema(fn, exclude_types=exclude_types, mode="openai")
         return cls(schema=schema, callable=fn)
 
     @classmethod
@@ -137,20 +137,16 @@ class ToolCodeGenerator:
         route_handler = self.generate_route_handler()
         # Set up the route with proper parameter annotations for FastAPI
         if param_cls:
-            # Get field information from the generated model
-            model_fields = param_cls.model_fields
-            func_code = generate_func_code(model_fields)
-            # Execute the dynamic function creation
+            func_code = generate_func_code(param_cls.model_fields)
             namespace = {"route_handler": route_handler, "Any": Any}
-            exec(func_code, namespace)
+            exec(func_code, namespace)  # Execute the dynamic function creation
             dynamic_handler: Callable = namespace["dynamic_handler"]  # type: ignore
         else:
 
             async def dynamic_handler() -> dict[str, Any]:
                 return await route_handler()
 
-        # Add route to FastAPI app
-        app.get(f"{path_prefix}/{self.name}")(dynamic_handler)
+        app.get(f"{path_prefix}/{self.name}")(dynamic_handler)  # Add route to FastAPI app
 
 
 if __name__ == "__main__":

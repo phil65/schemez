@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import TYPE_CHECKING, Any
 
 from schemez.schema import json_schema_to_base_model
@@ -24,7 +26,7 @@ def create_param_model(parameters_schema: dict[str, Any]) -> type[BaseModel] | N
         Pydantic model class or None if no parameters
     """
     if parameters_schema.get("properties"):
-        return json_schema_to_base_model(parameters_schema)  # type: ignore
+        return json_schema_to_base_model(parameters_schema)
     return None
 
 
@@ -79,7 +81,7 @@ def create_route_handler(tool_callable: Callable, param_cls: type | None) -> Cal
     return route_handler
 
 
-async def _execute_tool_function(tool_callable: Callable, **kwargs) -> Any:
+async def _execute_tool_function(tool_callable: Callable, **kwargs: Any) -> Any:
     """Execute a tool function with the given parameters.
 
     Args:
@@ -89,9 +91,6 @@ async def _execute_tool_function(tool_callable: Callable, **kwargs) -> Any:
     Returns:
         Tool execution result
     """
-    import asyncio
-    import inspect
-
     try:
         # Actually call the tool function
         if inspect.iscoroutinefunction(tool_callable):
@@ -118,18 +117,13 @@ if __name__ == "__main__":
     tool = Tool.from_callable(greet)
     schema = tool.schema["function"]
     parameters_schema = schema.get("parameters", {})
-
-    # Create parameter model
     param_cls = create_param_model(dict(parameters_schema))
     print(f"Generated parameter model: {param_cls}")
 
     if param_cls:
         print(f"Model fields: {param_cls.model_fields}")
-
-        # Generate function code
         func_code = generate_func_code(param_cls.model_fields)
         print(f"Generated function code:\n{func_code}")
 
-    # Create route handler
     handler = create_route_handler(greet, param_cls)
     print(f"Generated route handler: {handler}")

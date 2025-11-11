@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, assert_never, overload
 
 from pydantic import BaseModel
 
 
 PythonVersionStr = Literal["3.12", "3.13", "3.14"]
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 
 def json_schema_to_pydantic_code(
-    schema_source: str | dict,
+    schema: str | dict[str, Any],
     *,
     class_name: str = "Model",
     target_python_version: PythonVersionStr | None = None,
@@ -21,7 +24,7 @@ def json_schema_to_pydantic_code(
     """Generate Pydantic model code from a JSON schema using datamodel-codegen.
 
     Args:
-        schema_source: JSON schema as string or dict
+        schema: JSON schema as string or dict
         class_name: Name for the generated class
         target_python_version: Python version target (3.12, 3.13, 3.14)
         base_class: Base class for generated model
@@ -29,19 +32,12 @@ def json_schema_to_pydantic_code(
     Returns:
         Generated Python code string
     """
-    import json
-
     from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
     from datamodel_code_generator.model import get_data_model_types
     from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
+    from pydantic_core import to_json
 
-    # Convert schema to JSON string if needed
-    if isinstance(schema_source, dict):
-        source = json.dumps(schema_source)
-    else:
-        source = str(schema_source)
-
-    # Determine Python version
+    source = to_json(schema).decode() if isinstance(schema, dict) else str(schema)
     match target_python_version:
         case "3.12":
             py = PythonVersion.PY_312
@@ -49,8 +45,8 @@ def json_schema_to_pydantic_code(
             py = PythonVersion.PY_313
         case "3.14":
             py = PythonVersion.PY_314
-        case None:
-            py = PythonVersion.PY_313
+        case _ as unreachable:
+            assert_never(unreachable)
 
     # Get model types
     model_types = get_data_model_types(
@@ -80,7 +76,7 @@ def json_schema_to_pydantic_code(
 
 @overload
 def json_schema_to_pydantic_class[TBaseModel: BaseModel](
-    json_schema: str | dict,
+    json_schema: str | dict[str, Any],
     class_name: str = "DynamicModel",
     *,
     base_class: type[TBaseModel],
@@ -89,7 +85,7 @@ def json_schema_to_pydantic_class[TBaseModel: BaseModel](
 
 @overload
 def json_schema_to_pydantic_class(
-    json_schema: str | dict,
+    json_schema: str | dict[str, Any],
     class_name: str = "DynamicModel",
     *,
     base_class: str = "pydantic.BaseModel",
@@ -97,7 +93,7 @@ def json_schema_to_pydantic_class(
 
 
 def json_schema_to_pydantic_class(
-    json_schema: str | dict,
+    json_schema: str | dict[str, Any],
     class_name: str = "DynamicModel",
     *,
     base_class: type[BaseModel] | str = "pydantic.BaseModel",
@@ -124,7 +120,7 @@ def json_schema_to_pydantic_class(
         original_base_class = base_class
 
     code = json_schema_to_pydantic_code(
-        schema_source=json_schema,
+        json_schema,
         class_name=class_name,
         target_python_version="3.13",
         base_class=base_class_str,
@@ -197,10 +193,6 @@ def json_schema_to_pydantic_class(
     return model
 
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-
 def import_callable(path: str) -> Callable[..., Any]:
     """Import a callable from a dotted path.
 
@@ -234,7 +226,6 @@ def import_callable(path: str) -> Callable[..., Any]:
             for part in parts[i:]:
                 obj = getattr(obj, part)
 
-            # Check if we got a callable
             if callable(obj):
                 return obj
 
@@ -386,7 +377,7 @@ def model_to_python_code(
         name = class_name or model.__name__
 
     return json_schema_to_pydantic_code(
-        schema_source=schema,
+        schema,
         class_name=name,
         target_python_version=target_python_version,
         base_class=model_type,

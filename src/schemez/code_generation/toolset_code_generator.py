@@ -28,6 +28,26 @@ ArgsFormat = Literal["model", "explicit"]
 OutputType = Literal["stubs", "implementation"]
 
 
+IMPORTS = '''"""Generated tool client code."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Literal, List, Any, Dict
+from datetime import datetime
+import httpx
+
+'''
+
+STUB_IMPORTS = '''"""Generated tool stubs for LLM consumption."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+'''
+
+
 @dataclass
 class GeneratedCode:
     """Structured code generation result."""
@@ -69,13 +89,6 @@ class GeneratedCode:
         parts = []
 
         # Get stub imports for LLM consumption
-        stub_imports = '''"""Generated tool stubs for LLM consumption."""
-
-from __future__ import annotations
-
-from pydantic import BaseModel
-
-'''
 
         match (args_format, output_type):
             case ("model", "implementation"):
@@ -96,7 +109,7 @@ from pydantic import BaseModel
 
             case ("model", "stubs"):
                 # Model-based stubs for LLM consumption (minimal imports)
-                parts.append(stub_imports)
+                parts.append(STUB_IMPORTS)
                 if self.models:
                     parts.append(self.models)
                 if self.model_stubs:
@@ -104,7 +117,7 @@ from pydantic import BaseModel
 
             case ("explicit", "stubs"):
                 # Explicit signature stubs for LLM consumption (minimal imports)
-                parts.append(stub_imports)
+                parts.append(STUB_IMPORTS)
                 if self.explicit_stubs:
                     parts.append(self.explicit_stubs)
 
@@ -185,11 +198,7 @@ class ToolsetCodeGenerator:
             return "Execute Python code (no tools available)"
 
         return_models = self.generate_return_models()
-        parts = [
-            "Execute Python code with the following tools available as async functions:",
-            "",
-        ]
-
+        parts = ["Execute Python code with the following async functions available:", ""]
         if return_models:
             parts.extend([
                 "# Generated return type models",
@@ -249,9 +258,7 @@ class ToolsetCodeGenerator:
 
     def generate_return_models(self) -> str:
         """Generate Pydantic models for tool return types."""
-        model_parts = [
-            code for g in self.generators if (code := g.generate_return_model())
-        ]
+        model_parts = [c for g in self.generators if (c := g.generate_return_model())]
         return "\n\n".join(model_parts) if model_parts else ""
 
     def generate_structured_code(
@@ -268,25 +275,12 @@ class ToolsetCodeGenerator:
         """
         start_time = time.time()
         logger.info("Starting structured code generation")
-
-        # Common imports
-        imports = '''"""Generated tool client code."""
-
-from __future__ import annotations
-
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal, List, Any, Dict
-from datetime import datetime
-import httpx
-
-'''
-
         # Generate input models
-        models_parts = []
-        http_methods_parts = []
-        clean_methods_parts = []
-        model_stubs_parts = []
-        explicit_stubs_parts = []
+        models_parts: list[str] = []
+        http_methods_parts: list[str] = []
+        clean_methods_parts: list[str] = []
+        model_stubs_parts: list[str] = []
+        explicit_stubs_parts: list[str] = []
 
         for generator in self.generators:
             # Generate input model from schema parameters
@@ -301,7 +295,7 @@ import httpx
                         params_schema, class_name=input_class_name
                     )
                     if model_code:
-                        cleaned_model = self._clean_generated_code(model_code)
+                        cleaned_model = _clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
             except (ValueError, TypeError, AttributeError):
                 input_class_name = None
@@ -404,7 +398,7 @@ async def {signature_str}:
             clean_methods="\n".join(clean_methods_parts),
             model_stubs="\n".join(model_stubs_parts),
             explicit_stubs="\n".join(explicit_stubs_parts),
-            imports=imports,
+            imports=IMPORTS,
         )
 
     def add_all_routes(self, app: FastAPI, path_prefix: str = "/tools") -> None:
@@ -447,37 +441,38 @@ async def {signature_str}:
         structured_code = self.generate_structured_code(base_url, path_prefix)
         return structured_code.get_client_code(args_format, output_type)
 
-    def _clean_generated_code(self, code: str) -> str:
-        """Clean up generated code by removing redundant imports and headers."""
-        lines = code.split("\n")
-        cleaned_lines = []
-        skip_until_class = True
 
-        for line in lines:
-            # Skip lines until we find a class or other meaningful content
-            if skip_until_class:
-                if line.strip().startswith("class ") or (
-                    line.strip()
-                    and not line.startswith("#")
-                    and not line.startswith("from __future__")
-                    and not line.startswith("from pydantic import")
-                    and not line.startswith("from typing import")
-                    and not line.startswith("from datetime import")
-                ):
-                    skip_until_class = False
-                    cleaned_lines.append(line)
-                continue
-            # Skip redundant imports that are already in the header
-            if (
-                line.strip().startswith("from __future__")
-                or line.strip().startswith("from pydantic import")
-                or line.strip().startswith("from typing import")
-                or line.strip().startswith("from datetime import")
+def _clean_generated_code(code: str) -> str:
+    """Clean up generated code by removing redundant imports and headers."""
+    lines = code.split("\n")
+    cleaned_lines = []
+    skip_until_class = True
+
+    for line in lines:
+        # Skip lines until we find a class or other meaningful content
+        if skip_until_class:
+            if line.strip().startswith("class ") or (
+                line.strip()
+                and not line.startswith("#")
+                and not line.startswith("from __future__")
+                and not line.startswith("from pydantic import")
+                and not line.startswith("from typing import")
+                and not line.startswith("from datetime import")
             ):
-                continue
-            cleaned_lines.append(line)
+                skip_until_class = False
+                cleaned_lines.append(line)
+            continue
+        # Skip redundant imports that are already in the header
+        if (
+            line.strip().startswith("from __future__")
+            or line.strip().startswith("from pydantic import")
+            or line.strip().startswith("from typing import")
+            or line.strip().startswith("from datetime import")
+        ):
+            continue
+        cleaned_lines.append(line)
 
-        return "\n".join(cleaned_lines)
+    return "\n".join(cleaned_lines)
 
 
 if __name__ == "__main__":
@@ -495,26 +490,20 @@ if __name__ == "__main__":
     # Test new structured code generation
     print("🚀 MODEL IMPLEMENTATION (HTTP client with Pydantic models):")
     print("=" * 50)
-    model_impl_code = generator.generate_code(
-        args_format="model", output_type="implementation"
-    )
-    print(model_impl_code[:400] + "...\n")
+    model_impl_code = generator.generate_code(args_format="model")
+    print(model_impl_code)
 
     print("🚀 EXPLICIT IMPLEMENTATION (HTTP client with explicit signatures):")
     print("=" * 50)
-    explicit_impl_code = generator.generate_code(
-        args_format="explicit", output_type="implementation"
-    )
-    print(explicit_impl_code[:400] + "...\n")
+    explicit_impl_code = generator.generate_code(args_format="explicit")
+    print(explicit_impl_code)
 
     print("🚀 MODEL STUBS (Pydantic model stubs for LLM):")
     print("=" * 50)
     model_stubs_code = generator.generate_code(args_format="model", output_type="stubs")
-    print(model_stubs_code[:400] + "...\n")
+    print(model_stubs_code)
 
     print("🚀 EXPLICIT STUBS (Function signature stubs for LLM):")
     print("=" * 50)
-    explicit_stubs_code = generator.generate_code(
-        args_format="explicit", output_type="stubs"
-    )
+    explicit_stubs_code = generator.generate_code(output_type="stubs")
     print(explicit_stubs_code[:400] + "...")
