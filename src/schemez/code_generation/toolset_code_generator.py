@@ -9,6 +9,7 @@ import time
 from typing import TYPE_CHECKING, Any, Literal
 
 from schemez import log
+from schemez.code_generation.codegen import clean_generated_code, generate_tool_module
 from schemez.code_generation.namespace_callable import NamespaceCallable
 from schemez.code_generation.tool_code_generator import ToolCodeGenerator
 from schemez.helpers import model_to_python_code
@@ -261,6 +262,36 @@ class ToolsetCodeGenerator:
         model_parts = [c for g in self.generators if (c := g.generate_return_model())]
         return "\n\n".join(model_parts) if model_parts else ""
 
+    def generate_sandbox_files(self) -> dict[str, str]:
+        """Generate Python files for sandbox execution (ctx-zip style approach).
+
+        Returns dict mapping file paths to file contents for writing to sandbox.
+        Each tool becomes a separate .py file that can be imported directly.
+        """
+        files = {}
+
+        # Generate individual tool files
+        for generator in self.generators:
+            tool_code = generate_tool_module(generator)
+            files[f"tools/{generator.name}.py"] = tool_code
+
+        # Generate __init__.py for tools package
+        tool_imports = [f"from .{gen.name} import {gen.name}" for gen in self.generators]
+        init_content = (
+            "\n".join(tool_imports)
+            + "\n\n__all__ = "
+            + str([gen.name for gen in self.generators])
+        )
+        files["tools/__init__.py"] = init_content
+
+        # Generate models file if needed
+        if models_code := self.generate_return_models():
+            files["tools/models.py"] = (
+                f'"""Generated Pydantic models for tool return types."""\n\nfrom pydantic import BaseModel\n\n{models_code}'  # noqa: E501
+            )
+
+        return files
+
     def generate_structured_code(
         self, base_url: str = "http://localhost:8000", path_prefix: str = "/tools"
     ) -> GeneratedCode:
@@ -295,7 +326,7 @@ class ToolsetCodeGenerator:
                         params_schema, class_name=input_class_name
                     )
                     if model_code:
-                        cleaned_model = _clean_generated_code(model_code)
+                        cleaned_model = clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
             except (ValueError, TypeError, AttributeError):
                 input_class_name = None
@@ -440,39 +471,6 @@ async def {signature_str}:
         """
         structured_code = self.generate_structured_code(base_url, path_prefix)
         return structured_code.get_client_code(args_format, output_type)
-
-
-def _clean_generated_code(code: str) -> str:
-    """Clean up generated code by removing redundant imports and headers."""
-    lines = code.split("\n")
-    cleaned_lines = []
-    skip_until_class = True
-
-    for line in lines:
-        # Skip lines until we find a class or other meaningful content
-        if skip_until_class:
-            if line.strip().startswith("class ") or (
-                line.strip()
-                and not line.startswith("#")
-                and not line.startswith("from __future__")
-                and not line.startswith("from pydantic import")
-                and not line.startswith("from typing import")
-                and not line.startswith("from datetime import")
-            ):
-                skip_until_class = False
-                cleaned_lines.append(line)
-            continue
-        # Skip redundant imports that are already in the header
-        if (
-            line.strip().startswith("from __future__")
-            or line.strip().startswith("from pydantic import")
-            or line.strip().startswith("from typing import")
-            or line.strip().startswith("from datetime import")
-        ):
-            continue
-        cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)
 
 
 if __name__ == "__main__":
