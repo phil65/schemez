@@ -73,7 +73,7 @@ class ToolCodeGenerator:
     def get_function_definition(self, include_docstrings: bool = True) -> str:
         """Extract function definition using FunctionSchema."""
         parts = []
-        parts.append(f"async def  {self.get_function_signature()}")
+        parts.append(f"async def {self.get_function_signature()}")
         if include_docstrings and self.schema.description:
             lines = self.schema.description.split("\n")
             parts.extend(f"    {i.strip()}" for i in lines if i.strip())
