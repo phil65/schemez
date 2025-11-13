@@ -23,6 +23,7 @@ from typing import (
     NotRequired,
     Required,
     TypeGuard,
+    get_args,
     get_origin,
 )
 from uuid import UUID
@@ -374,10 +375,10 @@ def _is_optional_type(typ: type) -> TypeGuard[type]:
     Returns:
         True if the type is Optional, False otherwise
     """
-    origin = typing.get_origin(typ)
+    origin = get_origin(typ)
     if origin not in {typing.Union, types.UnionType}:  # pyright: ignore
         return False
-    args = typing.get_args(typ)
+    args = get_args(typ)
     # Check if any of the union members is None or NoneType
     return any(arg is type(None) for arg in args)
 
@@ -455,9 +456,9 @@ def resolve_type_annotation(
         )
 
     # Handle Annotated types first
-    if typing.get_origin(typ) is Annotated:
+    if get_origin(typ) is Annotated:
         # Get the underlying type (first argument)
-        base_type = typing.get_args(typ)[0]
+        base_type = get_args(typ)[0]
         return resolve_type_annotation(
             base_type,
             description=description,
@@ -465,8 +466,8 @@ def resolve_type_annotation(
             is_parameter=is_parameter,
         )
 
-    origin = typing.get_origin(typ)
-    args = typing.get_args(typ)
+    origin = get_origin(typ)
+    args = get_args(typ)
 
     # Handle Union types (including Optional)
     if origin in {typing.Union, types.UnionType}:  # pyright: ignore
@@ -508,13 +509,13 @@ def resolve_type_annotation(
         required = []
         for field_name, field_type in typ.__annotations__.items():
             # Check if field is wrapped in Required/NotRequired
-            origin = typing.get_origin(field_type)
+            origin = get_origin(field_type)
             if origin is Required:
                 is_required = True
-                field_type = typing.get_args(field_type)[0]
+                field_type = get_args(field_type)[0]
             elif origin is NotRequired:
                 is_required = False
-                field_type = typing.get_args(field_type)[0]
+                field_type = get_args(field_type)[0]
             else:
                 # Fall back to checking __required_keys__
                 is_required = field_name in getattr(
@@ -791,19 +792,14 @@ def _create_schema_pydantic(
     from pydantic_core import core_schema
 
     # Try to use pydantic-ai's OpenAI-compatible generator if available
-    schema_generator: Any
+    schema_generator_cls: type[GenerateJsonSchema]
     if use_openai_format:
-        try:
-            from pydantic_ai.tools import GenerateToolJsonSchema
+        from pydantic_ai.tools import GenerateToolJsonSchema
 
-            schema_generator = GenerateToolJsonSchema()
-        except ImportError:
-            # Fallback to standard generator
-            schema_generator = GenerateJsonSchema()
+        schema_generator_cls = GenerateToolJsonSchema
     else:
-        schema_generator = GenerateJsonSchema()
+        schema_generator_cls = GenerateJsonSchema
 
-    # Set up Pydantic schema generation
     config = pydantic.ConfigDict(title=func.__name__ or "unknown")
     config_wrapper = ConfigWrapper(config)
     gen_schema = _generate_schema.GenerateSchema(config_wrapper)
@@ -814,12 +810,8 @@ def _create_schema_pydantic(
         sig = inspect.signature(lambda: None)
 
     type_hints = _typing_extra.get_function_type_hints(func)
-
-    # Use pydantic-ai's approach for robust schema generation
     try:
-        from pydantic_ai._function_schema import (
-            function_schema as pydantic_ai_function_schema,
-        )
+        from pydantic_ai._function_schema import function_schema
 
         # Create a wrapper function without excluded parameters
         if exclude_types:
@@ -832,7 +824,6 @@ def _create_schema_pydantic(
                     annotation = Any
                 else:
                     annotation = type_hints.get(param.name, param.annotation)
-
                 # Skip excluded types
                 if not any(
                     _types_match(annotation, exclude_type)
@@ -844,15 +835,10 @@ def _create_schema_pydantic(
             new_sig = orig_sig.replace(parameters=filtered_params)
             # Type ignore for dynamic signature modification
             func.__signature__ = new_sig  # type: ignore[attr-defined]
-
         # Use pydantic-ai's function_schema
-        pydantic_ai_schema = pydantic_ai_function_schema(
-            func, schema_generator.__class__, takes_ctx=False
-        )
-
+        pydantic_ai_schema = function_schema(func, schema_generator_cls)
         # Convert to our format - now we can use the rich JSON schema directly
         json_schema = pydantic_ai_schema.json_schema
-
         # Create ToolParameters directly from the rich JSON schema
         parameters: ToolParameters = {
             "type": "object",
@@ -861,12 +847,10 @@ def _create_schema_pydantic(
 
         if "required" in json_schema:
             parameters["required"] = json_schema["required"]
-
         # Copy over any extra fields like $defs
         for key, value in json_schema.items():
             if key not in {"type", "properties", "required"}:
                 parameters[key] = value
-
         required_fields = json_schema.get("required", [])
 
     except ImportError:
@@ -942,7 +926,7 @@ def _create_schema_pydantic(
 
         # Generate JSON schema - this may fail for complex types
         try:
-            json_schema = schema_generator.generate(schema_dict)
+            json_schema = schema_generator_cls().generate(schema_dict)
             # Extract parameters
             fallback_parameters: ToolParameters = {
                 "type": "object",
@@ -964,7 +948,7 @@ def _create_schema_pydantic(
 
     if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
         element_type = next(
-            (t for t in typing.get_args(return_hint) if t is not type(None)),
+            (t for t in get_args(return_hint) if t is not type(None)),
             Any,
         )
         returns_dct = {
@@ -1060,7 +1044,7 @@ def _create_schema_simple(
 
     if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
         element_type = next(
-            (t for t in typing.get_args(return_hint) if t is not type(None)),
+            (t for t in get_args(return_hint) if t is not type(None)),
             Any,
         )
         prop = resolve_type_annotation(element_type, is_parameter=False)
@@ -1082,7 +1066,7 @@ if __name__ == "__main__":
 
     def get_weather(
         location: str,
-        unit: typing.Literal["C", "F"] = "C",
+        unit: Literal["C", "F"] = "C",
         detailed: bool = False,
     ) -> dict[str, str | float]:
         """Get the weather for a location.
