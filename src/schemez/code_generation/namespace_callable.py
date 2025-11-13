@@ -53,12 +53,12 @@ class NamespaceCallable:
         try:
             if inspect.iscoroutinefunction(self.callable):
                 result = await self.callable(*args, **kwargs)
-
-            result = self.callable(*args, **kwargs)
+            else:
+                result = self.callable(*args, **kwargs)
         except Exception as e:  # noqa: BLE001
             return f"Error executing {self.name}: {e!s}"
         else:
-            return result if result is not None else "Operation completed successfully"
+            return result or "Operation completed successfully"
 
     def __repr__(self) -> str:
         """Return detailed representation for debugging."""
