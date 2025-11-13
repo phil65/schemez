@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from schemez.functionschema import FunctionSchema, SchemaType
-    from schemez.functionschema.typedefs import ToolParameters
 
 
 @dataclass
@@ -67,18 +66,9 @@ class ToolCodeGenerator:
             return self.callable.__name__
         return self.schema.name
 
-    def _get_schema_params(self) -> ToolParameters:
-        """Get parameters from the schema."""
-        return self.schema.parameters
-
     def get_function_signature(self) -> str:
-        """Extract function signature using FunctionSchema."""
-        try:
-            sig = self.schema.to_python_signature()
-        except Exception:  # noqa: BLE001
-            return f"{self.name}(...) -> Any"
-        else:
-            return f"{self.name}{sig}"
+        """Assembles a signature for given generator, excluding (async) def."""
+        return f"{self.name}{self.schema.to_python_signature()}"
 
     def get_function_definition(self, include_docstrings: bool = True) -> str:
         """Extract function definition using FunctionSchema."""
