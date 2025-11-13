@@ -833,6 +833,16 @@ def _create_schema_pydantic(
 
             # Create new signature
             new_sig = orig_sig.replace(parameters=filtered_params)
+
+            # Check if this is a bound method - they don't support signature modification
+            if hasattr(func, "__func__") and hasattr(func, "__self__"):
+                msg = (
+                    f"Cannot filter parameters from bound method '{func.__qualname__}'. "
+                    f"Bound methods don't support signature modification. "
+                    f"Consider using a closure function instead:\n"
+                )
+                raise ValueError(msg)
+
             # Type ignore for dynamic signature modification
             func.__signature__ = new_sig  # type: ignore[attr-defined]
         # Use pydantic-ai's function_schema
