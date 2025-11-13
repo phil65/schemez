@@ -80,6 +80,15 @@ class ToolCodeGenerator:
         else:
             return f"{self.name}{sig}"
 
+    def get_function_definition(self, include_docstrings: bool = True) -> str:
+        """Extract function definition using FunctionSchema."""
+        parts = []
+        parts.append(f"async def  {self.get_function_signature()}")
+        if include_docstrings and self.schema.description:
+            lines = self.schema.description.split("\n")
+            parts.extend(f"    {i.strip()}" for i in lines if i.strip())
+        return "\n".join(parts)
+
     def generate_return_model(self) -> str | None:
         """Generate Pydantic model code for the tool's return type."""
         try:

@@ -170,9 +170,6 @@ class ToolsetCodeGenerator:
     generators: Sequence[ToolCodeGenerator]
     """ToolCodeGenerator instances for each tool."""
 
-    include_signatures: bool = True
-    """Include function signatures in documentation."""
-
     include_docstrings: bool = True
     """Include function docstrings in documentation."""
 
@@ -180,7 +177,6 @@ class ToolsetCodeGenerator:
     def from_callables(
         cls,
         callables: Sequence[Callable],
-        include_signatures: bool = True,
         include_docstrings: bool = True,
         exclude_types: list[type] | None = None,
     ) -> ToolsetCodeGenerator:
@@ -189,18 +185,17 @@ class ToolsetCodeGenerator:
             ToolCodeGenerator.from_callable(i, exclude_types=exclude_types)
             for i in callables
         ]
-        return cls(generators, include_signatures, include_docstrings)
+        return cls(generators, include_docstrings)
 
     @classmethod
     def from_schemas(
         cls,
         schemas: Sequence[FunctionSchema],
-        include_signatures: bool = True,
         include_docstrings: bool = True,
     ) -> ToolsetCodeGenerator:
         """Create a ToolsetCodeGenerator from schemas only (no execution capability)."""
         generators = [ToolCodeGenerator.from_schema(schema) for schema in schemas]
-        return cls(generators, include_signatures, include_docstrings)
+        return cls(generators, include_docstrings)
 
     def generate_tool_description(self) -> str:
         """Generate comprehensive tool description with available functions."""
@@ -209,18 +204,8 @@ class ToolsetCodeGenerator:
 
         parts = ["Available functions:"]
         for generator in self.generators:
-            if self.include_signatures:
-                signature = generator.get_function_signature()
-                parts.append(f"  {signature}")
-            else:
-                parts.append(f"  async def {generator.name}(...):")
-
-            if self.include_docstrings and generator.schema.description:
-                description_lines = generator.schema.description.split("\n")
-                parts.extend(
-                    f"    {line.strip()}" for line in description_lines if line.strip()
-                )
-
+            desc = generator.get_function_definition(self.include_docstrings)
+            parts.append(desc)
         return "\n".join(parts)
 
     def generate_execution_namespace(self) -> dict[str, Any]:
