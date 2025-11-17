@@ -7,11 +7,9 @@ from typing import Any, Literal, NotRequired, TypedDict
 class PropertyBase(TypedDict, total=False):
     """Base schema property with common fields."""
 
-    type: str
     description: str
     format: str
     default: Any
-    enum: NotRequired[list[Any]]
 
 
 class SimpleProperty(PropertyBase):

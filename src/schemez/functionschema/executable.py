@@ -121,7 +121,7 @@ class ExecutableFunction[T_co]:
             case FunctionType.SYNC:
                 return self.func(*args, **kwargs)  # type: ignore
             case FunctionType.ASYNC:
-                return await self.func(*args, **kwargs)  # type: ignore[no-any-return]
+                return await self.func(*args, **kwargs)  # type: ignore[no-any-return, misc]
             case FunctionType.SYNC_GENERATOR:
                 return list(self.func(*args, **kwargs))  # type: ignore
             case FunctionType.ASYNC_GENERATOR:
@@ -151,17 +151,11 @@ class ExecutableFunction[T_co]:
                 async for x in self.func(*args, **kwargs):  # type: ignore
                     yield x
             case FunctionType.SYNC:
-                yield self.func(*args, **kwargs)
+                yield self.func(*args, **kwargs)  # type: ignore[misc]
             case FunctionType.ASYNC:
-                yield await self.func(*args, **kwargs)
+                yield await self.func(*args, **kwargs)  # type: ignore[misc]
             case _ as unreachable:
                 assert_never(unreachable)
-
-
-@overload
-def create_executable[T_co](
-    func: Callable[..., T_co],
-) -> ExecutableFunction[T_co]: ...
 
 
 @overload
@@ -173,6 +167,12 @@ def create_executable[T_co](
 @overload
 def create_executable[T_co](
     func: Callable[..., AsyncGenerator[T_co]],
+) -> ExecutableFunction[T_co]: ...
+
+
+@overload
+def create_executable[T_co](
+    func: Callable[..., T_co],
 ) -> ExecutableFunction[T_co]: ...
 
 

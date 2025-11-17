@@ -230,7 +230,7 @@ class InlineSchemaDef(BaseSchemaDef):
                         key = f"VALUE_{i}"  # Otherwise, create a synthetic name
                     enum_members[key] = value
 
-                enum_class = Enum(enum_name, enum_members)
+                enum_class = Enum(enum_name, enum_members)  # type: ignore[misc]
                 python_type: Any = enum_class
 
                 if field.default is not None:  # Handle enum default value specially
@@ -335,7 +335,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     model.model_config["json_schema_extra"] = deps_extra
                 case dict() as schema_extra:
                     schema_extra.update(deps_extra)
-                case Callable() as callable_func:
+                case Callable() as callable_func:  # type: ignore[misc]
 
                     def wrapped_extra(*args: Any) -> None:
                         callable_func(*args)

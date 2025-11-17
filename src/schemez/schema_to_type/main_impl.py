@@ -94,7 +94,7 @@ def json_schema_to_pydantic_class(
                     config_dict["use_attribute_docstrings"] = False
                     new_config = ConfigDict(**config_dict)
 
-                class FallbackBase(original_base_class):  # type: ignore[valid-type]
+                class FallbackBase(original_base_class):  # type: ignore[valid-type, misc]
                     model_config = new_config
 
                 # Update namespace and code with fallback base

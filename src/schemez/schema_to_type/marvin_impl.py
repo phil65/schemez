@@ -381,7 +381,8 @@ def create_dataclass(
         if default_val is not MISSING:
             if isinstance(default_val, (dict, list)):
                 field_def = field(
-                    default_factory=lambda d=default_val: deepcopy(d), metadata=meta
+                    default_factory=lambda d=default_val: deepcopy(d),  # type: ignore[misc]
+                    metadata=meta,
                 )
             else:
                 field_def = field(default=default_val, metadata=meta)
@@ -400,7 +401,7 @@ def create_dataclass(
     cls = make_dataclass(sanitized_name, fields, kw_only=True)
 
     # Add model validator for defaults
-    @model_validator(mode="before")
+    @model_validator(mode="before")  # type: ignore[misc]
     @classmethod
     def _apply_defaults(
         cls: type[BaseModel], data: Mapping[str, Any]

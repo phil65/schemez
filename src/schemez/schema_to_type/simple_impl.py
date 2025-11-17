@@ -41,7 +41,7 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
         # Handle Enums
         if enum_values:
             enum_name: str = f"{field_name.capitalize()}Enum"
-            field_type: Any = Enum(enum_name, {v: v for v in enum_values})
+            field_type: Any = Enum(enum_name, {v: v for v in enum_values})  # type: ignore[misc]
         # Handle Nested Objects
         elif json_type == "object" and "properties" in field_props:
             # Recursively create submodel

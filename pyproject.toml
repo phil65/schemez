@@ -97,7 +97,6 @@ docstring-style = "google"
 [tool.mypy]
 python_version = "3.13"
 strict = true
-disable_error_code = ["misc"]
 pretty = true
 check_untyped_defs = true
 exclude = ["venv/", ".venv/"]
