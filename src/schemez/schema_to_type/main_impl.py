@@ -79,7 +79,7 @@ def json_schema_to_pydantic_class(
         # If it fails due to use_attribute_docstrings, try with modified base class
         if "built-in class" in str(e) and original_base_class is not None:
             # Check if base class has use_attribute_docstrings=True
-            config = getattr(original_base_class, "model_config", None)
+            config = original_base_class.model_config
             if config and config.get("use_attribute_docstrings", False):
                 # Create a subclass that disables use_attribute_docstrings
                 from pydantic import ConfigDict
@@ -88,11 +88,11 @@ def json_schema_to_pydantic_class(
                 if isinstance(config, dict):
                     config_copy = config.copy()
                     config_copy["use_attribute_docstrings"] = False
-                    new_config = ConfigDict(**config_copy)  # type:ignore[typeddict-item]
+                    new_config = ConfigDict(**config_copy)
                 else:
                     config_dict = config.__dict__.copy()
                     config_dict["use_attribute_docstrings"] = False
-                    new_config = ConfigDict(**config_dict)  # type:ignore[typeddict-item]
+                    new_config = ConfigDict(**config_dict)
 
                 class FallbackBase(original_base_class):  # type: ignore[valid-type]
                     model_config = new_config
