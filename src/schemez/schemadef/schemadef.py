@@ -230,7 +230,7 @@ class InlineSchemaDef(BaseSchemaDef):
                         key = f"VALUE_{i}"  # Otherwise, create a synthetic name
                     enum_members[key] = value
 
-                enum_class = Enum(enum_name, enum_members)  # Create the enum class
+                enum_class = Enum(enum_name, enum_members)
                 python_type: Any = enum_class
 
                 if field.default is not None:  # Handle enum default value specially

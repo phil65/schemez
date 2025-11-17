@@ -122,7 +122,7 @@ class FunctionSchema(pydantic.BaseModel):
             # Get base type
             if "enum" in details:
                 values = tuple(details["enum"])
-                param_type = Literal[values]  # type: ignore
+                param_type = Literal[values]  # type: ignore[valid-type]
             else:
                 type_map = {
                     "string": str,

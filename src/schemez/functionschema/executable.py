@@ -154,9 +154,8 @@ class ExecutableFunction[T_co]:
                 yield self.func(*args, **kwargs)
             case FunctionType.ASYNC:
                 yield await self.func(*args, **kwargs)
-            case _:
-                msg = f"Unknown function type: {self.function_type}"
-                raise ValueError(msg)
+            case _ as unreachable:
+                assert_never(unreachable)
 
 
 @overload
