@@ -43,9 +43,9 @@ def generate_func_code(model_fields: dict[str, FieldInfo]) -> str:
     for name, field_info in model_fields.items():
         field_type = field_info.annotation
         if field_info.is_required():
-            route_params.append(f"{name}: {field_type.__name__}")  # type: ignore
+            route_params.append(f"{name}: {field_type.__name__}")  # type: ignore[union-attr]
         else:
-            route_params.append(f"{name}: {field_type.__name__} = None")  # type: ignore
+            route_params.append(f"{name}: {field_type.__name__} = None")  # type: ignore[union-attr]
 
     # Create function signature dynamically
     param_str = ", ".join(route_params)

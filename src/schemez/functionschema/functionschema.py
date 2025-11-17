@@ -111,7 +111,7 @@ class FunctionSchema(pydantic.BaseModel):
 
     def _create_pydantic_model(self) -> type[pydantic.BaseModel]:
         """Create a Pydantic model from the schema parameters."""
-        fields: dict[str, tuple[type[Any] | Literal, pydantic.Field]] = {}  # type: ignore
+        fields: dict[str, tuple[type[Any] | Literal, pydantic.Field]] = {}  # type: ignore[valid-type]
         properties = self.parameters.get("properties", {})
         required = self.parameters.get("required", self.required)
 
@@ -146,7 +146,7 @@ class FunctionSchema(pydantic.BaseModel):
             )
             fields[name] = field
 
-        return pydantic.create_model(f"{self.name}_params", **fields)  # type: ignore
+        return pydantic.create_model(f"{self.name}_params", **fields)  # type: ignore[call-overload, no-any-return]
 
     def model_dump_openai(self) -> OpenAIFunctionTool:
         """Convert the schema to OpenAI's function calling format.
@@ -294,7 +294,7 @@ class FunctionSchema(pydantic.BaseModel):
         model = self._create_pydantic_model()
         annotations: dict[str, type[Any]] = {}
         for name, field in model.model_fields.items():
-            annotations[name] = field.annotation  # type: ignore
+            annotations[name] = field.annotation  # type: ignore[assignment]
         annotations["return"] = return_type
         return annotations
 
@@ -967,7 +967,7 @@ def _create_schema_pydantic(
         }
     else:
         returns = resolve_type_annotation(return_hint, is_parameter=False)
-        returns_dct = dict(returns)  # type: ignore
+        returns_dct = dict(returns)  # type: ignore[arg-type]
 
     # Get description
     import docstring_parser
@@ -1061,7 +1061,7 @@ def _create_schema_simple(
         returns_dct = {"type": "array", "items": prop}
     else:
         returns = resolve_type_annotation(return_hint, is_parameter=False)
-        returns_dct = dict(returns)  # type: ignore
+        returns_dct = dict(returns)  # type: ignore[arg-type]
 
     return FunctionSchema(
         name=name_override or getattr(func, "__name__", "unknown") or "unknown",

@@ -218,7 +218,7 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         type_context = {
             **vars(typing),
             **vars(collections.abc),
-            **{t.__name__: t for t in __builtins__.values() if isinstance(t, type)},  # type: ignore
+            **{t.__name__: t for t in __builtins__.values() if isinstance(t, type)},  # type: ignore[attr-defined]
         }
 
         try:

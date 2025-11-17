@@ -82,7 +82,7 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
         fields[param_name] = (type_hint, field)
 
     model_name = name or f"{func.__name__}Params"
-    return create_model(model_name, **fields, __base__=Schema, __doc__=description)  # type: ignore
+    return create_model(model_name, **fields, __base__=Schema, __doc__=description)  # type: ignore[no-any-return, call-overload]
 
 
 def get_ctor_basemodel(cls: type) -> type[Schema]:
@@ -114,14 +114,14 @@ def get_ctor_basemodel(cls: type) -> type[Schema]:
             )
             fields[field_name] = (field_type, field_default)
 
-        return create_model(cls.__name__, **fields, __base__=Schema)  # type: ignore
+        return create_model(cls.__name__, **fields, __base__=Schema)  # type: ignore[call-overload, no-any-return]
 
     if dataclasses.is_dataclass(cls):
         fields = {}
         hints = get_type_hints(cls)
         for field in dataclasses.fields(cls):
             fields[field.name] = (hints[field.name], ...)
-        return create_model(cls.__name__, __base__=Schema, **fields)  # type: ignore
+        return create_model(cls.__name__, __base__=Schema, **fields)  # type: ignore[no-any-return, call-overload]
     return get_function_model(cls.__init__, name=cls.__name__)
 
 
@@ -138,5 +138,5 @@ if __name__ == "__main__":
             """Do something."""
 
     model = get_function_model(Person.func_google)
-    instance = model(name="Test", age=30)  # type: ignore
+    instance = model(name="Test", age=30)  # type: ignore[call-arg]
     print(instance, isinstance(instance, BaseModel))

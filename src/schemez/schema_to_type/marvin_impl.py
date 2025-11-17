@@ -184,7 +184,7 @@ def create_enum(name: str, values: list[Any]) -> type | Enum:
     """Create enum type from list of values."""
     if all(isinstance(v, str) for v in values):
         return Enum(name, {v.upper(): v for v in values})
-    return Literal[tuple(values)]  # type: ignore
+    return Literal[tuple(values)]  # type: ignore[return-value]
 
 
 def create_array_type(

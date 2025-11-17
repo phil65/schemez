@@ -52,26 +52,26 @@ class ExecutableFunction[T_co]:
         """
         match self.function_type:
             case FunctionType.SYNC:
-                return self.func(*args, **kwargs)  # type: ignore
+                return self.func(*args, **kwargs)  # type: ignore[return-value]
             case FunctionType.ASYNC:
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
-                    return asyncio.run(self.func(*args, **kwargs))  # type: ignore
+                    return asyncio.run(self.func(*args, **kwargs))  # type: ignore[arg-type]
                 else:
                     if loop.is_running():
                         new_loop = asyncio.new_event_loop()
                         try:
                             return new_loop.run_until_complete(
-                                self.func(*args, **kwargs),  # type: ignore
+                                self.func(*args, **kwargs),  # type: ignore[arg-type]
                             )
                         finally:
                             new_loop.close()
                     return loop.run_until_complete(
-                        self.func(*args, **kwargs),  # type: ignore
+                        self.func(*args, **kwargs),  # type: ignore[arg-type]
                     )
             case FunctionType.SYNC_GENERATOR:
-                return list(self.func(*args, **kwargs))  # type: ignore
+                return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
             case FunctionType.ASYNC_GENERATOR:
                 try:
                     loop = asyncio.get_running_loop()
@@ -102,7 +102,7 @@ class ExecutableFunction[T_co]:
         Returns:
             List of collected results
         """
-        return [x async for x in self.func(*args, **kwargs)]  # type: ignore
+        return [x async for x in self.func(*args, **kwargs)]  # type: ignore[union-attr]
 
     async def arun(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:
         """Run the function asynchronously.
@@ -119,13 +119,13 @@ class ExecutableFunction[T_co]:
         """
         match self.function_type:
             case FunctionType.SYNC:
-                return self.func(*args, **kwargs)  # type: ignore
+                return self.func(*args, **kwargs)  # type: ignore[return-value]
             case FunctionType.ASYNC:
                 return await self.func(*args, **kwargs)  # type: ignore[no-any-return, misc]
             case FunctionType.SYNC_GENERATOR:
-                return list(self.func(*args, **kwargs))  # type: ignore
+                return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
             case FunctionType.ASYNC_GENERATOR:
-                return [x async for x in self.func(*args, **kwargs)]  # type: ignore
+                return [x async for x in self.func(*args, **kwargs)]  # type: ignore[union-attr]
             case _:
                 msg = f"Unknown function type: {self.function_type}"
                 raise ValueError(msg)
@@ -145,10 +145,10 @@ class ExecutableFunction[T_co]:
         """
         match self.function_type:
             case FunctionType.SYNC_GENERATOR:
-                for x in self.func(*args, **kwargs):  # type: ignore
+                for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
                     yield x
             case FunctionType.ASYNC_GENERATOR:
-                async for x in self.func(*args, **kwargs):  # type: ignore
+                async for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
                     yield x
             case FunctionType.SYNC:
                 yield self.func(*args, **kwargs)  # type: ignore[misc]

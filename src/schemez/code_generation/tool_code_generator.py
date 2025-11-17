@@ -140,7 +140,7 @@ class ToolCodeGenerator:
             func_code = generate_func_code(param_cls.model_fields)
             namespace = {"route_handler": route_handler, "Any": Any}
             exec(func_code, namespace)  # Execute the dynamic function creation
-            dynamic_handler: Callable = namespace["dynamic_handler"]  # type: ignore
+            dynamic_handler: Callable = namespace["dynamic_handler"]  # type: ignore[assignment, type-arg]
         else:
 
             async def dynamic_handler() -> dict[str, Any]:
