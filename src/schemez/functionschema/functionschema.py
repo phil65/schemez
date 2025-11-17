@@ -74,7 +74,7 @@ def get_param_type(param_details: Property) -> type[Any]:
         "array": list,
         "object": dict,
     }
-    return type_map.get(param_details.get("type", "string"), Any)  # type: ignore
+    return type_map.get(param_details.get("type", "string"), Any)
 
 
 class FunctionSchema(pydantic.BaseModel):
@@ -121,7 +121,7 @@ class FunctionSchema(pydantic.BaseModel):
                 continue
             # Get base type
             if "enum" in details:
-                values = tuple(details["enum"])  # type: ignore
+                values = tuple(details["enum"])
                 param_type = Literal[values]  # type: ignore
             else:
                 type_map = {
@@ -129,15 +129,15 @@ class FunctionSchema(pydantic.BaseModel):
                     "integer": int,
                     "number": float,
                     "boolean": bool,
-                    "array": list[Any],  # type: ignore
-                    "object": dict[str, Any],  # type: ignore
+                    "array": list[Any],
+                    "object": dict[str, Any],
                 }
                 param_type = type_map.get(details.get("type", "string"), Any)
 
             # Handle optional types (if there's a default of None)
             default_value = details.get("default")
             if default_value is None and name not in required:
-                param_type = param_type | None  # type: ignore
+                param_type = param_type | None
 
             # Create a proper pydantic Field
             field = (
@@ -235,8 +235,8 @@ class FunctionSchema(pydantic.BaseModel):
             "integer": int,
             "number": float,
             "boolean": bool,
-            "array": list[Any],  # type: ignore
-            "object": dict[str, Any],  # type: ignore
+            "array": list[Any],
+            "object": dict[str, Any],
         }
         param_type = type_map.get(self.returns.get("type", "string"), Any)
         return inspect.Signature(parameters=parameters, return_annotation=param_type)

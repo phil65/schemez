@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, Field, create_model
+
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 
 TYPE_MAPPING: dict[str, type] = {
@@ -27,7 +31,9 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
     required_fields = schema.get("required", [])
     model_fields = {}
 
-    def process_field(field_name: str, field_props: dict[str, Any]) -> tuple:
+    def process_field(
+        field_name: str, field_props: dict[str, Any]
+    ) -> tuple[Any, FieldInfo]:
         """Recursively processes a field and returns its type and Field instance."""
         json_type = field_props.get("type", "string")
         enum_values = field_props.get("enum")

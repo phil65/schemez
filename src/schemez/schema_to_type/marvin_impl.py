@@ -36,6 +36,8 @@ from typing_extensions import TypedDict
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from pydantic import BaseModel
+
 
 __all__ = ["JSONSchema", "jsonschema_to_type"]
 
@@ -134,7 +136,7 @@ def resolve_ref(ref: str, schemas: Mapping[str, Any]) -> Mapping[str, Any]:
 def create_string_type(schema: Mapping[str, Any]) -> type | Annotated[Any, ...]:
     """Create string type with optional constraints."""
     if "const" in schema:
-        return Literal[schema["const"]]  # type: ignore
+        return Literal[schema["const"]]
 
     if fmt := schema.get("format"):
         if fmt == "uri":
@@ -161,7 +163,7 @@ def create_numeric_type(
 ) -> type | Annotated[Any, ...]:
     """Create numeric type with optional constraints."""
     if "const" in schema:
-        return Literal[schema["const"]]  # type: ignore
+        return Literal[schema["const"]]
 
     constraints = {
         k: v
@@ -224,13 +226,13 @@ def _get_from_type_handler(
 ) -> Callable[..., Any]:
     """Get the appropriate type handler for the schema."""
     type_handlers: dict[str, Callable[..., Any]] = {  # TODO
-        "string": lambda s: create_string_type(s),  # type: ignore
-        "integer": lambda s: create_numeric_type(int, s),  # type: ignore
-        "number": lambda s: create_numeric_type(float, s),  # type: ignore
-        "boolean": lambda _: bool,  # type: ignore
-        "null": lambda _: type(None),  # type: ignore
-        "array": lambda s: create_array_type(s, schemas),  # type: ignore
-        "object": lambda s: create_dataclass(s, s.get("title"), schemas),  # type: ignore
+        "string": lambda s: create_string_type(s),
+        "integer": lambda s: create_numeric_type(int, s),
+        "number": lambda s: create_numeric_type(float, s),
+        "boolean": lambda _: bool,
+        "null": lambda _: type(None),
+        "array": lambda s: create_array_type(s, schemas),
+        "object": lambda s: create_dataclass(s, s.get("title"), schemas),
     }
     return type_handlers.get(schema.get("type", None), _return_any)
 
@@ -282,7 +284,7 @@ def schema_to_type(  # noqa: PLR0911
 
         return Union[tuple(types)]  # type: ignore  # noqa: UP007
 
-    return _get_from_type_handler(schema, schemas)(schema)  # type: ignore
+    return _get_from_type_handler(schema, schemas)(schema)  # type: ignore[no-any-return]
 
 
 def sanitize_name(name: str) -> str:
@@ -400,7 +402,9 @@ def create_dataclass(
     # Add model validator for defaults
     @model_validator(mode="before")
     @classmethod
-    def _apply_defaults(cls, data: Mapping[str, Any]):
+    def _apply_defaults(
+        cls: type[BaseModel], data: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         if isinstance(data, dict):
             return merge_defaults(data, original_schema)
         return data

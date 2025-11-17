@@ -121,7 +121,7 @@ class ExecutableFunction[T_co]:
             case FunctionType.SYNC:
                 return self.func(*args, **kwargs)  # type: ignore
             case FunctionType.ASYNC:
-                return await self.func(*args, **kwargs)  # type: ignore
+                return await self.func(*args, **kwargs)  # type: ignore[no-any-return]
             case FunctionType.SYNC_GENERATOR:
                 return list(self.func(*args, **kwargs))  # type: ignore
             case FunctionType.ASYNC_GENERATOR:
@@ -151,9 +151,9 @@ class ExecutableFunction[T_co]:
                 async for x in self.func(*args, **kwargs):  # type: ignore
                     yield x
             case FunctionType.SYNC:
-                yield self.func(*args, **kwargs)  # type: ignore
+                yield self.func(*args, **kwargs)
             case FunctionType.ASYNC:
-                yield await self.func(*args, **kwargs)  # type: ignore
+                yield await self.func(*args, **kwargs)
             case _:
                 msg = f"Unknown function type: {self.function_type}"
                 raise ValueError(msg)

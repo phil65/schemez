@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from schemez import log
 from schemez.helpers import model_to_python_code
@@ -11,7 +12,7 @@ from schemez.helpers import model_to_python_code
 logger = log.get_logger(__name__)
 
 
-async def generate_input_model(schema_dict: dict) -> tuple[str, str]:
+async def generate_input_model(schema_dict: dict[str, Any]) -> tuple[str, str]:
     """Generate input model code from schema."""
     start_time = time.time()
     logger.debug("Generating input model for %s", schema_dict["name"])

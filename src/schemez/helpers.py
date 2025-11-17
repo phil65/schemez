@@ -205,7 +205,7 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         }
 
         try:
-            return eval(type_string, {"__builtins__": {}}, type_context)
+            return eval(type_string, {"__builtins__": {}}, type_context)  # type: ignore[no-any-return]
         except Exception as e:
             msg = f"Failed to resolve type {type_string} in safe mode"
             raise ValueError(msg) from e
@@ -222,7 +222,7 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         }
 
         try:
-            return eval(type_string, {"__builtins__": {}}, type_context)
+            return eval(type_string, {"__builtins__": {}}, type_context)  # type: ignore[no-any-return]
         except Exception as e:
             msg = f"Failed to resolve type {type_string} in unsafe mode"
             raise ValueError(msg) from e

@@ -176,7 +176,7 @@ class ToolsetCodeGenerator:
     @classmethod
     def from_callables(
         cls,
-        callables: Sequence[Callable],
+        callables: Sequence[Callable[..., Any]],
         include_docstrings: bool = True,
         exclude_types: list[type] | None = None,
     ) -> ToolsetCodeGenerator:

@@ -88,11 +88,11 @@ def json_schema_to_pydantic_class(
                 if isinstance(config, dict):
                     config_copy = config.copy()
                     config_copy["use_attribute_docstrings"] = False
-                    new_config = ConfigDict(**config_copy)
+                    new_config = ConfigDict(**config_copy)  # type:ignore[typeddict-item]
                 else:
                     config_dict = config.__dict__.copy()
                     config_dict["use_attribute_docstrings"] = False
-                    new_config = ConfigDict(**config_dict)
+                    new_config = ConfigDict(**config_dict)  # type:ignore[typeddict-item]
 
                 class FallbackBase(original_base_class):  # type: ignore[valid-type]
                     model_config = new_config
@@ -109,7 +109,7 @@ def json_schema_to_pydantic_class(
     model = namespace.get(class_name)
     if model and isinstance(model, type) and issubclass(model, BaseModel):
         model.__module__ = __name__
-        return model
+        return model  # type: ignore[no-any-return]
 
     # Fallback: find any BaseModel subclass
     for v in namespace.values():

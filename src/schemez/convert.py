@@ -130,11 +130,11 @@ if __name__ == "__main__":
     class Person:
         """Person class."""
 
-        def __init__(self, name: str, age: int | None = None):
+        def __init__(self, name: str, age: int | None = None) -> None:
             self.name = name
             self.age = age
 
-        def func_google(self, name: str, age: int | None = None):
+        def func_google(self, name: str, age: int | None = None) -> None:
             """Do something."""
 
     model = get_function_model(Person.func_google)

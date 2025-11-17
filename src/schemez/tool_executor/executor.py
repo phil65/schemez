@@ -36,7 +36,7 @@ class HttpToolExecutor:
         schemas: Sequence[dict[str, Any] | JoinablePathLike],
         handler: ToolHandler,
         base_url: str = "http://localhost:8000",
-    ):
+    ) -> None:
         """Initialize the tool executor.
 
         Args:
@@ -52,9 +52,9 @@ class HttpToolExecutor:
         self._tool_mappings: dict[str, str] | None = None
         self._tools_code: str | None = None
         self._server_app: FastAPI | None = None
-        self._tool_functions: dict[str, Callable] | None = None
+        self._tool_functions: dict[str, Callable[..., Any]] | None = None
 
-    async def _load_schemas(self) -> list[dict]:
+    async def _load_schemas(self) -> list[dict[str, Any]]:
         """Load and normalize schemas from various sources."""
         loaded_schemas = []
 
@@ -86,7 +86,7 @@ class HttpToolExecutor:
         return self._tool_mappings
 
     async def _generate_http_wrapper(
-        self, schema_dict: dict, input_class_name: str
+        self, schema_dict: dict[str, Any], input_class_name: str
     ) -> str:
         """Generate HTTP wrapper function."""
         name = schema_dict["name"]
@@ -179,7 +179,7 @@ from datetime import datetime
         app = FastAPI(title="Tool Server", version="1.0.0")
 
         @app.post("/tools/{tool_name}")
-        async def handle_tool_call(tool_name: str, input_data: dict) -> str:
+        async def handle_tool_call(tool_name: str, input_data: dict[str, Any]) -> str:
             """Generic endpoint that routes all tool calls to user handler."""
             # Validate tool exists
             if tool_name not in tool_mappings:
@@ -204,7 +204,7 @@ from datetime import datetime
         self._server_app = app
         return app
 
-    async def get_tool_functions(self) -> dict[str, Callable]:
+    async def get_tool_functions(self) -> dict[str, Callable[..., Any]]:
         """Get ready-to-use tool functions."""
         if self._tool_functions is not None:
             return self._tool_functions
@@ -240,7 +240,7 @@ from datetime import datetime
 
     async def start_server(
         self, host: str = "0.0.0.0", port: int = 8000, background: bool = False
-    ) -> None | asyncio.Task:
+    ) -> None | asyncio.Task[None]:
         """Start the FastAPI server.
 
         Args:

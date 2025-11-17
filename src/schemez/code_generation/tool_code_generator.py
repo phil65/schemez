@@ -15,7 +15,7 @@ from schemez.functionschema import FunctionSchema
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from fastapi import FastAPI
 
@@ -29,7 +29,7 @@ class ToolCodeGenerator:
     schema: FunctionSchema
     """Schema of the tool (primary source of truth)."""
 
-    callable: Callable | None = None
+    callable: Callable[..., Any] | None = None
     """Optional callable for actual execution. Required only for FastAPI route generation
     and Python namespace execution. All other operations (client code generation,
     signatures, models) work purely from the schema."""
@@ -40,7 +40,7 @@ class ToolCodeGenerator:
     @classmethod
     def from_callable(
         cls,
-        fn: Callable,
+        fn: Callable[..., Any],
         exclude_types: list[type] | None = None,
         schema_type: SchemaType = "simple",
     ) -> ToolCodeGenerator:
@@ -105,7 +105,7 @@ class ToolCodeGenerator:
         except Exception:  # noqa: BLE001
             return None
 
-    def generate_route_handler(self) -> Callable:
+    def generate_route_handler(self) -> Callable[..., Awaitable[dict[str, Any]]]:
         """Generate FastAPI route handler for this tool.
 
         Returns:

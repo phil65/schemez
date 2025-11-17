@@ -194,7 +194,7 @@ def _convert_complex_property(
         type_str = "string"
 
     return _create_simple_property(
-        type_str=type_str,  # type: ignore # Valid since we checked above
+        type_str=type_str,
         description=description or prop.get("description"),
         enum_values=prop.get("enum"),
         default=prop.get("default"),

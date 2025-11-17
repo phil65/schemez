@@ -31,7 +31,7 @@ class BoundFunction[T]:
         self.__name__ = func.__name__
         self.__module__ = func.__module__
         self.__qualname__ = func.__qualname__
-        self.__doc__ = self._update_docstring(func.__doc__)
+        self.__doc__ = remove_kwargs_from_docstring(func.__doc__, self.bound_kwargs)
         self.__annotations__ = self._update_annotations(
             getattr(func, "__annotations__", {})
         )
@@ -87,59 +87,58 @@ class BoundFunction[T]:
             if name not in self.bound_kwargs and name != "return"
         }
 
-    def _update_docstring(self, docstring: str | None) -> str | None:
-        """Update docstring to remove bound parameters.
 
-        Args:
-            docstring: Original function docstring
+def remove_kwargs_from_docstring(
+    docstring: str | None, kwargs: dict[str, Any]
+) -> str | None:
+    """Update docstring to remove bound parameters.
 
-        Returns:
-            Updated docstring with bound parameters removed
-        """
-        if not docstring:
-            return docstring
+    Args:
+        docstring: Original function docstring
+        kwargs: kwargs to remove from docstring
 
-        lines = docstring.splitlines()
-        new_lines = []
+    Returns:
+        Updated docstring with bound parameters removed
+    """
+    if not docstring:
+        return docstring
 
-        # Find the Args section and modify it
-        in_args_section = False
-        skip_lines = False
-        current_param = None
+    lines = docstring.splitlines()
+    new_lines = []
 
-        for line in lines:
-            # Check if entering Args section
-            if "Args:" in line:
-                in_args_section = True
-                new_lines.append(line)
-                continue
-            if in_args_section and line.strip() and not line.startswith(" "):
-                in_args_section = False
-            if in_args_section and ":" in line:
-                # Get parameter name from the line
-                param_name = line.strip().split(":", 1)[0].strip()
-                if param_name in self.bound_kwargs:
-                    skip_lines = True
-                    current_param = param_name
-                else:
-                    skip_lines = False
-                    current_param = None
-            if (
-                in_args_section
-                and current_param
-                and line.strip()
-                and ":" in line.lstrip()
-            ):
-                new_param = line.strip().split(":", 1)[0].strip()
-                if new_param != current_param:
-                    skip_lines = False
-                    current_param = None
+    # Find the Args section and modify it
+    in_args_section = False
+    skip_lines = False
+    current_param = None
 
-            # Add the line if not skipping
-            if not skip_lines:
-                new_lines.append(line)
+    for line in lines:
+        # Check if entering Args section
+        if "Args:" in line:
+            in_args_section = True
+            new_lines.append(line)
+            continue
+        if in_args_section and line.strip() and not line.startswith(" "):
+            in_args_section = False
+        if in_args_section and ":" in line:
+            # Get parameter name from the line
+            param_name = line.strip().split(":", 1)[0].strip()
+            if param_name in kwargs:
+                skip_lines = True
+                current_param = param_name
+            else:
+                skip_lines = False
+                current_param = None
+        if in_args_section and current_param and line.strip() and ":" in line.lstrip():
+            new_param = line.strip().split(":", 1)[0].strip()
+            if new_param != current_param:
+                skip_lines = False
+                current_param = None
 
-        return "\n".join(new_lines)
+        # Add the line if not skipping
+        if not skip_lines:
+            new_lines.append(line)
+
+    return "\n".join(new_lines)
 
 
 if __name__ == "__main__":
@@ -150,7 +149,7 @@ if __name__ == "__main__":
         k: int = 5,
         filters: dict[str, list[str]] | None = None,
         min_score: float = 0.7,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Search the database for relevant information.
 
         Args:
@@ -181,7 +180,7 @@ if __name__ == "__main__":
     print(f"Docstring:\n{simple_search.__doc__}")
 
     # Run both functions to compare
-    async def run_test():
+    async def run_test() -> None:
         print("\nCalling original function:")
         result1 = await search_db("quantum computing")
         print(f"Result: {result1}")

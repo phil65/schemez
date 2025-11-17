@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, create_model, field_validator
 
 from schemez import Schema, helpers
+
+
+if TYPE_CHECKING:
+    from pydantic import ValidationInfo
 
 
 class SchemaField(Schema):
@@ -117,11 +121,11 @@ class SchemaField(Schema):
 
     @field_validator("max_length")
     @classmethod
-    def validate_max_min_length(cls, v: int | None, info) -> int | None:
+    def validate_max_min_length(cls, v: int | None, info: ValidationInfo) -> int | None:
         if (
             v is not None
             and info.data.get("min_length") is not None
-            and v < info.data.get("min_length")
+            and v < info.data.get("min_length")  # type:ignore[operator]
         ):
             msg = "max_length must be ≥ min_length"
             raise ValueError(msg)
@@ -250,7 +254,7 @@ class InlineSchemaDef(BaseSchemaDef):
                 python_type = Literal[field.literal_value]
 
             if field.optional:  # Handle optional fields (allowing None)
-                python_type = python_type | None  # type: ignore
+                python_type = python_type | None
 
             # Add standard Pydantic constraints. Collect all constraint values
             for constraint in [
@@ -341,7 +345,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     model.model_config["json_schema_extra"] = wrapped_extra
 
         # Return the created model
-        return model
+        return model  # type: ignore[no-any-return]
 
 
 class ImportedSchemaDef(BaseSchemaDef):

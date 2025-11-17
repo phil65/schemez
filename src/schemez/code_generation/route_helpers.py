@@ -10,7 +10,7 @@ from schemez.schema_to_type.simple_impl import json_schema_to_base_model
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from pydantic import BaseModel
     from pydantic.fields import FieldInfo
@@ -56,7 +56,9 @@ async def dynamic_handler({param_str}) -> dict[str, Any]:
 """
 
 
-def create_route_handler(tool_callable: Callable, param_cls: type | None) -> Callable:
+def create_route_handler(
+    tool_callable: Callable[..., Any], param_cls: type | None
+) -> Callable[..., Awaitable[dict[str, Any]]]:
     """Create FastAPI route handler for a tool.
 
     Args:
@@ -67,7 +69,7 @@ def create_route_handler(tool_callable: Callable, param_cls: type | None) -> Cal
         Async route handler function
     """
 
-    async def route_handler(*args, **kwargs) -> Any:
+    async def route_handler(*args: Any, **kwargs: Any) -> dict[str, Any]:
         """Route handler for the tool."""
         if param_cls:
             params_instance = param_cls(**kwargs)  # Parse and validate parameters
@@ -81,7 +83,7 @@ def create_route_handler(tool_callable: Callable, param_cls: type | None) -> Cal
     return route_handler
 
 
-async def _execute_tool_function(tool_callable: Callable, **kwargs: Any) -> Any:
+async def _execute_tool_function(tool_callable: Callable[..., Any], **kwargs: Any) -> Any:
     """Execute a tool function with the given parameters.
 
     Args:

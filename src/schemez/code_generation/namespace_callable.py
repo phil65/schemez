@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class NamespaceCallable:
     """Wrapper for tool functions with proper repr and call interface."""
 
-    callable: Callable
+    callable: Callable[..., Any]
     """The callable function to execute."""
 
     name_override: str | None = None
@@ -48,7 +48,7 @@ class NamespaceCallable:
             raise ValueError(msg)
         return cls(generator.callable, generator.name_override)
 
-    async def __call__(self, *args, **kwargs) -> Any:
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the wrapped callable."""
         try:
             if inspect.iscoroutinefunction(self.callable):
