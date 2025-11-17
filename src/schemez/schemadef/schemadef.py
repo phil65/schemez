@@ -205,7 +205,7 @@ class InlineSchemaDef(BaseSchemaDef):
         field = self.fields[field_name]
         field.add_schema_dependency(dependent_on, schema)
 
-    def get_schema(self) -> type[BaseModel]:  # type: ignore
+    def get_schema(self) -> type[BaseModel]:  # type: ignore[valid-type]
         """Create Pydantic model from inline definition."""
         fields = {}
         model_dependencies: dict[str, dict[str, Any]] = {}
@@ -373,7 +373,7 @@ class ImportedSchemaDef(BaseSchemaDef):
 
     # mypy is confused about "type"
     # TODO: convert BaseModel to Schema?
-    def get_schema(self) -> type[BaseModel]:  # type: ignore
+    def get_schema(self) -> type[BaseModel]:  # type: ignore[valid-type]
         """Import and return the model class."""
         try:
             model_class = helpers.import_class(self.import_path)

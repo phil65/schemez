@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import collections.abc
 import importlib
+import typing
 from typing import TYPE_CHECKING, Any, Literal, assert_never
 
 from pydantic import BaseModel
@@ -211,8 +213,6 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
             raise ValueError(msg) from e
     else:  # unsafe mode
         # Import common typing modules to make them available
-        import collections.abc
-        import typing
 
         # Create a context with full typing module available
         type_context = {

@@ -45,7 +45,7 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
         # Handle Nested Objects
         elif json_type == "object" and "properties" in field_props:
             # Recursively create submodel
-            field_type = json_schema_to_base_model(field_props)  # type: ignore
+            field_type = json_schema_to_base_model(field_props)  # type: ignore[misc, assignment]
         # Handle Arrays with Nested Objects
         elif json_type == "array" and "items" in field_props:
             item_props = field_props["items"]
@@ -53,9 +53,9 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
                 item_type: Any = json_schema_to_base_model(item_props)  # pyright: ignore[reportRedeclaration]
             else:
                 item_type = TYPE_MAPPING.get(item_props.get("type"), Any)  # pyright: ignore[reportAssignmentType]
-            field_type = list[item_type]  # type: ignore
+            field_type = list[item_type]  # type: ignore[assignment, misc]
         else:
-            field_type = TYPE_MAPPING.get(json_type, Any)  # type: ignore
+            field_type = TYPE_MAPPING.get(json_type, Any)  # type: ignore[assignment, misc]
 
         # Handle default values and optionality
         default_value = field_props.get("default", ...)
@@ -63,18 +63,18 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
         description = field_props.get("title", "")
 
         if nullable:
-            field_type = Optional[field_type]  # type: ignore  # noqa: UP045
+            field_type = Optional[field_type]  # type: ignore[assignment, misc] # noqa: UP045
 
         if field_name not in required_fields:
             default_value = field_props.get("default")
 
-        return field_type, Field(default_value, description=description)
+        return field_type, Field(default_value, description=description)  # pyright: ignore[reportReturnType]
 
     # Process each field
     for field_name, field_props in properties.items():
         model_fields[field_name] = process_field(field_name, field_props)
 
-    return create_model(  # type: ignore
+    return create_model(  # type: ignore[call-overload, no-any-return]
         schema.get("title", "DynamicModel"), **model_fields, __base__=model_cls
     )
 

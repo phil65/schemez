@@ -197,13 +197,13 @@ def create_array_type(
         item_types = [schema_to_type(s, schemas) for s in items]
         from typing import Union
 
-        combined = Union[tuple(item_types)]  # type: ignore # noqa: UP007
-        base = list[combined]  # type: ignore
+        combined = Union[tuple(item_types)]  # type: ignore[valid-type] # noqa: UP007
+        base = list[combined]  # type: ignore[valid-type]
     else:
         # Handle single item schema
         item_type = schema_to_type(items, schemas)
-        base = set if schema.get("uniqueItems") else list  # type: ignore
-        base = base[item_type]  # type: ignore
+        base = set if schema.get("uniqueItems") else list  # type: ignore[assignment, misc]
+        base = base[item_type]  # type: ignore[valid-type, type-arg, misc]
 
     constraints = {
         k: v
@@ -253,14 +253,14 @@ def schema_to_type(  # noqa: PLR0911
         ref = schema["$ref"]
         # Handle self-reference
         if ref == "#":
-            return ForwardRef(schema.get("title", "Root"))  # type: ignore
+            return ForwardRef(schema.get("title", "Root"))  # type: ignore[return-value]
         return schema_to_type(resolve_ref(ref, schemas), schemas)
 
     if "const" in schema:
-        return Literal[schema["const"]]  # type: ignore
+        return Literal[schema["const"]]  # type: ignore[return-value]
 
     if "enum" in schema:
-        return create_enum(f"Enum_{len(_classes)}", schema["enum"])  # type: ignore
+        return create_enum(f"Enum_{len(_classes)}", schema["enum"])  # type: ignore[return-value]
 
     schema_type = schema.get("type")
     if not schema_type:
@@ -279,7 +279,7 @@ def schema_to_type(  # noqa: PLR0911
             from typing import Union
 
             combined = Union[tuple(types)] if len(types) > 1 else types[0]  # noqa: UP007
-            return combined | None  # type: ignore
+            return combined | None  # type: ignore[return-value]
         from typing import Union
 
         return Union[tuple(types)]  # type: ignore  # noqa: UP007
@@ -347,7 +347,7 @@ def create_dataclass(
     if cache_key in _classes:
         existing = _classes[cache_key]
         if existing is None:
-            return ForwardRef(sanitized_name)  # type: ignore
+            return ForwardRef(sanitized_name)  # type: ignore[return-value]
         return existing
 
     # Place placeholder for recursive references
@@ -356,7 +356,7 @@ def create_dataclass(
     if "$ref" in schema:
         ref = schema["$ref"]
         if ref == "#":
-            return ForwardRef(sanitized_name)  # type: ignore
+            return ForwardRef(sanitized_name)  # type: ignore[return-value]
         schema = resolve_ref(ref, schemas or {})
 
     properties = schema.get("properties", {})
@@ -370,7 +370,7 @@ def create_dataclass(
         if prop_schema.get("$ref") == "#":
             field_type = ForwardRef(sanitized_name)
         else:
-            field_type = schema_to_type(prop_schema, schemas or {})  # type: ignore
+            field_type = schema_to_type(prop_schema, schemas or {})  # type: ignore[assignment]
 
         default_val = prop_schema.get("default", MISSING)
         is_required = prop_name in required
@@ -410,7 +410,7 @@ def create_dataclass(
             return merge_defaults(data, original_schema)
         return data
 
-    cls._apply_defaults = _apply_defaults  # type: ignore
+    cls._apply_defaults = _apply_defaults  # type: ignore[attr-defined]
 
     # Store completed class
     _classes[cache_key] = cls
