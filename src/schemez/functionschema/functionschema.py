@@ -17,6 +17,7 @@ from pydantic.json_schema import GenerateJsonSchema
 from schemez import log
 from schemez.functionschema.helpers import (
     determine_function_type,
+    pydantic_model_to_signature,
     resolve_type_annotation,
     types_match,
 )
@@ -142,18 +143,8 @@ class FunctionSchema(pydantic.BaseModel):
             ```
         """
         model = self._create_pydantic_model()
-        parameters: list[inspect.Parameter] = []
-        for name, field in model.model_fields.items():
-            default = inspect.Parameter.empty if field.is_required() else field.default
-            param = inspect.Parameter(
-                name=name,
-                kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=field.annotation,
-                default=default,
-            )
-            parameters.append(param)
         param_type = TYPE_MAP.get(self.returns.get("type", "string"), Any)
-        return inspect.Signature(parameters=parameters, return_annotation=param_type)
+        return pydantic_model_to_signature(model, param_type)
 
     def to_return_model_code(self, class_name: str | None = None) -> str:
         """Generate Pydantic model code for return type using datamodel-codegen.

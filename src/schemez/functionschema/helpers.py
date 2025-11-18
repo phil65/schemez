@@ -32,6 +32,8 @@ from schemez import log
 
 
 if typing.TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from schemez.functionschema.typedefs import Property
 
 
@@ -401,3 +403,28 @@ def types_match(annotation: Any, exclude_type: type) -> bool:
         pass
 
     return False
+
+
+def pydantic_model_to_signature(
+    model: type[BaseModel],
+    return_type: type,
+) -> inspect.Signature:
+    """Convert a Pydantic model to an inspect.Signature.
+
+    Model fields are represented as keyword-only parameters.
+
+    Args:
+        model: The Pydantic model to convert.
+        return_type: The return type of the function.
+    """
+    parameters: list[inspect.Parameter] = []
+    for name, field in model.model_fields.items():
+        default = inspect.Parameter.empty if field.is_required() else field.default
+        param = inspect.Parameter(
+            name=name,
+            kind=inspect.Parameter.KEYWORD_ONLY,
+            annotation=field.annotation,
+            default=default,
+        )
+        parameters.append(param)
+    return inspect.Signature(parameters=parameters, return_annotation=return_type)
