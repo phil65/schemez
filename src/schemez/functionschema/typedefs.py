@@ -129,7 +129,7 @@ def _create_object_property(
     return prop
 
 
-def _convert_complex_property(
+def clean_property(
     prop: dict[str, Any],
     description: str | None = None,
 ) -> Property:
@@ -170,7 +170,7 @@ def _convert_complex_property(
     if prop.get("type") == "array":
         items = prop.get("items", {"type": "string"})
         if isinstance(items, dict):
-            items = _convert_complex_property(items)
+            items = clean_property(items)
         return _create_array_property(
             items=items,
             description=description or prop.get("description"),
@@ -178,9 +178,7 @@ def _convert_complex_property(
 
     if prop.get("type") == "object":
         sub_props = prop.get("properties", {})
-        cleaned_props = {
-            name: _convert_complex_property(p) for name, p in sub_props.items()
-        }
+        cleaned_props = {name: clean_property(p) for name, p in sub_props.items()}
         return _create_object_property(
             description=description or prop.get("description"),
             properties=cleaned_props,

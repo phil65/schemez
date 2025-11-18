@@ -237,7 +237,7 @@ class FunctionSchema(pydantic.BaseModel):
         Raises:
             ValueError: If schema format is invalid or missing required fields
         """
-        from schemez.functionschema.typedefs import _convert_complex_property
+        from schemez.functionschema.typedefs import clean_property
 
         # Handle tool wrapper format
         if "type" in schema and schema["type"] == "function":
@@ -265,16 +265,11 @@ class FunctionSchema(pydantic.BaseModel):
         properties = param_dict.get("properties", {})
         cleaned_props: dict[str, Property] = {}
         for prop_name, prop in properties.items():
-            cleaned_props[prop_name] = _convert_complex_property(prop)
-
-        # Get required fields
+            cleaned_props[prop_name] = clean_property(prop)
         required = param_dict.get("required", [])
-
-        # Create parameters with cleaned properties
         parameters: ToolParameters = {"type": "object", "properties": cleaned_props}
         if required:
             parameters["required"] = required
-
         return cls(
             name=name,
             description=schema.get("description"),
