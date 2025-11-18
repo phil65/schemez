@@ -110,13 +110,9 @@ def test_roundtrip_conversion() -> None:
         """
         return {"temp": 22.5}
 
-    # Create schema from function
+    # roundtrip
     schema1 = create_schema(get_weather)
-
-    # Convert to OpenAI format
     openai_schema = schema1.model_dump_openai()
-
-    # Convert back to our schema
     schema2 = FunctionSchema.from_dict(openai_schema)  # type: ignore
 
     # Compare key attributes
@@ -138,16 +134,10 @@ def test_schema_to_signature_roundtrip() -> None:
 
     # Create schema from original function
     schema = create_schema(original_func)
-
-    # Get signature back from schema
     sig = schema.to_python_signature()
-
-    # Compare signatures
     original_sig = inspect.signature(original_func)
-
     # Compare parameter names and kinds
     assert sig.parameters.keys() == original_sig.parameters.keys()
-
     # Compare parameter defaults
     for name, param in sig.parameters.items():
         orig_param = original_sig.parameters[name]

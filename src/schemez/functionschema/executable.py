@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator, Callable  # noqa: TC003
 from typing import TYPE_CHECKING, Any, TypeVar, assert_never, overload
 
-from schemez.functionschema import FunctionType, create_schema
+from schemez.functionschema import create_schema
 
 
 if TYPE_CHECKING:
@@ -51,9 +51,9 @@ class ExecutableFunction[T_co]:
             Either a single result or list of results for generators
         """
         match self.function_type:
-            case FunctionType.SYNC:
+            case "sync":
                 return self.func(*args, **kwargs)  # type: ignore[return-value]
-            case FunctionType.ASYNC:
+            case "async":
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -70,9 +70,9 @@ class ExecutableFunction[T_co]:
                     return loop.run_until_complete(
                         self.func(*args, **kwargs),  # type: ignore[arg-type]
                     )
-            case FunctionType.SYNC_GENERATOR:
+            case "sync_generator":
                 return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
-            case FunctionType.ASYNC_GENERATOR:
+            case "async_generator":
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -118,13 +118,13 @@ class ExecutableFunction[T_co]:
             ValueError: If the function type is unknown
         """
         match self.function_type:
-            case FunctionType.SYNC:
+            case "sync":
                 return self.func(*args, **kwargs)  # type: ignore[return-value]
-            case FunctionType.ASYNC:
+            case "async":
                 return await self.func(*args, **kwargs)  # type: ignore[no-any-return, misc]
-            case FunctionType.SYNC_GENERATOR:
+            case "sync_generator":
                 return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
-            case FunctionType.ASYNC_GENERATOR:
+            case "async_generator":
                 return [x async for x in self.func(*args, **kwargs)]  # type: ignore[union-attr]
             case _:
                 msg = f"Unknown function type: {self.function_type}"
@@ -144,15 +144,15 @@ class ExecutableFunction[T_co]:
             ValueError: If the function type is unknown
         """
         match self.function_type:
-            case FunctionType.SYNC_GENERATOR:
+            case "sync_generator":
                 for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
                     yield x
-            case FunctionType.ASYNC_GENERATOR:
+            case "async_generator":
                 async for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
                     yield x
-            case FunctionType.SYNC:
+            case "sync":
                 yield self.func(*args, **kwargs)  # type: ignore[misc]
-            case FunctionType.ASYNC:
+            case "async":
                 yield await self.func(*args, **kwargs)  # type: ignore[misc]
             case _ as unreachable:
                 assert_never(unreachable)

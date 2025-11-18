@@ -56,13 +56,7 @@ TYPE_MAP = {
 }
 
 
-class FunctionType(enum.StrEnum):
-    """Enum representing different function types."""
-
-    SYNC = "sync"
-    ASYNC = "async"
-    SYNC_GENERATOR = "sync_generator"
-    ASYNC_GENERATOR = "async_generator"
+FunctionType = Literal["sync", "async", "sync_generator", "async_generator"]
 
 
 SchemaType = Literal["jsonschema", "openai", "simple"]
@@ -714,12 +708,12 @@ def resolve_type_annotation(
 def determine_function_type(func: Callable[..., Any]) -> FunctionType:
     """Determine the type of the function."""
     if inspect.isasyncgenfunction(func):
-        return FunctionType.ASYNC_GENERATOR
+        return "async_generator"
     if inspect.isgeneratorfunction(func):
-        return FunctionType.SYNC_GENERATOR
+        return "sync_generator"
     if inspect.iscoroutinefunction(func):
-        return FunctionType.ASYNC
-    return FunctionType.SYNC
+        return "async"
+    return "sync"
 
 
 def create_schema(
@@ -856,9 +850,6 @@ def _create_schema_pydantic(
         required_fields = json_schema.get("required", [])
 
     except ImportError:
-        # Fallback to original approach if pydantic-ai not available
-
-        # Parse docstring for parameter descriptions
         import docstring_parser
 
         docstring = docstring_parser.parse(func.__doc__ or "")
@@ -948,7 +939,7 @@ def _create_schema_pydantic(
     function_type = determine_function_type(func)
     return_hint = type_hints.get("return", Any)
 
-    if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
+    if function_type in {"sync_generator", "async_generator"}:
         element_type = next(
             (t for t in get_args(return_hint) if t is not type(None)),
             Any,
@@ -1044,7 +1035,7 @@ def _create_schema_simple(
     function_type = determine_function_type(func)
     return_hint = hints.get("return", Any)
 
-    if function_type in {FunctionType.SYNC_GENERATOR, FunctionType.ASYNC_GENERATOR}:
+    if function_type in {"sync_generator", "async_generator"}:
         element_type = next(
             (t for t in get_args(return_hint) if t is not type(None)),
             Any,
