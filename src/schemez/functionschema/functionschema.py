@@ -46,6 +46,15 @@ if typing.TYPE_CHECKING:
 
 logger = log.get_logger(__name__)
 
+TYPE_MAP = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list[Any],
+    "object": dict[str, Any],
+}
+
 
 class FunctionType(enum.StrEnum):
     """Enum representing different function types."""
@@ -124,15 +133,7 @@ class FunctionSchema(pydantic.BaseModel):
                 values = tuple(details["enum"])
                 param_type: Any = Literal[values]
             else:
-                type_map = {
-                    "string": str,
-                    "integer": int,
-                    "number": float,
-                    "boolean": bool,
-                    "array": list[Any],
-                    "object": dict[str, Any],
-                }
-                param_type = type_map.get(details.get("type", "string"), Any)
+                param_type = TYPE_MAP.get(details.get("type", "string"), Any)
 
             # Handle optional types (if there's a default of None)
             default_value = details.get("default")
@@ -230,15 +231,7 @@ class FunctionSchema(pydantic.BaseModel):
                 default=default,
             )
             parameters.append(param)
-        type_map = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "array": list[Any],
-            "object": dict[str, Any],
-        }
-        param_type = type_map.get(self.returns.get("type", "string"), Any)
+        param_type = TYPE_MAP.get(self.returns.get("type", "string"), Any)
         return inspect.Signature(parameters=parameters, return_annotation=param_type)
 
     def to_return_model_code(self, class_name: str | None = None) -> str:
@@ -299,12 +292,18 @@ class FunctionSchema(pydantic.BaseModel):
         return annotations
 
     @classmethod
-    def from_dict(cls, schema: dict[str, Any]) -> FunctionSchema:
+    def from_dict(
+        cls,
+        schema: dict[str, Any],
+        output_schema: dict[str, Any] | None = None,
+    ) -> FunctionSchema:
         """Create a FunctionSchema from a raw schema dictionary.
 
         Args:
             schema: OpenAI function schema dictionary.
                 Can be either a direct function definition or a tool wrapper.
+            output_schema: Optional dictionary specifying the return type.
+                If not provided, an object type will be set.
 
         Returns:
             New FunctionSchema instance
@@ -315,20 +314,14 @@ class FunctionSchema(pydantic.BaseModel):
         from schemez.functionschema.typedefs import _convert_complex_property
 
         # Handle tool wrapper format
-        if isinstance(schema, dict):
-            if "type" in schema and schema["type"] == "function":
-                if "function" not in schema:
-                    msg = 'Tool with type "function" must have a "function" field'
-                    raise ValueError(msg)
-                schema = schema["function"]
-            elif "type" in schema and schema.get("type") != "function":
-                msg = f"Unknown tool type: {schema.get('type')}"
+        if "type" in schema and schema["type"] == "function":
+            if "function" not in schema:
+                msg = 'Tool with type "function" must have a "function" field'
                 raise ValueError(msg)
-
-        # Validate we have a proper function definition
-        if not isinstance(schema, dict):
-            msg = "Schema must be a dictionary"
-            raise ValueError(msg)  # noqa: TRY004
+            schema = schema["function"]
+        elif "type" in schema and schema.get("type") != "function":
+            msg = f"Unknown tool type: {schema.get('type')}"
+            raise ValueError(msg)
 
         # Get function name
         name = schema.get("name", schema.get("function", {}).get("name"))
@@ -356,13 +349,12 @@ class FunctionSchema(pydantic.BaseModel):
         if required:
             parameters["required"] = required
 
-        # Create new instance
         return cls(
             name=name,
             description=schema.get("description"),
             parameters=parameters,
             required=required,
-            returns={"type": "object"},
+            returns=output_schema or {"type": "object"},
         )
 
 

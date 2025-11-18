@@ -85,10 +85,6 @@ def test_from_dict_invalid_schema() -> None:
     with pytest.raises(ValueError, match="Unknown tool type: chat"):
         FunctionSchema.from_dict({"type": "chat", "function": {}})
 
-    # Non-dict input
-    with pytest.raises(ValueError, match="Schema must be a dictionary"):
-        FunctionSchema.from_dict("not a dict")  # type: ignore
-
     # Parameters not a dict
     with pytest.raises(ValueError, match="Schema parameters must be a dictionary"):
         FunctionSchema.from_dict({
