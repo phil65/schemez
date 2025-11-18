@@ -362,3 +362,42 @@ def is_optional_type(typ: type) -> TypeGuard[type]:
     args = get_args(typ)
     # Check if any of the union members is None or NoneType
     return any(arg is type(None) for arg in args)
+
+
+def types_match(annotation: Any, exclude_type: type) -> bool:
+    """Check if annotation matches exclude_type using various strategies."""
+    try:
+        # Direct type match
+        if annotation is exclude_type:
+            return True
+
+        # Handle generic types - get origin for comparison
+        origin_annotation = get_origin(annotation)
+        if origin_annotation is exclude_type:
+            return True
+
+        # String-based comparison for forward references and __future__.annotations
+        annotation_str = str(annotation)
+        exclude_type_name = exclude_type.__name__
+        exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
+
+        # Check various string representations
+        if (
+            exclude_type_name in annotation_str
+            or exclude_type_full_name in annotation_str
+        ):
+            # Be more specific to avoid false positives
+            # Check if it's the exact type name, not just a substring
+            import re
+
+            patterns = [
+                rf"\b{re.escape(exclude_type_name)}\b",
+                rf"\b{re.escape(exclude_type_full_name)}\b",
+            ]
+            if any(re.search(pattern, annotation_str) for pattern in patterns):
+                return True
+
+    except Exception:  # noqa: BLE001
+        pass
+
+    return False

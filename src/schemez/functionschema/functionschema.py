@@ -8,7 +8,7 @@ from collections.abc import (
 )
 import inspect
 import typing
-from typing import Any, Literal, get_args, get_origin
+from typing import Any, Literal, get_args
 
 import pydantic
 from pydantic.fields import FieldInfo
@@ -18,6 +18,7 @@ from schemez import log
 from schemez.functionschema.helpers import (
     determine_function_type,
     resolve_type_annotation,
+    types_match,
 )
 from schemez.functionschema.typedefs import (
     OpenAIFunctionDefinition,
@@ -273,45 +274,6 @@ class FunctionSchema(pydantic.BaseModel):
         )
 
 
-def _types_match(annotation: Any, exclude_type: type) -> bool:
-    """Check if annotation matches exclude_type using various strategies."""
-    try:
-        # Direct type match
-        if annotation is exclude_type:
-            return True
-
-        # Handle generic types - get origin for comparison
-        origin_annotation = get_origin(annotation)
-        if origin_annotation is exclude_type:
-            return True
-
-        # String-based comparison for forward references and __future__.annotations
-        annotation_str = str(annotation)
-        exclude_type_name = exclude_type.__name__
-        exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
-
-        # Check various string representations
-        if (
-            exclude_type_name in annotation_str
-            or exclude_type_full_name in annotation_str
-        ):
-            # Be more specific to avoid false positives
-            # Check if it's the exact type name, not just a substring
-            import re
-
-            patterns = [
-                rf"\b{re.escape(exclude_type_name)}\b",
-                rf"\b{re.escape(exclude_type_full_name)}\b",
-            ]
-            if any(re.search(pattern, annotation_str) for pattern in patterns):
-                return True
-
-    except Exception:  # noqa: BLE001
-        pass
-
-    return False
-
-
 def create_schema(
     func: Callable[..., Any],
     name_override: str | None = None,
@@ -363,7 +325,7 @@ def _create_schema_pydantic(
 ) -> FunctionSchema:
     """Create schema using Pydantic's internal schema generation."""
     import docstring_parser
-    from pydantic._internal import _generate_schema, _typing_extra
+    from pydantic._internal import _decorators, _generate_schema, _typing_extra
     from pydantic._internal._config import ConfigWrapper
     from pydantic_core import core_schema
 
@@ -402,7 +364,7 @@ def _create_schema_pydantic(
                     annotation = type_hints.get(param.name, param.annotation)
                 # Skip excluded types
                 if not any(
-                    _types_match(annotation, exclude_type)
+                    types_match(annotation, exclude_type)
                     for exclude_type in exclude_types
                 ):
                     filtered_params.append(param)
@@ -450,29 +412,23 @@ def _create_schema_pydantic(
         fields: dict[str, core_schema.TypedDictField] = {}
         fallback_required_fields: list[str] = []
 
-        # Process parameters
         for name, param in sig.parameters.items():
-            # Skip self parameter
             if name == "self" and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
                 continue
 
-            # Skip *args and **kwargs
-            if param.kind in {
+            if param.kind in {  # Skip *args and **kwargs
                 inspect.Parameter.VAR_POSITIONAL,
                 inspect.Parameter.VAR_KEYWORD,
             }:
                 continue
 
-            # Get parameter annotation
             if param.annotation is sig.empty:
                 annotation = Any
             else:
                 annotation = type_hints.get(name, param.annotation)
 
             # Skip excluded types
-            if any(
-                _types_match(annotation, exclude_type) for exclude_type in exclude_types
-            ):
+            if any(types_match(annotation, t) for t in exclude_types):
                 continue
 
             # Create field info
@@ -483,32 +439,20 @@ def _create_schema_pydantic(
             else:
                 field_info = FieldInfo.from_annotated_attribute(annotation, param.default)  # pyright: ignore[reportArgumentType]
 
-            # Add description from docstring if available
-            if name in param_descriptions:
+            if name in param_descriptions:  # Add description from docstring if available
                 field_info.description = param_descriptions[name]
-
-            # Create typed dict field
-            from pydantic._internal import _decorators
-
-            td_field = gen_schema._generate_td_field_schema(
+            fields[name] = gen_schema._generate_td_field_schema(
                 name,
                 field_info,
                 _decorators.DecoratorInfos(),
                 required=required,
             )
-            fields[name] = td_field
 
         # Create typed dict schema
         core_config = config_wrapper.core_config(None)
         core_config["extra_fields_behavior"] = "forbid"
-
-        schema_dict = core_schema.typed_dict_schema(
-            fields,
-            config=core_config,
-        )
-
-        # Generate JSON schema - this may fail for complex types
-        try:
+        schema_dict = core_schema.typed_dict_schema(fields, config=core_config)
+        try:  # Generate JSON schema - this may fail for complex types
             json_schema = schema_generator_cls().generate(schema_dict)
             # Extract parameters
             fallback_parameters: ToolParameters = {
@@ -596,7 +540,7 @@ def _create_schema_simple(
 
         # Skip parameters with excluded types
         param_type = hints.get(name, Any)
-        if any(_types_match(param_type, exclude_type) for exclude_type in exclude_types):
+        if any(types_match(param_type, exclude_type) for exclude_type in exclude_types):
             continue
 
         param_doc = next(
@@ -614,10 +558,8 @@ def _create_schema_simple(
         if param.default is inspect.Parameter.empty:
             required.append(name)
 
-    # Add required fields to parameters if any exist
-    if required:
+    if required:  # Add required fields to parameters if any exist
         parameters["required"] = required
-
     # Handle return type with is_parameter=False
     function_type = determine_function_type(func)
     return_hint = hints.get("return", Any)
