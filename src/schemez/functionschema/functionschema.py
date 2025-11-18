@@ -79,7 +79,7 @@ class FunctionSchema(pydantic.BaseModel):
 
     model_config = pydantic.ConfigDict(frozen=True)
 
-    def _create_pydantic_model(self) -> type[pydantic.BaseModel]:
+    def create_parameter_model(self) -> type[pydantic.BaseModel]:
         """Create a Pydantic model from the schema parameters."""
         fields: dict[str, tuple[type[Any] | Literal, pydantic.Field]] = {}  # type: ignore[valid-type]
         properties = self.parameters.get("properties", {})
@@ -142,7 +142,7 @@ class FunctionSchema(pydantic.BaseModel):
             A function signature representing the schema parameters
             ```
         """
-        model = self._create_pydantic_model()
+        model = self.create_parameter_model()
         param_type = TYPE_MAP.get(self.returns.get("type", "string"), Any)
         return pydantic_model_to_signature(model, param_type)
 
@@ -196,7 +196,7 @@ class FunctionSchema(pydantic.BaseModel):
         Returns:
             Dictionary mapping parameter names to their Python types.
         """
-        model = self._create_pydantic_model()
+        model = self.create_parameter_model()
         annotations: dict[str, type[Any]] = {}
         for name, field in model.model_fields.items():
             annotations[name] = field.annotation  # type: ignore[assignment]
