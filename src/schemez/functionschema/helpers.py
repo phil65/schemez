@@ -256,42 +256,23 @@ def resolve_type_annotation(
                 },
             })
         # Check for Pydantic BaseModel
-        elif hasattr(typ, "__pydantic_fields__") or hasattr(typ, "model_fields"):
+        elif hasattr(typ, "model_fields"):
             # It's a Pydantic v1 or v2 model
-            try:
-                # Try Pydantic v2 first
-                if hasattr(typ, "model_fields"):
-                    fields = typ.model_fields
-                    properties = {}
-                    required = []
-                    for field_name, field_info in fields.items():
-                        field_type = field_info.annotation
-                        properties[field_name] = resolve_type_annotation(
-                            field_type,
-                            is_parameter=is_parameter,
-                        )
-                        if field_info.is_required():
-                            required.append(field_name)
-                # Fallback to Pydantic v1
-                elif hasattr(typ, "__fields__"):
-                    fields = typ.__fields__
-                    properties = {}
-                    required = []
-                    for field_name, field_info in fields.items():
-                        field_type = field_info.type_
-                        properties[field_name] = resolve_type_annotation(
-                            field_type,
-                            is_parameter=is_parameter,
-                        )
-                        if field_info.is_required():
-                            required.append(field_name)
+            fields = typ.model_fields
+            properties = {}
+            required = []
+            for field_name, field_info in fields.items():
+                field_type = field_info.annotation
+                properties[field_name] = resolve_type_annotation(
+                    field_type,
+                    is_parameter=is_parameter,
+                )
+                if field_info.is_required():
+                    required.append(field_name)
 
-                schema = {"type": "object", "properties": properties}
-                if required:
-                    schema["required"] = required
-            except (AttributeError, TypeError, ValueError):
-                # If introspection fails, fall back to generic object
-                schema["type"] = "object"
+            schema = {"type": "object", "properties": properties}
+            if required:
+                schema["required"] = required
         # Default to object for unknown types
         else:
             schema["type"] = "object"
