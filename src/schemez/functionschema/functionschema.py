@@ -138,12 +138,6 @@ class FunctionSchema(pydantic.BaseModel):
 
         Returns:
             A function signature representing the schema parameters
-
-        Example:
-            ```python
-            schema = FunctionSchema(...)
-            sig = schema.to_python_signature()
-            print(str(sig))  # -> (location: str, unit: str = None, ...)
             ```
         """
         model = self._create_pydantic_model()
@@ -345,14 +339,7 @@ def create_schema(
 
     Returns:
         Schema representing the function
-
-    Raises:
-        TypeError: If input is not callable
     """
-    if not callable(func):
-        msg = f"Expected callable, got {type(func)}"
-        raise TypeError(msg)
-
     exclude_types = exclude_types or []
     if mode == "simple":
         return _create_schema_simple(
@@ -375,6 +362,7 @@ def _create_schema_pydantic(
     use_openai_format: bool,
 ) -> FunctionSchema:
     """Create schema using Pydantic's internal schema generation."""
+    import docstring_parser
     from pydantic._internal import _generate_schema, _typing_extra
     from pydantic._internal._config import ConfigWrapper
     from pydantic_core import core_schema
@@ -453,9 +441,6 @@ def _create_schema_pydantic(
 
     except ImportError:
         # Fallback to original approach if pydantic-ai not available
-
-        # Parse docstring for parameter descriptions
-        import docstring_parser
 
         docstring = docstring_parser.parse(func.__doc__ or "")
         param_descriptions = {
@@ -556,9 +541,6 @@ def _create_schema_pydantic(
     else:
         returns = resolve_type_annotation(return_hint, is_parameter=False)
         returns_dct = dict(returns)  # type: ignore[arg-type]
-
-    # Get description
-    import docstring_parser
 
     docstring = docstring_parser.parse(func.__doc__ or "")
 
