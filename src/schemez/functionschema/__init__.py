@@ -2,11 +2,8 @@
 
 from schemez.functionschema.functionschema import (
     FunctionSchema,
-    FunctionType,
     SchemaType,
     create_schema,
-    determine_function_type,
-    resolve_type_annotation,
 )
 from schemez.functionschema.typedefs import (
     Property,
@@ -15,6 +12,12 @@ from schemez.functionschema.typedefs import (
     OpenAIFunctionTool,
     SimpleProperty,
 )
+from schemez.functionschema.helpers import (
+    FunctionType,
+    resolve_type_annotation,
+    determine_function_type,
+)
+
 from schemez.functionschema.schema_generators import (
     create_constructor_schema,
     create_schemas_from_callables,
