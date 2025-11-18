@@ -68,9 +68,7 @@ class FunctionSchema(pydantic.BaseModel):
     """JSON Schema object describing the function's parameters."""
 
     required: list[str] = pydantic.Field(default_factory=list)
-    """
-    List of parameter names that are required (do not have default values).
-    """
+    """List of parameter names that are required (do not have default values)."""
 
     returns: dict[str, Any] = pydantic.Field(
         default_factory=lambda: {"type": "object"},
@@ -137,10 +135,6 @@ class FunctionSchema(pydantic.BaseModel):
 
         This method creates a Python function signature from the OpenAI schema,
         mapping JSON schema types back to their Python equivalents.
-
-        Returns:
-            A function signature representing the schema parameters
-            ```
         """
         model = self.create_parameter_model()
         param_type = TYPE_MAP.get(self.returns.get("type", "string"), Any)
@@ -154,9 +148,6 @@ class FunctionSchema(pydantic.BaseModel):
 
         Returns:
             Generated Python code string
-
-        Raises:
-            ValueError: If schema parsing fails
         """
         from schemez.helpers import json_schema_to_pydantic_code
 
@@ -175,9 +166,6 @@ class FunctionSchema(pydantic.BaseModel):
 
         Returns:
             Generated Python code string
-
-        Raises:
-            ValueError: If schema parsing fails
         """
         from schemez.helpers import json_schema_to_pydantic_code
 
@@ -216,9 +204,6 @@ class FunctionSchema(pydantic.BaseModel):
                 Can be either a direct function definition or a tool wrapper.
             output_schema: Optional dictionary specifying the return type.
                 If not provided, an object type will be set.
-
-        Returns:
-            New FunctionSchema instance
 
         Raises:
             ValueError: If schema format is invalid or missing required fields
@@ -289,9 +274,6 @@ def create_schema(
               - simple" (default) uses custom simple implementation,
               - "openai" for OpenAI function calling via Pydantic,
               - "jsonschema" for standard JSON schema via Pydantic
-
-    Returns:
-        Schema representing the function
     """
     exclude_types = exclude_types or []
     if mode == "simple":
@@ -591,9 +573,6 @@ if __name__ == "__main__":
         """
         return {"temp": 22.5, "conditions": "sunny"}
 
-    # Create schema and executable function
     schema = create_schema(get_weather)
     signature = schema.to_python_signature()
     print(signature)
-    text = signature.format()
-    print(text)

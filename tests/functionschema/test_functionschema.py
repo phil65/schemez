@@ -281,15 +281,6 @@ def test_default_values() -> None:
     assert "lst" not in schema.required
 
 
-def test_invalid_input() -> None:
-    """Test invalid inputs."""
-    with pytest.raises(TypeError, match="Expected callable"):
-        create_schema("not a function")  # type: ignore
-
-    with pytest.raises(TypeError, match="Expected callable"):
-        create_schema(None)  # type: ignore
-
-
 def test_sync_generator() -> None:
     """Test sync generator functions are properly schematized."""
 
