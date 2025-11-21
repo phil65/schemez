@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self
 from pydantic import BaseModel, ConfigDict
 import upath
 
+from schemez.generators import SchemaDataGenerator
 from schemez.helpers import model_to_python_code
 
 
@@ -220,6 +221,57 @@ class Schema(BaseModel):
             target_python_version=target_python_version,
             model_type=model_type,
         )
+
+    @classmethod
+    def generate_test_data(
+        cls,
+        *,
+        seed: int = 0,
+        mode: Literal["minimal", "maximal", "realistic"] = "realistic",
+    ) -> Self:
+        """Generate test data that conforms to this schema.
+
+        Args:
+            seed: Seed for deterministic generation (default: 0)
+            mode: Generation mode:
+                - "minimal": Only required fields, minimum values
+                - "maximal": All fields, maximum reasonable values
+                - "realistic": Balanced generation (default)
+
+        Returns:
+            An instance of this schema populated with generated test data
+
+        Example:
+            ```python
+            class PersonSchema(Schema):
+                name: str
+                age: int = 25
+                email: str | None = None
+
+            # Generate test data
+            person = PersonSchema.generate_test_data(seed=42)
+            # Result: PersonSchema(name="abc", age=42, email=None)
+
+            # Generate minimal data (required fields only)
+            minimal = PersonSchema.generate_test_data(mode="minimal")
+            # Result: PersonSchema(name="a", age=0, email=None)
+
+            # Generate maximal data (all fields populated)
+            maximal = PersonSchema.generate_test_data(mode="maximal")
+            # Result: PersonSchema(name="abcdefghij", age=1000, email="user0@example.com")
+            ```
+        """
+        json_schema = cls.model_json_schema()
+        generator = SchemaDataGenerator(json_schema, seed=seed)
+
+        if mode == "minimal":
+            data = generator.generate_minimal()
+        elif mode == "maximal":
+            data = generator.generate_maximal()
+        else:  # realistic
+            data = generator.generate()
+
+        return cls.model_validate(data)
 
 
 if __name__ == "__main__":
