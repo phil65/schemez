@@ -15,6 +15,45 @@ if TYPE_CHECKING:
     from pydantic import ValidationInfo
 
 
+FieldType = Literal["str", "int", "bool", "float", "list", "dict", "enum"]
+ConstraintType = Literal[
+    "alias",
+    "alias_priority",
+    "validation_alias",
+    "serialization_alias",
+    "title",
+    "field_title_generator",
+    "description",
+    "examples",
+    "exclude",
+    "exclude_if",
+    "discriminator",
+    "deprecated",
+    "json_schema_extra",
+    "frozen",
+    "validate_default",
+    "repr",
+    "init",
+    "init_var",
+    "kw_only",
+    "pattern",
+    "strict",
+    "coerce_numbers_to_str",
+    "gt",
+    "ge",
+    "lt",
+    "le",
+    "multiple_of",
+    "allow_inf_nan",
+    "max_digits",
+    "decimal_places",
+    "min_length",
+    "max_length",
+    "union_mode",
+    "fail_fast",
+]
+
+
 class SchemaField(Schema):
     """Field definition for inline response types.
 
@@ -28,70 +67,145 @@ class SchemaField(Schema):
     Used by InlineSchemaDef to structure response fields.
     """
 
-    type: str
+    type: FieldType = Field(title="Field type", examples=["str", "int", "enum"])
     """Data type of the response field"""
 
-    description: str | None = None
+    description: str | None = Field(
+        default=None,
+        title="Field description",
+        examples=["User name", "Port number", "Enable debug mode"],
+    )
     """Optional description of what this field represents"""
 
-    values: list[Any] | None = None
+    values: list[Any] | None = Field(
+        default=None,
+        title="Enum values",
+        examples=[["active", "inactive", "pending"], ["small", "medium", "large"]],
+    )
     """Values for enum type fields"""
 
-    default: Any | None = None
+    default: Any | None = Field(
+        default=None,
+        title="Default value",
+        examples=["localhost", 8080, True, []],
+    )
     """Default value for the field"""
 
-    title: str | None = None
+    title: str | None = Field(
+        default=None,
+        title="Field title",
+        examples=["Server Name", "Port Number", "Debug Mode"],
+    )
     """Title for the field in generated JSON Schema"""
 
-    pattern: str | None = None
+    pattern: str | None = Field(
+        default=None,
+        title="Regex pattern",
+        examples=["^[A-Za-z]+$", "\\d{3}-\\d{3}-\\d{4}", "^[a-z0-9_]+$"],
+    )
     """Regex pattern for string validation"""
 
-    min_length: Annotated[int | None, Field(ge=0)] = None
+    min_length: Annotated[int | None, Field(ge=0)] = Field(
+        default=None,
+        title="Minimum length",
+        examples=[1, 3, 8],
+    )
     """Minimum length for collections"""
 
-    max_length: Annotated[int | None, Field(ge=0)] = None
+    max_length: Annotated[int | None, Field(ge=0)] = Field(
+        default=None, title="Maximum length", examples=[50, 255, 1000]
+    )
     """Maximum length for collections"""
 
-    gt: float | None = None
+    gt: float | None = Field(default=None, title="Greater than", examples=[0, 1.0, 100])
     """Greater than (exclusive) validation for numbers"""
 
-    ge: float | None = None
+    ge: float | None = Field(
+        default=None,
+        title="Greater than or equal",
+        examples=[0, 1, 18],
+    )
     """Greater than or equal (inclusive) validation for numbers"""
 
-    lt: float | None = None
+    lt: float | None = Field(default=None, title="Less than", examples=[100, 65536, 1.0])
     """Less than (exclusive) validation for numbers"""
 
-    le: float | None = None
+    le: float | None = Field(
+        default=None,
+        title="Less than or equal",
+        examples=[100, 255, 99.9],
+    )
     """Less than or equal (inclusive) validation for numbers"""
 
-    multiple_of: Annotated[float | None, Field(gt=0)] = None
+    multiple_of: Annotated[float | None, Field(gt=0)] = Field(
+        default=None,
+        title="Multiple of",
+        examples=[2, 5, 10, 0.5],
+    )
     """Number must be a multiple of this value"""
 
-    literal_value: Any | None = None
+    literal_value: Any | None = Field(
+        default=None,
+        title="Literal value",
+        examples=["production", 42, True],
+    )
     """Value for Literal type constraint, makes field accept only this specific value"""
 
-    examples: list[Any] | None = None
+    examples: list[Any] | None = Field(
+        default=None,
+        title="Field examples",
+        examples=[["localhost", "example.com"], [8080, 3000, 443], [True, False]],
+    )
     """Examples for this field in JSON Schema"""
 
-    optional: bool = False
+    optional: bool = Field(default=False, title="Optional field")
     """Whether this field is optional (None value allowed)"""
 
-    json_schema_extra: dict[str, Any] | None = None
+    json_schema_extra: dict[str, Any] | None = Field(
+        default=None,
+        title="JSON Schema extras",
+        examples=[{"format": "email"}, {"contentMediaType": "application/json"}],
+    )
     """Additional JSON Schema information"""
 
-    field_config: dict[str, Any] | None = None
+    field_config: dict[str, Any] | None = Field(
+        default=None,
+        title="Pydantic field config",
+        examples=[{"alias": "userName"}, {"exclude": True}],
+    )
     """Configuration for Pydantic model fields"""
 
     # Dependencies between fields
-    dependent_required: dict[str, list[str]] = Field(default_factory=dict)
+    dependent_required: dict[str, list[str]] = Field(
+        default_factory=dict,
+        title="Required field dependencies",
+        examples=[
+            {"payment_method": ["card_number", "expiry_date"]},
+            {"auth_enabled": ["username", "password"]},
+        ],
+    )
     """Field dependencies - when this field exists, dependent fields are required"""
 
-    dependent_schema: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    dependent_schema: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        title="Schema dependencies",
+        examples=[
+            {"ssl_enabled": {"properties": {"ssl_cert": {"type": "string"}}}},
+            {"debug": {"properties": {"log_level": {"enum": ["debug", "trace"]}}}},
+        ],
+    )
     """Schema dependencies - when this field exists, dependent fields must match schema"""
 
     # Extensibility for future or custom constraints
-    constraints: dict[str, Any] = Field(default_factory=dict)
-    """Additional constraints not covered by explicit fields"""
+    constraints: dict[ConstraintType, Any] = Field(
+        default_factory=dict,
+        examples=[
+            {"min_length": 3, "max_length": 50},
+            {"ge": 0, "le": 100},
+            {"strict": True, "frozen": False},
+        ],
+    )
+    """Additional Pydantic Field constraints not covered by explicit fields"""
 
     def add_required_dependency(
         self, field_name: str, required_fields: list[str]
@@ -137,7 +251,11 @@ class BaseSchemaDef(Schema):
 
     type: str = Field(init=False)
 
-    description: str | None = None
+    description: str | None = Field(
+        default=None,
+        title="Schema description",
+        examples=["User profile data", "API response format", "Configuration schema"],
+    )
     """A description for this response definition."""
 
 
@@ -168,7 +286,15 @@ class InlineSchemaDef(BaseSchemaDef):
     type: Literal["inline"] = Field("inline", init=False)
     """Inline response definition."""
 
-    fields: dict[str, SchemaField]
+    fields: dict[str, SchemaField] = Field(
+        title="Schema fields",
+        examples=[
+            {
+                "name": {"type": "str", "description": "User name"},
+                "age": {"type": "int", "description": "User age", "ge": 0},
+            }
+        ],
+    )
     """A dictionary containing all fields."""
 
     def add_field_dependency(
@@ -368,7 +494,14 @@ class ImportedSchemaDef(BaseSchemaDef):
     type: Literal["import"] = Field("import", init=False)
     """Import-path based response definition."""
 
-    import_path: str
+    import_path: str = Field(
+        title="Import path",
+        examples=[
+            "myapp.models.User",
+            "schemas.api:ResponseModel",
+            "models.core.BaseResponse",
+        ],
+    )
     """The path to the pydantic model to use as the response type."""
 
     # mypy is confused about "type"
