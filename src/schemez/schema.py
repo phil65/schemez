@@ -163,16 +163,155 @@ class Schema(BaseModel):
         exclude_none: bool = True,
         exclude_defaults: bool = False,
         exclude_unset: bool = False,
+        comments: bool = False,
     ) -> str:
-        """Dump configuration to YAML string."""
+        """Dump configuration to YAML string.
+
+        Args:
+            exclude_none: Exclude fields with None values
+            exclude_defaults: Exclude fields with default values
+            exclude_unset: Exclude fields that are not set
+            comments: Include descriptions as comments in the YAML output
+
+        Returns:
+            YAML string representation of the model
+        """
+        import re
+
         import yamling
 
-        text = self.model_dump(
+        if not comments:
+            text = self.model_dump(
+                exclude_none=exclude_none,
+                exclude_defaults=exclude_defaults,
+                exclude_unset=exclude_unset,
+            )
+            return yamling.dump_yaml(text)
+
+        # Get the data and schema
+        data = self.model_dump(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
         )
-        return yamling.dump_yaml(text)
+        schema = self.model_json_schema()
+
+        # Generate base YAML
+        base_yaml = yamling.dump_yaml(data)
+
+        def get_description(field_schema: dict[str, Any]) -> str | None:
+            """Get first line of field description."""
+            desc = field_schema.get("description", "")
+            if desc:
+                first_line = desc.split("\n")[0].strip()
+                return first_line[:100] + "..." if len(first_line) > 100 else first_line  # type: ignore[no-any-return]  # noqa: PLR2004
+            return None
+
+        def find_schema_for_path(
+            schema_obj: dict[str, Any],
+            path: list[str],
+        ) -> dict[str, Any] | None:
+            """Navigate schema to find definition for nested path."""
+            current = schema_obj
+
+            for i, segment in enumerate(path):
+                # Handle properties
+                if "properties" in current and segment in current["properties"]:
+                    current = current["properties"][segment]
+
+                    # If this field has a $ref, resolve it for subsequent navigation
+                    if "$ref" in current:
+                        ref_path = current["$ref"].replace("#/$defs/", "")
+                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
+                            # If this is the last segment,
+                            # return the original with $ref for description
+                            if i == len(path) - 1:
+                                return current  # type: ignore[no-any-return]
+                            # Otherwise continue with resolved reference
+                            current = schema_obj["$defs"][ref_path]
+                        else:
+                            return None
+
+                # Handle array items
+                elif "items" in current:
+                    current = current["items"]
+                    # Resolve $ref in items if present
+                    if "$ref" in current:
+                        ref_path = current["$ref"].replace("#/$defs/", "")
+                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
+                            current = schema_obj["$defs"][ref_path]
+                        else:
+                            return None
+
+                # Handle additionalProperties
+                elif "additionalProperties" in current and isinstance(
+                    current["additionalProperties"], dict
+                ):
+                    current = current["additionalProperties"]
+                    # Resolve $ref in additionalProperties if present
+                    if "$ref" in current:
+                        ref_path = current["$ref"].replace("#/$defs/", "")
+                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
+                            current = schema_obj["$defs"][ref_path]
+                        else:
+                            return None
+                else:
+                    return None
+            return current
+
+        def process_yaml_lines(yaml_lines: list[str]) -> list[str]:
+            """Add comments to YAML lines based on schema descriptions."""
+            result: list[str] = []
+            path_stack: list[str] = []
+
+            for line in yaml_lines:
+                original_line = line
+                stripped = line.lstrip()
+                indent_level = (len(line) - len(stripped)) // 2
+
+                # Adjust path stack based on indentation
+                while len(path_stack) > indent_level:
+                    path_stack.pop()
+
+                # Check if this is a field definition
+                if (
+                    ":" in stripped
+                    and not stripped.startswith("#")
+                    and not stripped.startswith("-")
+                ):
+                    field_match = re.match(r"^([^:]+):\s*(.*)", stripped)
+                    if field_match:
+                        field_name, value = field_match.groups()
+                        field_name = field_name.strip().strip('"').strip("'")
+
+                        # Update path stack
+                        if len(path_stack) == indent_level:
+                            path_stack.append(field_name)
+                        else:
+                            path_stack = [*path_stack[:indent_level], field_name]
+
+                        # Find schema for this field
+                        field_schema = find_schema_for_path(schema, path_stack)
+                        if field_schema:
+                            desc = get_description(field_schema)
+                            if desc:
+                                # Add comment
+                                if value.strip() and not value.strip().startswith("|"):
+                                    result.append(f"{line}  # {desc}")
+                                else:
+                                    result.append(f"{line}  # {desc}")
+                                continue
+
+                # Keep original line if no comment added
+                result.append(original_line)
+
+            return result
+
+        # Process the YAML
+        yaml_lines = base_yaml.strip().split("\n")
+        commented_lines = process_yaml_lines(yaml_lines)
+
+        return "\n".join(commented_lines)
 
     def save(self, path: JoinablePathLike, overwrite: bool = False) -> None:
         """Save configuration to a YAML file.

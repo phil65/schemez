@@ -197,7 +197,7 @@ class SchemaField(Schema):
     """Schema dependencies - when this field exists, dependent fields must match schema"""
 
     # Extensibility for future or custom constraints
-    constraints: dict[ConstraintType, Any] = Field(
+    constraints: dict[ConstraintType | str, Any] = Field(
         default_factory=dict,
         examples=[
             {"min_length": 3, "max_length": 50},
