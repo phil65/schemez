@@ -194,7 +194,7 @@ class SchemaDataGenerator:
                     data[key] = self._gen_any(value)
 
         if addition_props := schema.get("additionalProperties"):
-            add_prop_key = "additionalProperty"
+            add_prop_key = "example_name"
             while add_prop_key in data:
                 add_prop_key += "_"
             if addition_props is True:
@@ -214,7 +214,7 @@ class SchemaDataGenerator:
                 data[key] = self._gen_any_maximal(value)
 
         if addition_props := schema.get("additionalProperties"):
-            add_prop_key = "additionalProperty"
+            add_prop_key = "example_name"
             while add_prop_key in data:
                 add_prop_key += "_"
             if addition_props is True:
