@@ -15,7 +15,32 @@ if TYPE_CHECKING:
     from pydantic import ValidationInfo
 
 
-FieldType = Literal["str", "int", "bool", "float", "list", "dict", "enum"]
+FieldType = Literal[
+    "str",
+    "int",
+    "bool",
+    "float",
+    "list",
+    "dict",
+    "set",
+    "enum",
+    "list[str]",
+    "list[int]",
+    "list[float]",
+    "list[bool]",
+    "dict[str, str]",
+    "dict[str, int]",
+    "dict[str, float]",
+    "dict[str, bool]",
+    "dict[str, Any]",
+    "set[str]",
+    "set[int]",
+    "set[float]",
+    "set[bool]",
+    "tuple[str, ...]",
+    "tuple[int, ...]",
+    "Any",
+]
 ConstraintType = Literal[
     "alias",
     "alias_priority",
@@ -67,7 +92,9 @@ class SchemaField(Schema):
     Used by InlineSchemaDef to structure response fields.
     """
 
-    type: FieldType = Field(title="Field type", examples=["str", "int", "enum"])
+    type: FieldType | str = Field(
+        title="Field type", examples=["str", "int", "list[str]", "dict[str, Any]", "enum"]
+    )
     """Data type of the response field"""
 
     description: str | None = Field(
