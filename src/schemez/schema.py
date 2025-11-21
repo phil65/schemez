@@ -228,6 +228,7 @@ class Schema(BaseModel):
         *,
         seed: int = 0,
         mode: Literal["minimal", "maximal", "realistic"] = "realistic",
+        validate: bool = True,
     ) -> Self:
         """Generate test data that conforms to this schema.
 
@@ -237,6 +238,7 @@ class Schema(BaseModel):
                 - "minimal": Only required fields, minimum values
                 - "maximal": All fields, maximum reasonable values
                 - "realistic": Balanced generation (default)
+            validate: Whether to validate the generated data (default: True)
 
         Returns:
             An instance of this schema populated with generated test data
@@ -271,7 +273,9 @@ class Schema(BaseModel):
         else:  # realistic
             data = generator.generate()
 
-        return cls.model_validate(data)
+        if validate:
+            return cls.model_validate(data)
+        return cls.model_construct(**data)
 
 
 if __name__ == "__main__":
