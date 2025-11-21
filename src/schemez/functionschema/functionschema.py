@@ -289,6 +289,24 @@ def create_schema(
     )
 
 
+def _wrap_bound_method(bound_method: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap a bound method in a function to allow signature modification."""
+    import functools
+
+    # Create wrapper that delegates to the bound method
+    @functools.wraps(bound_method.__func__)  # type: ignore[attr-defined]
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return bound_method(*args, **kwargs)
+
+    # Copy important attributes from the bound method
+    wrapper.__annotations__ = getattr(bound_method.__func__, "__annotations__", {})  # type: ignore[attr-defined]
+    wrapper.__doc__ = bound_method.__func__.__doc__  # type: ignore[attr-defined]
+    wrapper.__name__ = bound_method.__func__.__name__  # type: ignore[attr-defined]
+    wrapper.__qualname__ = bound_method.__func__.__qualname__  # type: ignore[attr-defined]
+
+    return wrapper
+
+
 def _create_schema_pydantic(
     func: Callable[..., Any],
     name_override: str | None,
@@ -345,14 +363,9 @@ def _create_schema_pydantic(
             # Create new signature
             new_sig = orig_sig.replace(parameters=filtered_params)
 
-            # Check if this is a bound method - they don't support signature modification
+            # Check if this is a bound method - wrap it to allow signature modification
             if hasattr(func, "__func__") and hasattr(func, "__self__"):
-                msg = (
-                    f"Cannot filter parameters from bound method '{func.__qualname__}'. "
-                    f"Bound methods don't support signature modification. "
-                    f"Consider using a closure function instead:\n"
-                )
-                raise ValueError(msg)
+                func = _wrap_bound_method(func)
 
             # Type ignore for dynamic signature modification
             func.__signature__ = new_sig  # type: ignore[attr-defined]

@@ -106,6 +106,78 @@ def test_async_method_schema() -> None:
     assert schema.returns == {"type": "object"}
 
 
+def test_bound_method_with_parameter_exclusion() -> None:
+    """Test bound method schema generation with parameter exclusion."""
+
+    class TestContext:
+        """Test context type for exclusion."""
+
+    class TestClassWithContext:
+        """Test class with method that has excludable parameter."""
+
+        def method_with_context(self, ctx: TestContext, value: int) -> str:
+            """Method with context parameter to exclude.
+
+            Args:
+                ctx: Context to exclude
+                value: Value to process
+
+            Returns:
+                Processed value as string
+            """
+            return str(value)
+
+    instance = TestClassWithContext()
+    schema = create_schema(instance.method_with_context, exclude_types=[TestContext])
+
+    assert isinstance(schema, FunctionSchema)
+    assert schema.name == "method_with_context"
+    # Context parameter should be excluded
+    assert "ctx" not in schema.parameters["properties"]
+    # Value parameter should be included
+    assert "value" in schema.parameters["properties"]
+    assert schema.parameters["properties"]["value"]["type"] == "integer"
+    assert schema.returns == {"type": "string"}
+
+
+def test_bound_method_wrapper_preserves_attributes() -> None:
+    """Test that bound method wrapper preserves all important attributes."""
+    from schemez.functionschema.functionschema import _wrap_bound_method
+
+    class TestMethodAttributes:
+        """Test class for attribute preservation."""
+
+        def method_with_attrs(self, x: int, y: str = "default") -> bool:
+            """Method with various attributes to preserve.
+
+            Args:
+                x: Integer parameter
+                y: String parameter with default
+
+            Returns:
+                Always True
+            """
+            return True
+
+    instance = TestMethodAttributes()
+    original_method = instance.method_with_attrs
+    wrapped_method = _wrap_bound_method(original_method)
+
+    # Test preserved attributes
+    assert wrapped_method.__name__ == original_method.__func__.__name__
+    assert wrapped_method.__qualname__ == original_method.__func__.__qualname__
+    assert wrapped_method.__doc__ == original_method.__func__.__doc__
+    assert wrapped_method.__annotations__ == original_method.__func__.__annotations__
+
+    # Test that wrapped method still works
+    result = wrapped_method(42, "test")
+    assert result is True
+
+    # Test with defaults
+    result_default = wrapped_method(42)
+    assert result_default is True
+
+
 def test_create_schemas_from_class_methods() -> None:
     """Test creating schemas from all methods in a class."""
     # Default prefix (class name)
