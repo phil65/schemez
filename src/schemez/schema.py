@@ -275,7 +275,7 @@ class Schema(BaseModel):
 
         if validate:
             return cls.model_validate(data)
-        return cls.model_construct(**data)
+        return cls.model_construct(**data)  # type: ignore[return-value]
 
 
 if __name__ == "__main__":
