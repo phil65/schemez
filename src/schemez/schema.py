@@ -164,6 +164,7 @@ class Schema(BaseModel):
         exclude_defaults: bool = False,
         exclude_unset: bool = False,
         comments: bool = False,
+        mode: Literal["json", "python"] = "python",
     ) -> str:
         """Dump configuration to YAML string.
 
@@ -172,6 +173,7 @@ class Schema(BaseModel):
             exclude_defaults: Exclude fields with default values
             exclude_unset: Exclude fields that are not set
             comments: Include descriptions as comments in the YAML output
+            mode: Output mode, either "json" or "python"
 
         Returns:
             YAML string representation of the model
@@ -180,24 +182,17 @@ class Schema(BaseModel):
 
         import yamling
 
-        if not comments:
-            text = self.model_dump(
-                exclude_none=exclude_none,
-                exclude_defaults=exclude_defaults,
-                exclude_unset=exclude_unset,
-            )
-            return yamling.dump_yaml(text)
-
-        # Get the data and schema
         data = self.model_dump(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
+            mode=mode,
         )
-        schema = self.model_json_schema()
-
-        # Generate base YAML
         base_yaml = yamling.dump_yaml(data)
+        if not comments:
+            return base_yaml
+
+        schema = self.model_json_schema()
 
         def get_description(field_schema: dict[str, Any]) -> str | None:
             """Get first line of field description."""
@@ -436,4 +431,4 @@ if __name__ == "__main__":
     model = Schema.from_json_schema(schema)
     import devtools
 
-    devtools.debug(model.__fields__)
+    devtools.debug(model.model_fields)
