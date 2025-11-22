@@ -226,6 +226,7 @@ class SchemaField(Schema):
     # Extensibility for future or custom constraints
     constraints: dict[ConstraintType | str, Any] = Field(
         default_factory=dict,
+        title="Constraints",
         examples=[
             {"min_length": 3, "max_length": 50},
             {"ge": 0, "le": 100},

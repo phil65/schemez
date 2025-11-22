@@ -366,7 +366,7 @@ class Schema(BaseModel):
         cls,
         *,
         seed: int = 0,
-        mode: Literal["minimal", "maximal", "realistic"] = "realistic",
+        mode: Literal["minimal", "maximal", "default"] = "default",
         validate: bool = True,
     ) -> Self:
         """Generate test data that conforms to this schema.
@@ -376,7 +376,7 @@ class Schema(BaseModel):
             mode: Generation mode:
                 - "minimal": Only required fields, minimum values
                 - "maximal": All fields, maximum reasonable values
-                - "realistic": Balanced generation (default)
+                - "default": Balanced generation (default)
             validate: Whether to validate the generated data (default: True)
 
         Returns:
@@ -409,7 +409,7 @@ class Schema(BaseModel):
             data = generator.generate_minimal()
         elif mode == "maximal":
             data = generator.generate_maximal()
-        else:  # realistic
+        else:  # default
             data = generator.generate()
 
         if validate:
