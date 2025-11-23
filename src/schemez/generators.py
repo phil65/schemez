@@ -111,22 +111,22 @@ class SchemaDataGenerator:
         match schema.get("type"):
             case None:
                 # if there's no type or ref, fallback to string
-                return self._char()
+                return _char(seed=self.seed)
             case "object":
                 return self._object_gen(schema)
             case "string":
-                return self._str_gen(schema)
+                return _str_gen(schema, seed=self.seed)
             case "integer":
-                return self._int_gen(schema)
+                return _int_gen(schema, seed=self.seed)
             case "number":
-                return float(self._int_gen(schema))
+                return float(_int_gen(schema, seed=self.seed))
             case "boolean":
-                return self._bool_gen()
+                return _bool_gen(seed=self.seed)
             case "array":
                 return self._array_gen(schema)
             case "null":
                 return None
-            case list():
+            case list() as type_:
                 # Handle union types like ["string", "null"]
                 non_null_types = [t for t in type_ if t != "null"]
                 if non_null_types:
@@ -158,23 +158,23 @@ class SchemaDataGenerator:
 
         match schema.get("type"):
             case None:
-                return self._char()
+                return _char(seed=self.seed)
             case "object":
                 return self._object_gen_maximal(schema)
             case "string":
-                return self._str_gen_maximal(schema)
+                return _str_gen_maximal(schema, seed=self.seed)
             case "integer":
-                return self._int_gen_maximal(schema)
+                return _int_gen_maximal(schema, seed=self.seed)
             case "number":
-                return float(self._int_gen_maximal(schema))
+                return float(_int_gen_maximal(schema, seed=self.seed))
             case "boolean":
                 return True  # Always true for maximal
             case "array":
                 return self._array_gen_maximal(schema)
             case "null":
                 return None
-            case list():
-                non_null_types = [t for t in type_ if t != "null"]
+            case list() as ls:
+                non_null_types = [t for t in ls if t != "null"]
                 if non_null_types:
                     # Pick the last non-null type
                     selected_type = non_null_types[-1]
@@ -199,7 +199,7 @@ class SchemaDataGenerator:
             while add_prop_key in data:
                 add_prop_key += "_"
             if addition_props is True:
-                data[add_prop_key] = self._char()
+                data[add_prop_key] = _char(seed=self.seed)
             else:
                 data[add_prop_key] = self._gen_any(addition_props)
 
@@ -219,94 +219,11 @@ class SchemaDataGenerator:
             while add_prop_key in data:
                 add_prop_key += "_"
             if addition_props is True:
-                data[add_prop_key] = self._char()
+                data[add_prop_key] = _char(seed=self.seed)
             else:
                 data[add_prop_key] = self._gen_any_maximal(addition_props)
 
         return data
-
-    def _str_gen(self, schema: dict[str, Any]) -> str:  # noqa: PLR0911
-        """Generate a string from a JSON Schema string type."""
-        min_len = schema.get("minLength")
-        if min_len is not None:
-            return self._char() * min_len  # type: ignore[no-any-return]
-
-        if schema.get("maxLength") == 0:
-            return ""
-
-        if fmt := schema.get("format"):
-            match fmt:
-                case "date":
-                    return (date(2024, 1, 1) + timedelta(days=self.seed)).isoformat()
-                case "email":
-                    return f"user{self.seed}@example.com"
-                case "uri":
-                    return f"https://example.com/resource{self.seed}"
-                case "uuid":
-                    # Generate a simple UUID-like string
-                    return f"12345678-1234-1234-1234-12345678{self.seed:04d}"
-
-        return self._char()
-
-    def _str_gen_maximal(self, schema: dict[str, Any]) -> str:
-        """Generate maximal string data."""
-        max_len = schema.get("maxLength")
-        if max_len is not None:
-            # Cap at reasonable limit for maximal generation
-            effective_max = min(max_len, 100)
-            return self._char() * effective_max  # type: ignore[no-any-return]
-
-        min_len = schema.get("minLength", 1)
-        # For maximal without max constraint, use a reasonable default
-        return self._char() * max(min_len, 10)  # type: ignore[no-any-return]
-
-    def _int_gen(self, schema: dict[str, Any]) -> int:
-        """Generate an integer from a JSON Schema integer type."""
-        maximum = schema.get("maximum")
-        if maximum is None:
-            exc_max = schema.get("exclusiveMaximum")
-            if exc_max is not None:
-                maximum = exc_max - 1
-
-        minimum = schema.get("minimum")
-        if minimum is None:
-            exc_min = schema.get("exclusiveMinimum")
-            if exc_min is not None:
-                minimum = exc_min + 1
-
-        if minimum is not None and maximum is not None:
-            return minimum + self.seed % (maximum - minimum + 1)  # type: ignore[no-any-return]
-        if minimum is not None:
-            return minimum + self.seed  # type: ignore[no-any-return]
-        if maximum is not None:
-            return maximum - self.seed  # type: ignore[no-any-return]
-        return self.seed
-
-    def _int_gen_maximal(self, schema: dict[str, Any]) -> int:
-        """Generate maximal integer data."""
-        maximum = schema.get("maximum")
-        if maximum is None:
-            exc_max = schema.get("exclusiveMaximum")
-            if exc_max is not None:
-                maximum = exc_max - 1
-
-        if maximum is not None:
-            return maximum  # type: ignore[no-any-return]
-
-        minimum = schema.get("minimum")
-        if minimum is None:
-            exc_min = schema.get("exclusiveMinimum")
-            if exc_min is not None:
-                minimum = exc_min + 1
-
-        if minimum is not None:
-            # For maximal without max constraint, use reasonable large value
-            return minimum + 1000  # type: ignore[no-any-return]
-        return 1000  # Reasonable maximal default
-
-    def _bool_gen(self) -> bool:
-        """Generate a boolean from a JSON Schema boolean type."""
-        return bool(self.seed % 2)
 
     def _array_gen(self, schema: dict[str, Any]) -> list[Any]:
         """Generate an array from a JSON Schema array type."""
@@ -320,9 +237,7 @@ class SchemaDataGenerator:
                     self.seed += 1
 
         items_schema = schema.get("items", {})
-        min_items = schema.get("minItems", 0)
-
-        if min_items > len(data):
+        if (min_items := schema.get("minItems", 0)) > len(data):
             for _ in range(min_items - len(data)):
                 data.append(self._gen_any(items_schema))
                 if unique_items:
@@ -369,13 +284,109 @@ class SchemaDataGenerator:
 
         return data
 
-    def _char(self) -> str:
-        """Generate a character sequence like Excel columns (a-z, aa-az, ...)."""
-        chars = len(_CHARS)
-        s = ""
-        rem = self.seed // chars
-        while rem > 0:
-            s += _CHARS[(rem - 1) % chars]
-            rem //= chars
-        s += _CHARS[self.seed % chars]
-        return s
+
+def _str_gen(schema: dict[str, Any], seed: int = 0) -> str:  # noqa: PLR0911
+    """Generate a string from a JSON Schema string type."""
+    min_len = schema.get("minLength")
+    if min_len is not None:
+        return _char(seed=seed) * min_len  # type: ignore[no-any-return]
+
+    if schema.get("maxLength") == 0:
+        return ""
+
+    if fmt := schema.get("format"):
+        match fmt:
+            case "date":
+                return (date(2024, 1, 1) + timedelta(days=seed)).isoformat()
+            case "email":
+                return f"user{seed}@example.com"
+            case "uri":
+                return f"https://example.com/resource{seed}"
+            case "uuid":
+                # Generate a simple UUID-like string
+                return f"12345678-1234-1234-1234-12345678{seed:04d}"
+
+    return _char(seed=seed)
+
+
+def _str_gen_maximal(schema: dict[str, Any], seed: int = 0) -> str:
+    """Generate maximal string data."""
+    max_len = schema.get("maxLength")
+    if max_len is not None:
+        # Cap at reasonable limit for maximal generation
+        effective_max = min(max_len, 100)
+        return _char(seed=seed) * effective_max  # type: ignore[no-any-return]
+
+    min_len = schema.get("minLength", 1)
+    # For maximal without max constraint, use a reasonable default
+    return _char(seed=seed) * max(min_len, 10)  # type: ignore[no-any-return]
+
+
+def _int_gen(schema: dict[str, Any], seed: int = 0) -> int:
+    """Generate an integer from a JSON Schema integer type."""
+    maximum = schema.get("maximum")
+    if maximum is None:
+        exc_max = schema.get("exclusiveMaximum")
+        if exc_max is not None:
+            maximum = exc_max - 1
+
+    minimum = schema.get("minimum")
+    if minimum is None:
+        exc_min = schema.get("exclusiveMinimum")
+        if exc_min is not None:
+            minimum = exc_min + 1
+
+    if minimum is not None and maximum is not None:
+        return minimum + seed % (maximum - minimum + 1)  # type: ignore[no-any-return]
+    if minimum is not None:
+        return minimum + seed  # type: ignore[no-any-return]
+    if maximum is not None:
+        return maximum - seed  # type: ignore[no-any-return]
+    return seed
+
+
+def _bool_gen(seed: int = 0) -> bool:
+    """Generate a boolean from a JSON Schema boolean type."""
+    return bool(seed % 2)
+
+
+def _char(seed: int = 0) -> str:
+    """Generate a character sequence like Excel columns (a-z, aa-az, ...)."""
+    chars = len(_CHARS)
+    s = ""
+    rem = seed // chars
+    while rem > 0:
+        s += _CHARS[(rem - 1) % chars]
+        rem //= chars
+    s += _CHARS[seed % chars]
+    return s
+
+
+def _int_gen_maximal(schema: dict[str, Any]) -> int:
+    """Generate maximal integer data."""
+    maximum = schema.get("maximum")
+    if maximum is None:
+        exc_max = schema.get("exclusiveMaximum")
+        if exc_max is not None:
+            maximum = exc_max - 1
+
+    if maximum is not None:
+        return maximum  # type: ignore[no-any-return]
+
+    minimum = schema.get("minimum")
+    if minimum is None:
+        exc_min = schema.get("exclusiveMinimum")
+        if exc_min is not None:
+            minimum = exc_min + 1
+
+    if minimum is not None:
+        # For maximal without max constraint, use reasonable large value
+        return minimum + 1000  # type: ignore[no-any-return]
+    return 1000  # Reasonable maximal default
+
+
+if __name__ == "__main__":
+    from llmling_agent import AgentsManifest
+
+    data = AgentsManifest.generate_test_data(mode="maximal")
+    print(data)

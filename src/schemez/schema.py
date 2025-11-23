@@ -220,7 +220,10 @@ class Schema(BaseModel):
                 return None
 
             def resolve_anyof_oneof(schema_part: dict[str, Any]) -> dict[str, Any] | None:
-                """Resolve anyOf/oneOf by finding the first non-null object type with $ref."""
+                """Resolve anyOf/oneOf.
+
+                Resolves  by finding the first non-null object type with $ref.
+                """
                 for union_key in ["anyOf", "oneOf"]:
                     if union_key in schema_part:
                         for option in schema_part[union_key]:
