@@ -164,6 +164,7 @@ class Schema(BaseModel):
         exclude_defaults: bool = False,
         exclude_unset: bool = False,
         comments: bool = False,
+        sort_keys: bool = True,
         mode: Literal["json", "python"] = "python",
     ) -> str:
         """Dump configuration to YAML string.
@@ -173,6 +174,7 @@ class Schema(BaseModel):
             exclude_defaults: Exclude fields with default values
             exclude_unset: Exclude fields that are not set
             comments: Include descriptions as comments in the YAML output
+            sort_keys: Sort keys in the YAML output
             mode: Output mode, either "json" or "python"
 
         Returns:
@@ -188,7 +190,7 @@ class Schema(BaseModel):
             exclude_unset=exclude_unset,
             mode=mode,
         )
-        base_yaml = yamling.dump_yaml(data)
+        base_yaml = yamling.dump_yaml(data, sort_keys=sort_keys)
         if not comments:
             return base_yaml
 
@@ -209,47 +211,69 @@ class Schema(BaseModel):
             """Navigate schema to find definition for nested path."""
             current = schema_obj
 
+            def resolve_ref(schema_part: dict[str, Any]) -> dict[str, Any] | None:
+                """Resolve a $ref reference."""
+                if "$ref" in schema_part:
+                    ref_path = schema_part["$ref"].replace("#/$defs/", "")
+                    if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
+                        return schema_obj["$defs"][ref_path]
+                return None
+
+            def resolve_anyof_oneof(schema_part: dict[str, Any]) -> dict[str, Any] | None:
+                """Resolve anyOf/oneOf by finding the first non-null object type with $ref."""
+                for union_key in ["anyOf", "oneOf"]:
+                    if union_key in schema_part:
+                        for option in schema_part[union_key]:
+                            if "$ref" in option:
+                                resolved = resolve_ref(option)
+                                if resolved:
+                                    return resolved
+                            elif (
+                                option.get("type") == "object" and "properties" in option
+                            ):
+                                return option
+                return None
+
             for i, segment in enumerate(path):
                 # Handle properties
                 if "properties" in current and segment in current["properties"]:
                     current = current["properties"][segment]
 
-                    # If this field has a $ref, resolve it for subsequent navigation
-                    if "$ref" in current:
-                        ref_path = current["$ref"].replace("#/$defs/", "")
-                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
-                            # If this is the last segment,
-                            # return the original with $ref for description
-                            if i == len(path) - 1:
-                                return current  # type: ignore[no-any-return]
-                            # Otherwise continue with resolved reference
-                            current = schema_obj["$defs"][ref_path]
-                        else:
-                            return None
+                    # If this is the last segment, return the field directly
+                    if i == len(path) - 1:
+                        return current
+
+                    # For non-last segments, we need to resolve to continue navigation
+                    # First try direct $ref
+                    resolved = resolve_ref(current)
+                    if resolved:
+                        current = resolved
+                        continue
+
+                    # Then try anyOf/oneOf
+                    resolved = resolve_anyof_oneof(current)
+                    if resolved:
+                        current = resolved
+                        continue
+
+                    # If no resolution possible, we can't continue
+                    return None
 
                 # Handle array items
-                elif "items" in current:
+                if "items" in current:
                     current = current["items"]
-                    # Resolve $ref in items if present
-                    if "$ref" in current:
-                        ref_path = current["$ref"].replace("#/$defs/", "")
-                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
-                            current = schema_obj["$defs"][ref_path]
-                        else:
-                            return None
+                    resolved = resolve_ref(current)
+                    if resolved:
+                        current = resolved
 
                 # Handle additionalProperties
                 elif "additionalProperties" in current and isinstance(
                     current["additionalProperties"], dict
                 ):
                     current = current["additionalProperties"]
-                    # Resolve $ref in additionalProperties if present
-                    if "$ref" in current:
-                        ref_path = current["$ref"].replace("#/$defs/", "")
-                        if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
-                            current = schema_obj["$defs"][ref_path]
-                        else:
-                            return None
+                    resolved = resolve_ref(current)
+                    if resolved:
+                        current = resolved
                 else:
                     return None
             return current
@@ -413,22 +437,17 @@ class Schema(BaseModel):
 
 
 if __name__ == "__main__":
-    schema = {
-        "$id": "https://example.com/person.schema.json",
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Person",
-        "type": "object",
-        "properties": {
-            "firstName": {"type": "string", "description": "The person's first name."},
-            "lastName": {"type": "string", "description": "The person's last name."},
-            "age": {
-                "description": "Age in years, must be equal to or greater than zero.",
-                "type": "integer",
-                "minimum": 0,
-            },
-        },
-    }
-    model = Schema.from_json_schema(schema)
-    import devtools
+    from pydantic import Field
 
-    devtools.debug(model.model_fields)
+    class Inner(Schema):
+        a: int = 0
+        """Inner class field"""
+
+    class Outer(Schema):
+        b: str = Field(default="", examples=["hello"])
+        """Outer string field."""
+        inner: Inner | None = Field(default=None, examples=[{"a": 100}])
+        """Outer nested field"""
+
+    result = Outer.generate_test_data(mode="maximal").model_dump_yaml(comments=True)
+    print(result)
