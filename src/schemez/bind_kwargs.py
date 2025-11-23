@@ -65,12 +65,10 @@ class BoundFunction[T]:
             Updated signature without bound parameters
         """
         sig = inspect.signature(self.func)
-        parameters = [
-            param
-            for name, param in sig.parameters.items()
-            if name not in self.bound_kwargs
+        params = [
+            p for name, p in sig.parameters.items() if name not in self.bound_kwargs
         ]
-        return sig.replace(parameters=parameters)
+        return sig.replace(parameters=params)
 
     def _update_annotations(self, annotations: dict[str, Any]) -> dict[str, Any]:
         """Remove bound parameters from annotations.

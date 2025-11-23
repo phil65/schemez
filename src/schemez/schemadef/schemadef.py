@@ -275,7 +275,7 @@ class SchemaField(Schema):
 
 
 class BaseSchemaDef(Schema):
-    """Base class for response definitions."""
+    """Response type definition."""
 
     type: str = Field(init=False)
 
