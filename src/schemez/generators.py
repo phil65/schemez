@@ -164,9 +164,9 @@ class SchemaDataGenerator:
             case "string":
                 return _str_gen_maximal(schema, seed=self.seed)
             case "integer":
-                return _int_gen_maximal(schema, seed=self.seed)
+                return _int_gen_maximal(schema)
             case "number":
-                return float(_int_gen_maximal(schema, seed=self.seed))
+                return float(_int_gen_maximal(schema))
             case "boolean":
                 return True  # Always true for maximal
             case "array":
