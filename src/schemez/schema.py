@@ -163,6 +163,9 @@ class Schema(BaseModel):
         exclude_none: bool = True,
         exclude_defaults: bool = False,
         exclude_unset: bool = False,
+        indent: int = 2,
+        default_flow_style: bool | None = None,
+        allow_unicode: bool = True,
         comments: bool = False,
         sort_keys: bool = True,
         mode: Literal["json", "python"] = "python",
@@ -173,6 +176,9 @@ class Schema(BaseModel):
             exclude_none: Exclude fields with None values
             exclude_defaults: Exclude fields with default values
             exclude_unset: Exclude fields that are not set
+            indent: Indentation level for YAML output
+            default_flow_style: Default flow style for YAML output
+            allow_unicode: Allow unicode characters in YAML output
             comments: Include descriptions as comments in the YAML output
             sort_keys: Sort keys in the YAML output
             mode: Output mode, either "json" or "python"
@@ -190,7 +196,13 @@ class Schema(BaseModel):
             exclude_unset=exclude_unset,
             mode=mode,
         )
-        base_yaml = yamling.dump_yaml(data, sort_keys=sort_keys)
+        base_yaml = yamling.dump_yaml(
+            data,
+            sort_keys=sort_keys,
+            indent=indent,
+            default_flow_style=default_flow_style,
+            allow_unicode=allow_unicode,
+        )
         if not comments:
             return base_yaml
 
