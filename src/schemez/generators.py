@@ -108,33 +108,34 @@ class SchemaDataGenerator:
         if any_of := schema.get("anyOf"):
             return self._gen_any(any_of[self.seed % len(any_of)])
 
-        type_ = schema.get("type")
-        if type_ is None:
-            # if there's no type or ref, fallback to string
-            return self._char()
-        if type_ == "object":
-            return self._object_gen(schema)
-        if type_ == "string":
-            return self._str_gen(schema)
-        if type_ == "integer":
-            return self._int_gen(schema)
-        if type_ == "number":
-            return float(self._int_gen(schema))
-        if type_ == "boolean":
-            return self._bool_gen()
-        if type_ == "array":
-            return self._array_gen(schema)
-        if type_ == "null":
-            return None
-        if isinstance(type_, list):
-            # Handle union types like ["string", "null"]
-            non_null_types = [t for t in type_ if t != "null"]
-            if non_null_types:
-                selected_type = non_null_types[self.seed % len(non_null_types)]
-                return self._gen_any({**schema, "type": selected_type})
-            return None
-        msg = f"Unknown type: {type_}"
-        raise NotImplementedError(msg)
+        match schema.get("type"):
+            case None:
+                # if there's no type or ref, fallback to string
+                return self._char()
+            case "object":
+                return self._object_gen(schema)
+            case "string":
+                return self._str_gen(schema)
+            case "integer":
+                return self._int_gen(schema)
+            case "number":
+                return float(self._int_gen(schema))
+            case "boolean":
+                return self._bool_gen()
+            case "array":
+                return self._array_gen(schema)
+            case "null":
+                return None
+            case list():
+                # Handle union types like ["string", "null"]
+                non_null_types = [t for t in type_ if t != "null"]
+                if non_null_types:
+                    selected_type = non_null_types[self.seed % len(non_null_types)]
+                    return self._gen_any({**schema, "type": selected_type})
+                return None
+            case _ as type_:
+                msg = f"Unknown type: {type_}"
+                raise NotImplementedError(msg)
 
     def _gen_any_maximal(self, schema: dict[str, Any]) -> Any:  # noqa: PLR0911
         """Generate maximal data for any JSON Schema type."""
@@ -155,33 +156,33 @@ class SchemaDataGenerator:
             # Pick the last option for maximal
             return self._gen_any_maximal(any_of[-1])
 
-        type_ = schema.get("type")
-        if type_ is None:
-            return self._char()
-        if type_ == "object":
-            return self._object_gen_maximal(schema)
-        if type_ == "string":
-            return self._str_gen_maximal(schema)
-        if type_ == "integer":
-            return self._int_gen_maximal(schema)
-        if type_ == "number":
-            return float(self._int_gen_maximal(schema))
-        if type_ == "boolean":
-            return True  # Always true for maximal
-        if type_ == "array":
-            return self._array_gen_maximal(schema)
-        if type_ == "null":
-            return None
-        if isinstance(type_, list):
-            # For maximal, prefer non-null types
-            non_null_types = [t for t in type_ if t != "null"]
-            if non_null_types:
-                # Pick the last non-null type
-                selected_type = non_null_types[-1]
-                return self._gen_any_maximal({**schema, "type": selected_type})
-            return None
-        msg = f"Unknown type: {type_}"
-        raise NotImplementedError(msg)
+        match schema.get("type"):
+            case None:
+                return self._char()
+            case "object":
+                return self._object_gen_maximal(schema)
+            case "string":
+                return self._str_gen_maximal(schema)
+            case "integer":
+                return self._int_gen_maximal(schema)
+            case "number":
+                return float(self._int_gen_maximal(schema))
+            case "boolean":
+                return True  # Always true for maximal
+            case "array":
+                return self._array_gen_maximal(schema)
+            case "null":
+                return None
+            case list():
+                non_null_types = [t for t in type_ if t != "null"]
+                if non_null_types:
+                    # Pick the last non-null type
+                    selected_type = non_null_types[-1]
+                    return self._gen_any_maximal({**schema, "type": selected_type})
+                return None
+            case _ as type_:
+                msg = f"Unknown type: {type_}"
+                raise NotImplementedError(msg)
 
     def _object_gen(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Generate data for a JSON Schema object."""
@@ -234,15 +235,16 @@ class SchemaDataGenerator:
             return ""
 
         if fmt := schema.get("format"):
-            if fmt == "date":
-                return (date(2024, 1, 1) + timedelta(days=self.seed)).isoformat()
-            if fmt == "email":
-                return f"user{self.seed}@example.com"
-            if fmt == "uri":
-                return f"https://example.com/resource{self.seed}"
-            if fmt == "uuid":
-                # Generate a simple UUID-like string
-                return f"12345678-1234-1234-1234-12345678{self.seed:04d}"
+            match fmt:
+                case "date":
+                    return (date(2024, 1, 1) + timedelta(days=self.seed)).isoformat()
+                case "email":
+                    return f"user{self.seed}@example.com"
+                case "uri":
+                    return f"https://example.com/resource{self.seed}"
+                case "uuid":
+                    # Generate a simple UUID-like string
+                    return f"12345678-1234-1234-1234-12345678{self.seed:04d}"
 
         return self._char()
 
