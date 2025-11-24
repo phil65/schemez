@@ -103,8 +103,7 @@ class SchemaDataGenerator:
             return examples[self.seed % len(examples)]
         if ref := schema.get("$ref"):
             key = re.sub(r"^#/\$defs/", "", ref)
-            js_def = self.defs[key]
-            return self._gen_any(js_def)
+            return self._gen_any(self.defs[key])
         if any_of := schema.get("anyOf"):
             return self._gen_any(any_of[self.seed % len(any_of)])
 
@@ -126,10 +125,9 @@ class SchemaDataGenerator:
                 return self._array_gen(schema)
             case "null":
                 return None
-            case list() as type_:
+            case list() as ls:
                 # Handle union types like ["string", "null"]
-                non_null_types = [t for t in type_ if t != "null"]
-                if non_null_types:
+                if non_null_types := [t for t in ls if t != "null"]:
                     selected_type = non_null_types[self.seed % len(non_null_types)]
                     return self._gen_any({**schema, "type": selected_type})
                 return None
@@ -150,8 +148,7 @@ class SchemaDataGenerator:
             return examples[-1]
         if ref := schema.get("$ref"):
             key = re.sub(r"^#/\$defs/", "", ref)
-            js_def = self.defs[key]
-            return self._gen_any_maximal(js_def)
+            return self._gen_any_maximal(self.defs[key])
         if any_of := schema.get("anyOf"):
             # Pick the last option for maximal
             return self._gen_any_maximal(any_of[-1])
@@ -174,8 +171,7 @@ class SchemaDataGenerator:
             case "null":
                 return None
             case list() as ls:
-                non_null_types = [t for t in ls if t != "null"]
-                if non_null_types:
+                if non_null_types := [t for t in ls if t != "null"]:
                     # Pick the last non-null type
                     selected_type = non_null_types[-1]
                     return self._gen_any_maximal({**schema, "type": selected_type})
@@ -276,8 +272,7 @@ class SchemaDataGenerator:
         else:
             min_items = schema.get("minItems", 1)
             # For maximal without max constraint, use reasonable default
-            target_items = max(min_items, 5)
-            while len(data) < target_items:
+            while len(data) < max(min_items, 5):
                 data.append(self._gen_any_maximal(items_schema))
                 if unique_items:
                     self.seed += 1
@@ -287,13 +282,10 @@ class SchemaDataGenerator:
 
 def _str_gen(schema: dict[str, Any], seed: int = 0) -> str:  # noqa: PLR0911
     """Generate a string from a JSON Schema string type."""
-    min_len = schema.get("minLength")
-    if min_len is not None:
+    if (min_len := schema.get("minLength")) is not None:
         return _char(seed=seed) * min_len  # type: ignore[no-any-return]
-
     if schema.get("maxLength") == 0:
         return ""
-
     if fmt := schema.get("format"):
         match fmt:
             case "date":
@@ -311,8 +303,7 @@ def _str_gen(schema: dict[str, Any], seed: int = 0) -> str:  # noqa: PLR0911
 
 def _str_gen_maximal(schema: dict[str, Any], seed: int = 0) -> str:
     """Generate maximal string data."""
-    max_len = schema.get("maxLength")
-    if max_len is not None:
+    if (max_len := schema.get("maxLength")) is not None:
         # Cap at reasonable limit for maximal generation
         effective_max = min(max_len, 100)
         return _char(seed=seed) * effective_max  # type: ignore[no-any-return]
