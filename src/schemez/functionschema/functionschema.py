@@ -114,7 +114,7 @@ class FunctionSchema(pydantic.BaseModel):
         Returns:
             A dictionary matching OpenAI's complete function tool definition format.
             {"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}
-        """  # noqa: E501
+        """
         parameters: ToolParameters = {
             "type": "object",
             "properties": self.parameters["properties"],
@@ -277,9 +277,7 @@ def create_schema(
     """
     exclude_types = exclude_types or []
     if mode == "simple":
-        return _create_schema_simple(
-            func, name_override, description_override, exclude_types
-        )
+        return _create_schema_simple(func, name_override, description_override, exclude_types)
     return _create_schema_pydantic(
         func,
         name_override,
@@ -354,10 +352,7 @@ def _create_schema_pydantic(
                 else:
                     annotation = type_hints.get(param.name, param.annotation)
                 # Skip excluded types
-                if not any(
-                    types_match(annotation, exclude_type)
-                    for exclude_type in exclude_types
-                ):
+                if not any(types_match(annotation, exclude_type) for exclude_type in exclude_types):
                     filtered_params.append(param)
 
             # Create new signature
@@ -391,9 +386,7 @@ def _create_schema_pydantic(
         # Fallback to original approach if pydantic-ai not available
 
         docstring = docstring_parser.parse(func.__doc__ or "")
-        param_descriptions = {
-            p.arg_name: p.description for p in docstring.params if p.description
-        }
+        param_descriptions = {p.arg_name: p.description for p in docstring.params if p.description}
 
         fields: dict[str, core_schema.TypedDictField] = {}
         fallback_required_fields: list[str] = []
@@ -451,9 +444,7 @@ def _create_schema_pydantic(
             parameters = fallback_parameters
         except Exception:  # noqa: BLE001
             # If JSON schema generation fails, fall back to original implementation
-            return _create_schema_simple(
-                func, name_override, description_override, exclude_types
-            )
+            return _create_schema_simple(func, name_override, description_override, exclude_types)
 
     # Handle return type
     function_type = determine_function_type(func)

@@ -217,9 +217,7 @@ class TestToolCodeGenerator:
 
     def test_empty_exclude_types_list(self):
         """Test behavior with explicitly empty exclude_types list."""
-        generator = ToolCodeGenerator.from_callable(
-            function_with_generic_context, exclude_types=[]
-        )
+        generator = ToolCodeGenerator.from_callable(function_with_generic_context, exclude_types=[])
 
         signature = generator.get_function_signature()
 

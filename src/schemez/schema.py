@@ -44,9 +44,7 @@ class Schema(BaseModel):
         return merge_models(self, other)
 
     @classmethod
-    def from_yaml(
-        cls, content: str, inherit_path: JoinablePathLike | None = None
-    ) -> Self:
+    def from_yaml(cls, content: str, inherit_path: JoinablePathLike | None = None) -> Self:
         """Create from YAML string."""
         import yamling
 
@@ -54,9 +52,7 @@ class Schema(BaseModel):
         return cls.model_validate(data)
 
     @classmethod
-    def for_function(
-        cls, func: Callable[..., Any], *, name: str | None = None
-    ) -> type[Schema]:
+    def for_function(cls, func: Callable[..., Any], *, name: str | None = None) -> type[Schema]:
         """Create a schema model from a function's signature.
 
         Args:

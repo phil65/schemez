@@ -45,9 +45,7 @@ def test_generic_types():
         fields={
             "str_list": SchemaField(type="list[str]", description="List of strings"),
             "int_list": SchemaField(type="list[int]", description="List of integers"),
-            "str_dict": SchemaField(
-                type="dict[str, int]", description="String to int mapping"
-            ),
+            "str_dict": SchemaField(type="dict[str, int]", description="String to int mapping"),
         },
     )
 

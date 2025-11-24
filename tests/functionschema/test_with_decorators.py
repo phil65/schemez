@@ -35,9 +35,7 @@ def wrapped_decorator[T](func: Callable[..., T]) -> Callable[..., T]:
     return wrapper
 
 
-def parameterized_decorator[T](
-    *, tag: str
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+def parameterized_decorator[T](*, tag: str) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """A parameterized decorator that uses functools.wraps."""
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:

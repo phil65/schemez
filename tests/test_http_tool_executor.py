@@ -155,9 +155,7 @@ async def test_get_tool_mappings(
     assert mappings["create_calendar_event"] == "CreateCalendarEventInput"
 
 
-async def test_generate_tools_code(
-    weather_schema: dict[str, Any], mock_handler: MockToolHandler
-):
+async def test_generate_tools_code(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test generating HTTP wrapper tools code."""
     executor = HttpToolExecutor([weather_schema], mock_handler)
 
@@ -184,9 +182,7 @@ async def test_generate_tools_code_caching(
     assert code1 is code2
 
 
-async def test_generate_server_app(
-    weather_schema: dict[str, Any], mock_handler: MockToolHandler
-):
+async def test_generate_server_app(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test generating FastAPI server."""
     pytest.importorskip("fastapi")  # Skip if FastAPI not available
 
@@ -198,9 +194,7 @@ async def test_generate_server_app(
     assert app.version == "1.0.0"
 
 
-async def test_get_tool_functions(
-    weather_schema: dict[str, Any], mock_handler: MockToolHandler
-):
+async def test_get_tool_functions(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test getting ready-to-use tool functions."""
     executor = HttpToolExecutor([weather_schema], mock_handler)
 
@@ -210,9 +204,7 @@ async def test_get_tool_functions(
     assert callable(tools["get_weather"])
 
 
-async def test_save_to_files(
-    weather_schema: dict[str, Any], mock_handler: MockToolHandler
-):
+async def test_save_to_files(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test saving generated code to files."""
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = Path(temp_dir) / "output"
@@ -267,9 +259,7 @@ async def test_simple_manual_schema(mock_handler):
             "description": "A simple test tool",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "message": {"type": "string", "description": "Input message"}
-                },
+                "properties": {"message": {"type": "string", "description": "Input message"}},
                 "required": ["message"],
             },
         },
@@ -318,9 +308,7 @@ async def test_base_url_customization(
     assert custom_url in code
 
 
-async def test_tool_mappings_caching(
-    weather_schema: dict[str, Any], mock_handler: MockToolHandler
-):
+async def test_tool_mappings_caching(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test that tool mappings are cached."""
     executor = HttpToolExecutor([weather_schema], mock_handler)
 

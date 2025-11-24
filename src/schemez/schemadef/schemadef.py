@@ -235,9 +235,7 @@ class SchemaField(Schema):
     )
     """Additional Pydantic Field constraints not covered by explicit fields"""
 
-    def add_required_dependency(
-        self, field_name: str, required_fields: list[str]
-    ) -> None:
+    def add_required_dependency(self, field_name: str, required_fields: list[str]) -> None:
         """Add a dependency requiring other fields when this field exists.
 
         Args:
@@ -247,9 +245,7 @@ class SchemaField(Schema):
         if field_name not in self.dependent_required:
             self.dependent_required[field_name] = []
         self.dependent_required[field_name].extend([
-            field
-            for field in required_fields
-            if field not in self.dependent_required[field_name]
+            field for field in required_fields if field not in self.dependent_required[field_name]
         ])
 
     def add_schema_dependency(self, field_name: str, schema: dict[str, Any]) -> None:

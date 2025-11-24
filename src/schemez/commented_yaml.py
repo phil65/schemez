@@ -106,11 +106,7 @@ def process_yaml_lines(yaml_lines: list[str], schema: dict[str, Any]) -> list[st
             path_stack.pop()
 
         # Check if this is a field definition
-        if (
-            ":" in stripped
-            and not stripped.startswith("#")
-            and not stripped.startswith("-")
-        ):
+        if ":" in stripped and not stripped.startswith("#") and not stripped.startswith("-"):
             field_match = re.match(r"^([^:]+):\s*(.*)", stripped)
             if field_match:
                 field_name, value = field_match.groups()

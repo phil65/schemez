@@ -35,9 +35,7 @@ def clean_generated_code(code: str) -> str:
         # Skip lines until we find a class or other meaningful content
         if skip_until_class:
             if line.strip().startswith("class ") or (
-                line.strip()
-                and not line.startswith("#")
-                and not line.startswith("from __future__")
+                line.strip() and not line.startswith("#") and not line.startswith("from __future__")
             ):
                 skip_until_class = False
                 cleaned_lines.append(line)

@@ -109,9 +109,7 @@ def get_ctor_basemodel(cls: type) -> type[Schema]:
         fields = {}
         for field_name, field_info in cls.model_fields.items():
             field_type = field_info.annotation
-            field_default = (
-                field_info.default if field_info.default is not Ellipsis else ...
-            )
+            field_default = field_info.default if field_info.default is not Ellipsis else ...
             fields[field_name] = (field_type, field_default)
 
         return create_model(cls.__name__, **fields, __base__=Schema)  # type: ignore[call-overload, no-any-return]

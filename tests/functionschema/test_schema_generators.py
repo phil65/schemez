@@ -232,14 +232,9 @@ def test_create_schemas_from_module() -> None:
 
     # Test default prefix (module name)
     schemas = create_schemas_from_module(schema_module)
-    assert (
-        "schemez.functionschema.schema_generators.create_schemas_from_callables"
-        in schemas
-    )
+    assert "schemez.functionschema.schema_generators.create_schemas_from_callables" in schemas
     assert "schemez.functionschema.schema_generators.create_schemas_from_class" in schemas
-    assert (
-        "schemez.functionschema.schema_generators.create_schemas_from_module" in schemas
-    )
+    assert "schemez.functionschema.schema_generators.create_schemas_from_module" in schemas
 
     # Test with no prefix
     no_prefix = create_schemas_from_module(schema_module, prefix=False)
@@ -261,9 +256,7 @@ def test_create_schemas_from_module() -> None:
     assert "API.create_schemas_from_callables" in included
 
     # Verify schemas are identical regardless of prefix
-    base_schema = schemas[
-        "schemez.functionschema.schema_generators.create_schemas_from_callables"
-    ]
+    base_schema = schemas["schemez.functionschema.schema_generators.create_schemas_from_callables"]
     no_prefix_schema = no_prefix["create_schemas_from_callables"]
     custom_schema = custom["API.create_schemas_from_callables"]
 
@@ -306,9 +299,7 @@ def test_create_schemas_from_callables() -> None:
         "public": func1,
         "_private": func2,
     }
-    filtered = create_schemas_from_callables(
-        private_callables, prefix=False, exclude_private=True
-    )
+    filtered = create_schemas_from_callables(private_callables, prefix=False, exclude_private=True)
     assert len(filtered) == 1
     assert "public" in filtered
     assert "_private" not in filtered

@@ -153,9 +153,7 @@ from datetime import datetime
             # Remove future imports and datamodel-codegen header from individual models
             cleaned_input_code = clean_generated_code(input_code)
             code_parts.append(cleaned_input_code)
-            wrapper_code = await self._generate_http_wrapper(
-                schema_data, input_class_name
-            )
+            wrapper_code = await self._generate_http_wrapper(schema_data, input_class_name)
             code_parts.append(wrapper_code)
 
             all_exports.extend([input_class_name, function_schema.name])
@@ -229,9 +227,7 @@ from datetime import datetime
         # Extract tool functions
         tool_mappings = await self._get_tool_mappings()
         self._tool_functions = {
-            tool_name: namespace[tool_name]
-            for tool_name in tool_mappings
-            if tool_name in namespace
+            tool_name: namespace[tool_name] for tool_name in tool_mappings if tool_name in namespace
         }
 
         elapsed = time.time() - start_time

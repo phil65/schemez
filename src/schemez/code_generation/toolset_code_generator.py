@@ -154,10 +154,7 @@ class GeneratedCode:
                     parts.append(self.explicit_stubs)
 
             case _:
-                msg = (
-                    f"Unknown combination: args_format={args_format}, "
-                    f"output_type={output_type}"
-                )
+                msg = f"Unknown combination: args_format={args_format}, output_type={output_type}"
                 raise ValueError(msg)
 
         return "\n\n".join(parts)
@@ -182,8 +179,7 @@ class ToolsetCodeGenerator:
     ) -> ToolsetCodeGenerator:
         """Create a ToolsetCodeGenerator from a sequence of callables."""
         generators = [
-            ToolCodeGenerator.from_callable(i, exclude_types=exclude_types)
-            for i in callables
+            ToolCodeGenerator.from_callable(i, exclude_types=exclude_types) for i in callables
         ]
         return cls(generators, include_docstrings)
 
@@ -327,9 +323,7 @@ async def close_all_mcp_connections():
                     words = [word.title() for word in generator.name.split("_")]
                     input_class_name = f"{''.join(words)}Input"
 
-                    model_code = model_to_python_code(
-                        params_schema, class_name=input_class_name
-                    )
+                    model_code = model_to_python_code(params_schema, class_name=input_class_name)
                     if model_code:
                         cleaned_model = clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
@@ -525,9 +519,7 @@ async def {signature_str}:
         mcp_client_code = self.get_fastmcp_client_code(server_configs)
 
         # Get the appropriate client code based on format/type
-        tools_code = structured.get_client_code(
-            args_format, output_type, client_type="fastmcp"
-        )
+        tools_code = structured.get_client_code(args_format, output_type, client_type="fastmcp")
 
         # Combine client and tools code
         return f"""{FASTMCP_IMPORTS}
@@ -565,8 +557,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 50 + "\n")
 
     # Test HTTP code generation
-    http_code = generator.generate_code(
-        args_format="explicit", output_type="implementation"
-    )
+    http_code = generator.generate_code(args_format="explicit", output_type="implementation")
     print("=== HTTP Code ===")
     print(http_code)

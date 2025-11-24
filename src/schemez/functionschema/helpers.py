@@ -138,9 +138,7 @@ def resolve_type_annotation(
                 field_type = get_args(field_type)[0]
             else:
                 # Fall back to checking __required_keys__
-                is_required = field_name in getattr(
-                    typ, "__required_keys__", {field_name}
-                )
+                is_required = field_name in getattr(typ, "__required_keys__", {field_name})
 
             properties[field_name] = resolve_type_annotation(
                 field_type,
@@ -161,9 +159,7 @@ def resolve_type_annotation(
         if is_parameter:  # Only add additionalProperties for parameters
             # Dict[K, V] should have at least 2 type arguments for key and value
             min_dict_args = 2
-            if (
-                len(args) >= min_dict_args
-            ):  # Dict[K, V] - use value type for additionalProperties
+            if len(args) >= min_dict_args:  # Dict[K, V] - use value type for additionalProperties
                 value_type = args[1]
                 # Special case: Any should remain as True for backward compatibility
                 if value_type is Any:
@@ -384,10 +380,7 @@ def types_match(annotation: Any, exclude_type: type) -> bool:
         exclude_type_full_name = f"{exclude_type.__module__}.{exclude_type.__name__}"
 
         # Check various string representations
-        if (
-            exclude_type_name in annotation_str
-            or exclude_type_full_name in annotation_str
-        ):
+        if exclude_type_name in annotation_str or exclude_type_full_name in annotation_str:
             # Be more specific to avoid false positives
             # Check if it's the exact type name, not just a substring
             import re

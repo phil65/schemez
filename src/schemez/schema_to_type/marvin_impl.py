@@ -403,9 +403,7 @@ def create_dataclass(
     # Add model validator for defaults
     @model_validator(mode="before")  # type: ignore[misc]
     @classmethod
-    def _apply_defaults(
-        cls: type[BaseModel], data: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
+    def _apply_defaults(cls: type[BaseModel], data: Mapping[str, Any]) -> Mapping[str, Any]:
         if isinstance(data, dict):
             return merge_defaults(data, original_schema)
         return data
@@ -438,11 +436,7 @@ def merge_defaults(
     elif parent_default:
         result = dict(parent_default)
         for key, value in data.items():
-            if (
-                isinstance(value, dict)
-                and key in result
-                and isinstance(result[key], dict)
-            ):
+            if isinstance(value, dict) and key in result and isinstance(result[key], dict):
                 # recursively merge nested dicts
                 result[key] = merge_defaults(value, {"properties": {}}, result[key])
             else:
@@ -473,9 +467,7 @@ def merge_defaults(
             elif "default" in prop_schema:
                 nested_default = prop_schema["default"]
 
-            result[prop_name] = merge_defaults(
-                result[prop_name], prop_schema, nested_default
-            )
+            result[prop_name] = merge_defaults(result[prop_name], prop_schema, nested_default)
 
     return result
 

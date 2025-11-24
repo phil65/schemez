@@ -47,9 +47,7 @@ def get_docstring_info(
         sections = docstring.parse()
 
     params = {}
-    if parameters := next(
-        (p for p in sections if p.kind == DocstringSectionKind.parameters), None
-    ):
+    if parameters := next((p for p in sections if p.kind == DocstringSectionKind.parameters), None):
         params = {p.name: p.description for p in parameters.value}
 
     main_desc = ""

@@ -32,9 +32,7 @@ class BoundFunction[T]:
         self.__module__ = func.__module__
         self.__qualname__ = func.__qualname__
         self.__doc__ = remove_kwargs_from_docstring(func.__doc__, self.bound_kwargs)
-        self.__annotations__ = self._update_annotations(
-            getattr(func, "__annotations__", {})
-        )
+        self.__annotations__ = self._update_annotations(getattr(func, "__annotations__", {}))
         self.__signature__ = self._update_signature()
 
         # Verify all bound kwargs are valid parameters
@@ -65,9 +63,7 @@ class BoundFunction[T]:
             Updated signature without bound parameters
         """
         sig = inspect.signature(self.func)
-        params = [
-            p for name, p in sig.parameters.items() if name not in self.bound_kwargs
-        ]
+        params = [p for name, p in sig.parameters.items() if name not in self.bound_kwargs]
         return sig.replace(parameters=params)
 
     def _update_annotations(self, annotations: dict[str, Any]) -> dict[str, Any]:
@@ -86,9 +82,7 @@ class BoundFunction[T]:
         }
 
 
-def remove_kwargs_from_docstring(
-    docstring: str | None, kwargs: dict[str, Any]
-) -> str | None:
+def remove_kwargs_from_docstring(docstring: str | None, kwargs: dict[str, Any]) -> str | None:
     """Update docstring to remove bound parameters.
 
     Args:

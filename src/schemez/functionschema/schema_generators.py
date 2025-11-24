@@ -151,9 +151,7 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
         "required": required,
     })
 
-    return FunctionSchema(
-        name=name, description=description, parameters=params, required=required
-    )
+    return FunctionSchema(name=name, description=description, parameters=params, required=required)
 
 
 def create_schemas_from_module(
@@ -181,11 +179,7 @@ def create_schemas_from_module(
         >>> print(schemas['math.sin'])
     """
     # Resolve module if string name provided
-    mod = (
-        module
-        if isinstance(module, types.ModuleType)
-        else importlib.import_module(module)
-    )
+    mod = module if isinstance(module, types.ModuleType) else importlib.import_module(module)
 
     # Get all functions from module
     callables: dict[str, Callable[..., Any]] = {

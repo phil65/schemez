@@ -72,9 +72,7 @@ def test_from_dict_function_only() -> None:
 def test_from_dict_invalid_schema() -> None:
     """Test creating schema from invalid input."""
     # Missing function field in tool definition
-    with pytest.raises(
-        ValueError, match='Tool with type "function" must have a "function" field'
-    ):
+    with pytest.raises(ValueError, match='Tool with type "function" must have a "function" field'):
         FunctionSchema.from_dict({"type": "function"})
 
     # Missing name

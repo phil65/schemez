@@ -118,10 +118,7 @@ def json_schema_to_pydantic_class(
             break
 
     if not model:
-        msg = (
-            f"Could not find generated model class '{class_name}' "
-            f"in: {list(namespace.keys())}"
-        )
+        msg = f"Could not find generated model class '{class_name}' in: {list(namespace.keys())}"
         raise Exception(msg)  # noqa: TRY002
 
     model.__module__ = __name__
