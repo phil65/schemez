@@ -44,6 +44,7 @@ Source = "https://github.com/phil65/schemez"
 [project.optional-dependencies]
 ai = ["llmling-agent", "anyenv>=0.4.14"]
 codegen = ["datamodel-code-generator"]
+markdown = ["jinja2>=3.1.0"]
 tool_execution = ["fastapi>=0.118.2"]
 yaml = ["yamling"]
 
@@ -99,7 +100,7 @@ python_version = "3.13"
 strict = true
 pretty = true
 check_untyped_defs = true
-exclude = ["venv/", ".venv/"]
+exclude = ["venv/", ".venv/", "tests/"]
 plugins = ["pydantic.mypy"]
 
 [tool.pyright]

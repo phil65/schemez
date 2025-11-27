@@ -374,10 +374,8 @@ class InlineSchemaDef(BaseSchemaDef):
                 enum_name = f"{name.capitalize()}Enum"  # Create dynamic Enum class
                 enum_members = {}  # Create enum members dictionary
                 for i, value in enumerate(field.values):
-                    if isinstance(value, str) and value.isidentifier():
-                        key = value  # If value is a valid Python identifier, use as is
-                    else:
-                        key = f"VALUE_{i}"  # Otherwise, create a synthetic name
+                    # If value is valid Python identifier use as is, otherwise create synthetic name
+                    key = value if isinstance(value, str) and value.isidentifier() else f"VALUE_{i}"
                     enum_members[key] = value
 
                 enum_class = Enum(enum_name, enum_members)  # type: ignore[misc]

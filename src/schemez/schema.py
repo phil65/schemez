@@ -37,6 +37,74 @@ class Schema(BaseModel):
 
     model_config = ConfigDict(extra="forbid", use_attribute_docstrings=True)
 
+    def model_dump_markdown(
+        self,
+        *,
+        template: str | None = None,
+        header_level: int = 1,
+        include_defaults: bool = True,
+        include_examples: bool = True,
+        include_constraints: bool = True,
+        include_values: bool = True,
+    ) -> str:
+        """Dump model instance to Markdown documentation.
+
+        Args:
+            template: Custom Jinja2 template string (uses default if None)
+            header_level: Starting header level (1 = h1, 2 = h2, etc.)
+            include_defaults: Include default values in the table
+            include_examples: Include examples section
+            include_constraints: Include constraints section
+            include_values: Include current instance values
+
+        Returns:
+            Markdown string documenting the model
+        """
+        from schemez.markdown import instance_to_markdown
+
+        return instance_to_markdown(
+            self,
+            template=template,
+            header_level=header_level,
+            include_defaults=include_defaults,
+            include_examples=include_examples,
+            include_constraints=include_constraints,
+            include_values=include_values,
+        )
+
+    @classmethod
+    def dump_markdown_schema(
+        cls,
+        *,
+        template: str | None = None,
+        header_level: int = 1,
+        include_defaults: bool = True,
+        include_examples: bool = True,
+        include_constraints: bool = True,
+    ) -> str:
+        """Dump model class schema to Markdown documentation.
+
+        Args:
+            template: Custom Jinja2 template string (uses default if None)
+            header_level: Starting header level (1 = h1, 2 = h2, etc.)
+            include_defaults: Include default values in the table
+            include_examples: Include examples section
+            include_constraints: Include constraints section
+
+        Returns:
+            Markdown string documenting the model schema
+        """
+        from schemez.markdown import model_to_markdown
+
+        return model_to_markdown(
+            cls,
+            template=template,
+            header_level=header_level,
+            include_defaults=include_defaults,
+            include_examples=include_examples,
+            include_constraints=include_constraints,
+        )
+
     def merge(self, other: Self) -> Self:
         """Merge with another instance by overlaying its non-None values."""
         from schemez.helpers import merge_models
@@ -316,10 +384,14 @@ if __name__ == "__main__":
     from pydantic import Field
 
     class Inner(Schema):
+        """A nested model for demonstration."""
+
         a: int = 0
         """Inner class field"""
 
     class Outer(Schema):
+        """An outer model with nested schema."""
+
         b: str = Field(default="", examples=["hello"])
         """Outer string field."""
         inner: Inner | None = Field(default=None, examples=[{"a": 100}])
