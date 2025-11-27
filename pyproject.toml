@@ -11,7 +11,22 @@ license-files = ["LICENSE"]
 authors = [
   { name = "Philipp Temminghoff", email = "philipptemminghoff@googlemail.com" },
 ]
-keywords = []
+keywords = [
+  "code-generation",
+  "configuration",
+  "data-models",
+  "function-calling",
+  "json-schema",
+  "llm",
+  "openai",
+  "pydantic",
+  "schema",
+  "serialization",
+  "tool-use",
+  "type-hints",
+  "validation",
+  "yaml",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: Pydantic",
