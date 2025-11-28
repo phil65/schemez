@@ -68,6 +68,7 @@ def json_schema_to_pydantic_code(
         base_class=base_class,
         use_union_operator=True,
         use_schema_description=True,
+        use_standard_collections=True,  # Use list/dict instead of List/Dict
         enum_field_as_literal=LiteralType.All,
     )
 
