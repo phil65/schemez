@@ -17,6 +17,7 @@ __license__ = "MIT"
 __url__ = "https://github.com/phil65/schemez"
 
 from schemez.schema import Schema
+from schemez.storage import ModelStore
 from schemez.code import PythonCode, JSONCode, TOMLCode, YAMLCode
 from schemez.schemadef.schemadef import (
     SchemaDef,
@@ -53,6 +54,7 @@ __all__ = [
     "JSONCode",
     "MimeType",
     "ModelIdentifier",
+    "ModelStore",
     "ModelTemperature",
     "OpenAIFunctionDefinition",
     "OpenAIFunctionTool",

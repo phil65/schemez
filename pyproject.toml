@@ -62,6 +62,7 @@ Source = "https://github.com/phil65/schemez"
 ai = ["llmling-agent", "anyenv>=0.4.14"]
 codegen = ["datamodel-code-generator"]
 markdown = ["jinja2>=3.1.0"]
+storage = ["aiosqlite>=0.20.0"]
 tool_execution = ["fastapi>=0.118.2"]
 yaml = ["yamling"]
 
