@@ -56,10 +56,7 @@ def _clean_markdown(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text)
 
 
-def _resolve_type_name(  # noqa: PLR0911
-    type_schema: dict[str, Any],
-    defs: dict[str, Any],
-) -> str:
+def _resolve_type_name(type_schema: dict[str, Any], defs: dict[str, Any]) -> str:  # noqa: PLR0911
     """Resolve a JSON schema type to a human-readable type name."""
     if "$ref" in type_schema:
         return type_schema["$ref"].rsplit("/", 1)[-1]  # type: ignore[no-any-return]
@@ -195,11 +192,7 @@ def _extract_field_info(
     }
 
 
-def _extract_model_info(
-    name: str,
-    schema: dict[str, Any],
-    defs: dict[str, Any],
-) -> dict[str, Any]:
+def _extract_model_info(name: str, schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, Any]:
     """Extract model information from a JSON schema."""
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
