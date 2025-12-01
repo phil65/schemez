@@ -483,7 +483,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     model.model_config["json_schema_extra"] = deps_extra
                 case dict() as schema_extra:
                     schema_extra.update(deps_extra)
-                case Callable() as callable_func:  # type: ignore[misc]
+                case Callable() as callable_func:
 
                     def wrapped_extra(*args: Any) -> None:
                         callable_func(*args)

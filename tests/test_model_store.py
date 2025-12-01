@@ -44,7 +44,7 @@ async def test_insert_and_get():
         retrieved = await store.get(row_id)
         assert retrieved is not None
         assert retrieved.name == "Alice"
-        assert retrieved.age == 30
+        assert retrieved.age == 30  # noqa: PLR2004
 
 
 async def test_get_nonexistent():
@@ -64,7 +64,7 @@ async def test_insert_many():
         assert ids == [1, 2, 3]
 
         all_users = await store.all()
-        assert len(all_users) == 3
+        assert len(all_users) == 3  # noqa: PLR2004
 
 
 async def test_delete():
@@ -93,7 +93,7 @@ async def test_count():
         assert await store.count() == 1
 
         await store.insert(SimpleModel(name="Bob", age=25))
-        assert await store.count() == 2
+        assert await store.count() == 2  # noqa: PLR2004
 
 
 async def test_query():
@@ -105,8 +105,8 @@ async def test_query():
         ])
 
         results = await store.query(age=30)
-        assert len(results) == 2
-        assert all(u.age == 30 for u in results)
+        assert len(results) == 2  # noqa: PLR2004
+        assert all(u.age == 30 for u in results)  # noqa: PLR2004
 
         results = await store.query(name="Alice", age=30)
         assert len(results) == 1
@@ -171,7 +171,7 @@ async def test_nested_model():
         assert retrieved.title == "Outer"
         assert isinstance(retrieved.inner, SimpleModel)
         assert retrieved.inner.name == "Inner"
-        assert retrieved.inner.age == 10
+        assert retrieved.inner.age == 10  # noqa: PLR2004
 
 
 async def test_datetime_handling():
@@ -224,9 +224,9 @@ async def test_schema_storage_and_reconstruction(tmp_path):
 
         # Should be able to query
         all_items = await store.all()
-        assert len(all_items) == 2
+        assert len(all_items) == 2  # noqa: PLR2004
         assert all_items[0].name == "Alice"
-        assert all_items[0].age == 30
+        assert all_items[0].age == 30  # noqa: PLR2004
 
 
 async def test_schema_reconstruction_complex_model(tmp_path):
