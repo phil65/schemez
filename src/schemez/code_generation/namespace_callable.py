@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import inspect
 from typing import TYPE_CHECKING, Any
 
+from schemez.helpers import get_object_name
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -25,13 +27,13 @@ class NamespaceCallable:
 
     def __post_init__(self) -> None:
         """Set function attributes for introspection."""
-        self.__name__ = self.name_override or getattr(self.callable, "__name__", "unknown")
+        self.__name__ = self.name_override or get_object_name(self.callable, "unknown")
         self.__doc__ = self.callable.__doc__ or ""
 
     @property
     def name(self) -> str:
         """Get the effective name of the callable."""
-        return self.name_override or getattr(self.callable, "__name__", "unknown")
+        return self.name_override or get_object_name(self.callable, "unknown")
 
     @classmethod
     def from_generator(cls, generator: ToolCodeGenerator) -> NamespaceCallable:

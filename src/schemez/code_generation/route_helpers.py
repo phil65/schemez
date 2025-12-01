@@ -6,6 +6,7 @@ import asyncio
 import inspect
 from typing import TYPE_CHECKING, Any
 
+from schemez.helpers import get_object_name
 from schemez.schema_to_type.simple_impl import json_schema_to_base_model
 
 
@@ -103,7 +104,7 @@ async def _execute_tool_function(tool_callable: Callable[..., Any], **kwargs: An
                 None, lambda: tool_callable(**kwargs)
             )
     except Exception as e:  # noqa: BLE001
-        name = getattr(tool_callable, "__name__", "unknown")
+        name = get_object_name(tool_callable, "unknown")
         return f"Error executing {name}: {e!s}"
     else:
         return result

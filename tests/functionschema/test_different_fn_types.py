@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from schemez.functionschema import create_schema
+from schemez.helpers import get_object_name
 
 
 def regular_function(x: int) -> str:
@@ -53,7 +54,7 @@ def test_all_methods() -> None:
         TestMethods.static_method,
     ]:
         schema = create_schema(func)  # type: ignore[arg-type]
-        fn_name = getattr(func, "__name__", "unknown")
+        fn_name = get_object_name(func, "unknown")
         print(f"\n{fn_name} schema params: {list(schema.parameters['properties'])}")
         assert list(schema.parameters["properties"]) == ["x"]
 

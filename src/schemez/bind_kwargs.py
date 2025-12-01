@@ -3,6 +3,8 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
+from schemez.helpers import get_object_name, get_object_qualname
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -28,9 +30,9 @@ class BoundFunction[T]:
         """
         self.func = func
         self.bound_kwargs = bound_kwargs
-        self.__name__ = getattr(func, "__name__", "unknown")
+        self.__name__ = get_object_name(func, "unknown")
         self.__module__ = func.__module__
-        self.__qualname__ = getattr(func, "__qualname__", "unknown")
+        self.__qualname__ = get_object_qualname(func, "unknown")
         self.__doc__ = remove_kwargs_from_docstring(func.__doc__, self.bound_kwargs)
         self.__annotations__ = self._update_annotations(getattr(func, "__annotations__", {}))
         self.__signature__ = self._update_signature()
@@ -39,7 +41,7 @@ class BoundFunction[T]:
         sig = inspect.signature(func)
         for param in bound_kwargs:
             if param not in sig.parameters:
-                name = getattr(func, "__name__", "unknown")
+                name = get_object_name(func, "unknown")
                 msg = f"Parameter {param!r} not found in signature of {name}"
                 raise ValueError(msg)
 

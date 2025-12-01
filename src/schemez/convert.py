@@ -18,6 +18,7 @@ from typing import (
 from pydantic import BaseModel, Field, create_model
 
 from schemez.docstrings import get_docstring_info
+from schemez.helpers import get_object_name
 from schemez.schema import Schema
 
 
@@ -80,7 +81,7 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
             description=param_docs.get(param_name),  # TODO: Add docstring parsing
         )
         fields[param_name] = (type_hint, field)
-    name = getattr(func, "__name__", "unknown")
+    name = get_object_name(func, "unknown")
     model_name = name or f"{name}Params"
     return create_model(model_name, **fields, __base__=Schema, __doc__=description)  # type: ignore[no-any-return, call-overload]
 

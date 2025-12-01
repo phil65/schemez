@@ -26,6 +26,7 @@ from schemez.functionschema.typedefs import (
     OpenAIFunctionTool,
     ToolParameters,
 )
+from schemez.helpers import get_object_name
 
 
 if typing.TYPE_CHECKING:
@@ -326,7 +327,7 @@ def _create_schema_pydantic(
         schema_generator_cls = GenerateToolJsonSchema
     else:
         schema_generator_cls = GenerateJsonSchema
-    name = getattr(func, "__name__", "unknown")
+    name = get_object_name(func, "unknown")
     config = pydantic.ConfigDict(title=name)
     config_wrapper = ConfigWrapper(config)
     gen_schema = _generate_schema.GenerateSchema(config_wrapper)
@@ -466,7 +467,7 @@ def _create_schema_pydantic(
     docstring = docstring_parser.parse(func.__doc__ or "")
 
     return FunctionSchema(
-        name=name_override or getattr(func, "__name__", "unknown") or "unknown",
+        name=name_override or get_object_name(func, "unknown") or "unknown",
         description=description_override or docstring.short_description,
         parameters=parameters,
         required=required_fields,
@@ -492,7 +493,7 @@ def _create_schema_simple(
         hints = typing.get_type_hints(func, localns=locals())
     except NameError:
         msg = "Unable to resolve type hints for function %s, skipping"
-        logger.warning(msg, getattr(func, "__name__", "unknown"))
+        logger.warning(msg, get_object_name(func, "unknown"))
         hints = {}
 
     parameters: ToolParameters = {"type": "object", "properties": {}}
@@ -553,7 +554,7 @@ def _create_schema_simple(
         returns_dct = dict(returns)  # type: ignore[arg-type]
 
     return FunctionSchema(
-        name=name_override or getattr(func, "__name__", "unknown") or "unknown",
+        name=name_override or get_object_name(func, "unknown") or "unknown",
         description=description_override or docstring.short_description,
         parameters=parameters,
         required=required,

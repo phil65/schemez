@@ -14,6 +14,7 @@ PythonVersionStr = Literal["3.12", "3.13", "3.14"]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    import types
 
 
 def json_schema_to_pydantic_code(
@@ -276,3 +277,23 @@ if __name__ == "__main__":
 
     code = model_to_python_code(TestModel)
     print(code)
+
+
+def get_object_name(fn: Callable[..., Any] | types.ModuleType, fallback: str = "<unknown>") -> str:
+    """Get the name of a function."""
+    name = getattr(fn, "__name__", None)
+    if name is None:
+        return fallback
+    assert isinstance(name, str)
+    return name
+
+
+def get_object_qualname(
+    fn: Callable[..., Any] | types.ModuleType, fallback: str = "<unknown>"
+) -> str:
+    """Get the qualified name of a function."""
+    name = getattr(fn, "__qualname__", None)
+    if name is None:
+        return fallback
+    assert isinstance(name, str)
+    return name

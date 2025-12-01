@@ -12,6 +12,7 @@ from schemez.code_generation.route_helpers import (
     generate_func_code,
 )
 from schemez.functionschema import FunctionSchema
+from schemez.helpers import get_object_name
 
 
 if TYPE_CHECKING:
@@ -63,7 +64,7 @@ class ToolCodeGenerator:
         if self.name_override:
             return self.name_override
         if self.callable:
-            return getattr(self.callable, "__name__", "unknown")
+            return get_object_name(self.callable, "unknown")
         return self.schema.name
 
     def get_function_signature(self) -> str:
