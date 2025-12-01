@@ -326,7 +326,7 @@ async def test_complex_schema_types():
     assert "async def complex_tool" in code
 
     # Should generate nested models
-    assert "List[" in code  # For arrays
+    assert "list[" in code  # For arrays
     assert "Literal[" in code  # For enums
 
     # Skip slow get_tool_functions test
