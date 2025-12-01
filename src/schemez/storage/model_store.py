@@ -183,6 +183,7 @@ class ModelStore[T: BaseModel]:
         self._model_type: type[T] | None = model_type
         self._table_name = table_name
         self._columns: list[tuple[str, str, bool, Any]] | None = None
+        self._import_path: str | None = None
 
         # Validate: can't create new DB without model_type
         if model_type is None:
@@ -195,6 +196,9 @@ class ModelStore[T: BaseModel]:
         else:
             self._table_name = table_name or model_type.__name__.lower()
             self._columns = self._build_column_definitions()
+            module = model_type.__module__
+            if module != "__main__":
+                self._import_path = f"{module}.{model_type.__name__}"
 
     @classmethod
     async def open(cls, path: str | Path) -> ModelStore[BaseModel]:
@@ -229,6 +233,11 @@ class ModelStore[T: BaseModel]:
     def json_schema(self) -> dict[str, Any]:
         """Get the JSON schema for the stored model."""
         return self.model_type.model_json_schema()
+
+    @property
+    def import_path(self) -> str | None:
+        """Get the import path for the stored model, if available."""
+        return self._import_path
 
     def _build_column_definitions(self) -> list[tuple[str, str, bool, Any]]:
         """Build column definitions from model fields.
@@ -279,6 +288,8 @@ class ModelStore[T: BaseModel]:
 
         schema = self._model_type.model_json_schema()
         model_name = self._model_type.__name__
+        module = self._model_type.__module__
+        import_path = f"{module}.{model_name}" if module != "__main__" else None
 
         await conn.execute(
             f"INSERT OR REPLACE INTO {META_TABLE} (key, value) VALUES (?, ?)",
@@ -292,6 +303,11 @@ class ModelStore[T: BaseModel]:
             f"INSERT OR REPLACE INTO {META_TABLE} (key, value) VALUES (?, ?)",
             ("table_name", self._table_name),
         )
+        if import_path:
+            await conn.execute(
+                f"INSERT OR REPLACE INTO {META_TABLE} (key, value) VALUES (?, ?)",
+                ("import_path", import_path),
+            )
 
     async def _load_schema(self, conn: aiosqlite.Connection) -> None:
         """Load and reconstruct model from stored schema."""
@@ -308,8 +324,8 @@ class ModelStore[T: BaseModel]:
 
         # Load schema and model name
         cursor = await conn.execute(
-            f"SELECT key, value FROM {META_TABLE} WHERE key IN (?, ?, ?)",
-            ("schema", "model_name", "table_name"),
+            f"SELECT key, value FROM {META_TABLE} WHERE key IN (?, ?, ?, ?)",
+            ("schema", "model_name", "table_name", "import_path"),
         )
         rows = await cursor.fetchall()
         meta = {row[0]: row[1] for row in rows}
@@ -321,6 +337,7 @@ class ModelStore[T: BaseModel]:
         schema = json.loads(meta["schema"])
         model_name = meta.get("model_name", "DynamicModel")
         self._table_name = meta.get("table_name", model_name.lower())
+        self._import_path = meta.get("import_path")
 
         # Reconstruct the model class
         self._model_type = json_schema_to_pydantic_class(schema, class_name=model_name)  # type: ignore[assignment]
