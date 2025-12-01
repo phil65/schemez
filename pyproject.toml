@@ -292,5 +292,8 @@ preview = true
 python-version = "3.13"
 python-platform = "all"
 
+[tool.ty.rules]
+invalid-type-form = "ignore"
+
 [tool.uv]
 default-groups = ["dev", "lint", "docs"]

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
     from schemez.functionschema import FunctionSchema
+    from schemez.functionschema.helpers import FunctionType
 
 T_co = TypeVar("T_co", covariant=True)
 
@@ -38,7 +39,7 @@ class ExecutableFunction[T_co]:
 
         self.schema = schema
         self.func = func
-        self.function_type = determine_function_type(self.func)
+        self.function_type: FunctionType = determine_function_type(self.func)
 
     def run(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:  # noqa: PLR0911
         """Run the function synchronously.

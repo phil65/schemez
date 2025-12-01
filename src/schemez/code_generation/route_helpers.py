@@ -103,7 +103,8 @@ async def _execute_tool_function(tool_callable: Callable[..., Any], **kwargs: An
                 None, lambda: tool_callable(**kwargs)
             )
     except Exception as e:  # noqa: BLE001
-        return f"Error executing {tool_callable.__name__}: {e!s}"
+        name = getattr(tool_callable, "__name__", "unknown")
+        return f"Error executing {name}: {e!s}"
     else:
         return result
 

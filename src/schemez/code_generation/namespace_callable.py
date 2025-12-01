@@ -25,13 +25,13 @@ class NamespaceCallable:
 
     def __post_init__(self) -> None:
         """Set function attributes for introspection."""
-        self.__name__ = self.name_override or self.callable.__name__
+        self.__name__ = self.name_override or getattr(self.callable, "__name__", "unknown")
         self.__doc__ = self.callable.__doc__ or ""
 
     @property
     def name(self) -> str:
         """Get the effective name of the callable."""
-        return self.name_override or self.callable.__name__
+        return self.name_override or getattr(self.callable, "__name__", "unknown")
 
     @classmethod
     def from_generator(cls, generator: ToolCodeGenerator) -> NamespaceCallable:

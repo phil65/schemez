@@ -80,8 +80,8 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
             description=param_docs.get(param_name),  # TODO: Add docstring parsing
         )
         fields[param_name] = (type_hint, field)
-
-    model_name = name or f"{func.__name__}Params"
+    name = getattr(func, "__name__", "unknown")
+    model_name = name or f"{name}Params"
     return create_model(model_name, **fields, __base__=Schema, __doc__=description)  # type: ignore[no-any-return, call-overload]
 
 

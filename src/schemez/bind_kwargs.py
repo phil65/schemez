@@ -28,9 +28,9 @@ class BoundFunction[T]:
         """
         self.func = func
         self.bound_kwargs = bound_kwargs
-        self.__name__ = func.__name__
+        self.__name__ = getattr(func, "__name__", "unknown")
         self.__module__ = func.__module__
-        self.__qualname__ = func.__qualname__
+        self.__qualname__ = getattr(func, "__qualname__", "unknown")
         self.__doc__ = remove_kwargs_from_docstring(func.__doc__, self.bound_kwargs)
         self.__annotations__ = self._update_annotations(getattr(func, "__annotations__", {}))
         self.__signature__ = self._update_signature()
@@ -39,7 +39,8 @@ class BoundFunction[T]:
         sig = inspect.signature(func)
         for param in bound_kwargs:
             if param not in sig.parameters:
-                msg = f"Parameter {param!r} not found in signature of {func.__name__}"
+                name = getattr(func, "__name__", "unknown")
+                msg = f"Parameter {param!r} not found in signature of {name}"
                 raise ValueError(msg)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T:

@@ -48,21 +48,17 @@ async def test_end_to_end_workflow():
 
     # Create executor
     executor = HttpToolExecutor([schema], handler)
-
     # Test complete workflow
     # 1. Generate code
     code = await executor.generate_tools_code()
     assert "EchoToolInput" in code
     assert "async def echo_tool" in code
-
     # 2. Get tool functions (skip - this is slow)
     # tools = await executor.get_tool_functions()
     # assert "echo_tool" in tools
-
     # 3. Generate server
     server = await executor.generate_server_app()
     assert server.title == "Tool Server"
-
     # 4. Save to files
     with tempfile.TemporaryDirectory() as temp_dir:
         saved_files = await executor.save_to_files(Path(temp_dir))
@@ -179,17 +175,14 @@ async def test_file_based_schemas():
 
         # Create executor with file paths
         executor = HttpToolExecutor(schema_files, file_handler)
-
         # Test loading and processing
         loaded_schemas = await executor._load_schemas()
         assert len(loaded_schemas) == 2  # noqa: PLR2004
-
         # Skip slow get_tool_functions test
         # tools = await executor.get_tool_functions()
         # assert len(tools) == 2
         # assert "file_tool_1" in tools
         # assert "file_tool_2" in tools
-
         # Test mappings instead
         mappings = await executor._get_tool_mappings()
         assert len(mappings) == 2  # noqa: PLR2004
@@ -232,19 +225,15 @@ async def test_mixed_schema_sources():
         # Create file schema
         file_path = Path(temp_dir) / "file_tool.json"
         file_path.write_text(json.dumps(file_schema))
-
         # Mix dict and file schemas
         executor = HttpToolExecutor([dict_schema, file_path], mixed_handler)
-
         # Test both are loaded
         schemas = await executor._load_schemas()
         assert len(schemas) == 2  # noqa: PLR2004
-
         # Skip slow get_tool_functions test
         # tools = await executor.get_tool_functions()
         # assert "dict_tool" in tools
         # assert "file_tool" in tools
-
         # Test mappings instead
         mappings = await executor._get_tool_mappings()
         assert "dict_tool" in mappings
@@ -274,7 +263,6 @@ async def test_error_handling_in_handler():
         return "Success"
 
     executor = HttpToolExecutor([schema], error_handler)
-
     # Server should handle handler exceptions gracefully
     app = await executor.generate_server_app()
     assert app is not None
@@ -324,11 +312,9 @@ async def test_complex_schema_types():
     code = await executor.generate_tools_code()
     assert "ComplexToolInput" in code
     assert "async def complex_tool" in code
-
     # Should generate nested models
     assert "list[" in code  # For arrays
     assert "Literal[" in code  # For enums
-
     # Skip slow get_tool_functions test
     # tools = await executor.get_tool_functions()
     # assert "complex_tool" in tools
@@ -363,7 +349,6 @@ async def test_multiple_tools_performance():
         return f"Bulk result for {method_name}"
 
     executor = HttpToolExecutor(schemas, bulk_handler)
-
     # Test code generation works with multiple tools (skip slow get_tool_functions)
     code = await executor.generate_tools_code()
     for i in range(num_tools):
@@ -393,14 +378,10 @@ async def test_custom_base_url_in_generated_code():
     async def url_handler(method_name: str, input_props: BaseModel) -> str:
         return "URL test result"
 
-    custom_urls = [
-        "http://localhost:9999",  # Only test localhost to avoid slow tests
-    ]
-
+    custom_urls = ["http://localhost:9999"]
     for custom_url in custom_urls:
         executor = HttpToolExecutor([schema], url_handler, base_url=custom_url)
         code = await executor.generate_tools_code()
-
         # Check that custom URL appears in the generated HTTP calls
         assert custom_url in code
         assert f'"{custom_url}/tools/url_test_tool"' in code
@@ -426,11 +407,9 @@ async def test_regeneration_consistency():
 
     executor1 = HttpToolExecutor([schema], consistent_handler)
     executor2 = HttpToolExecutor([schema], consistent_handler)
-
     # Generate code from both executors
     code1 = await executor1.generate_tools_code()
     code2 = await executor2.generate_tools_code()
-
     # Results should be functionally equivalent
     # (exact string match might vary due to temp file names in comments)
     assert "ConsistencyToolInput" in code1

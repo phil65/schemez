@@ -63,7 +63,7 @@ class ToolCodeGenerator:
         if self.name_override:
             return self.name_override
         if self.callable:
-            return self.callable.__name__
+            return getattr(self.callable, "__name__", "unknown")
         return self.schema.name
 
     def get_function_signature(self) -> str:

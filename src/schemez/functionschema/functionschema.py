@@ -326,8 +326,8 @@ def _create_schema_pydantic(
         schema_generator_cls = GenerateToolJsonSchema
     else:
         schema_generator_cls = GenerateJsonSchema
-
-    config = pydantic.ConfigDict(title=func.__name__ or "unknown")
+    name = getattr(func, "__name__", "unknown")
+    config = pydantic.ConfigDict(title=name)
     config_wrapper = ConfigWrapper(config)
     gen_schema = _generate_schema.GenerateSchema(config_wrapper)
 
