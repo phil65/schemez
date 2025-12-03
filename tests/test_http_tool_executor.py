@@ -221,7 +221,7 @@ async def test_save_to_files(weather_schema: dict[str, Any], mock_handler: MockT
         assert tools_file.exists()
         assert server_file.exists()
 
-        tools_content = tools_file.read_text()
+        tools_content = tools_file.read_text("utf-8")
         assert "GetWeatherInput" in tools_content
         assert "async def get_weather" in tools_content
 

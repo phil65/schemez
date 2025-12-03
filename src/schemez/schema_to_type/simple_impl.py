@@ -96,4 +96,4 @@ if __name__ == "__main__":
     model = json_schema_to_base_model(schema)
     import devtools
 
-    devtools.debug(model.__fields__)
+    devtools.debug(model.model_fields)

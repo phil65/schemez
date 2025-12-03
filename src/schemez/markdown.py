@@ -91,8 +91,12 @@ def _resolve_type_name(type_schema: dict[str, Any], defs: dict[str, Any]) -> str
             return f"list[{item_type}]"
         case "object":
             if "additionalProperties" in type_schema:
-                val_type = _resolve_type_name(type_schema["additionalProperties"], defs)
-                return f"dict[str, {val_type}]"
+                additional = type_schema["additionalProperties"]
+                if isinstance(additional, dict):
+                    val_type = _resolve_type_name(additional, defs)
+                    return f"dict[str, {val_type}]"
+                # additionalProperties: true/false - just a generic dict
+                return "dict"
             return "dict"
         case "string":
             if "enum" in type_schema:
