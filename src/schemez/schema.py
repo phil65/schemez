@@ -8,11 +8,15 @@ from pydantic import BaseModel, ConfigDict
 import upath
 
 from schemez.generators import SchemaDataGenerator
-from schemez.helpers import model_to_python_code
+from schemez.helpers import (
+    iter_submodel_types as _iter_submodel_types,
+    iter_submodels as _iter_submodels,
+    model_to_python_code,
+)
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from llmling_agent.models.content import BaseContent
     from upath.types import JoinablePathLike
@@ -110,6 +114,45 @@ class Schema(BaseModel):
         from schemez.helpers import merge_models
 
         return merge_models(self, other)
+
+    def iter_submodels(self, *, recursive: bool = True) -> Iterator[tuple[str, BaseModel]]:
+        """Iterate through all nested BaseModel instances in fields.
+
+        Supports fields of type:
+        - BaseModel (direct instance)
+        - list[BaseModel]
+        - dict[str, BaseModel]
+
+        Args:
+            recursive: If True, also iterate through submodels of submodels
+
+        Yields:
+            Tuples of (path, submodel) where path is like "field", "field[0]", "field['key']"
+        """
+        return _iter_submodels(self, recursive=recursive)
+
+    @classmethod
+    def iter_submodel_types(
+        cls, *, recursive: bool = True, include_union_members: bool = True
+    ) -> Iterator[tuple[str, type[BaseModel]]]:
+        """Iterate through all nested BaseModel types in field annotations.
+
+        Supports field types:
+        - BaseModel (direct type)
+        - list[BaseModel]
+        - dict[str, BaseModel]
+        - BaseModel | OtherModel (unions, when include_union_members=True)
+
+        Args:
+            recursive: If True, also iterate through submodel types of submodels
+            include_union_members: If True, yield each union member separately
+
+        Yields:
+            Tuples of (path, model_type) where path is like "field", "field[]", "field{}"
+        """
+        return _iter_submodel_types(
+            cls, recursive=recursive, include_union_members=include_union_members
+        )
 
     @classmethod
     def from_yaml(cls, content: str, inherit_path: JoinablePathLike | None = None) -> Self:

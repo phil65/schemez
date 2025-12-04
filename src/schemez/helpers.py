@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import collections.abc
 import importlib
+import types
 import typing
-from typing import TYPE_CHECKING, Any, Literal, assert_never
+from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -13,8 +14,7 @@ from pydantic import BaseModel
 PythonVersionStr = Literal["3.12", "3.13", "3.14"]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    import types
+    from collections.abc import Callable, Iterator
 
 
 def json_schema_to_pydantic_code(
@@ -297,3 +297,129 @@ def get_object_qualname(
         return fallback
     assert isinstance(name, str)
     return name
+
+
+def iter_submodels(model: BaseModel, *, recursive: bool = True) -> Iterator[tuple[str, BaseModel]]:
+    """Iterate through all nested BaseModel instances in fields.
+
+    Supports field types:
+    - BaseModel (direct instance)
+    - list[BaseModel]
+    - dict[str, BaseModel]
+
+    Args:
+        model: The BaseModel instance to iterate
+        recursive: If True, also iterate through submodels of submodels
+
+    Yields:
+        Tuples of (path, submodel) where path is like "field", "field[0]", "field['key']"
+    """
+
+    def _iter(current: BaseModel, prefix: str) -> Iterator[tuple[str, BaseModel]]:
+        for field_name in current.model_fields:
+            value = getattr(current, field_name)
+            if value is None:
+                continue
+            path = f"{prefix}.{field_name}" if prefix else field_name
+            match value:
+                case BaseModel() as submodel:
+                    yield path, submodel
+                    if recursive:
+                        yield from _iter(submodel, path)
+                case list() as items:
+                    for idx, item in enumerate(items):
+                        if isinstance(item, BaseModel):
+                            item_path = f"{path}[{idx}]"
+                            yield item_path, item
+                            if recursive:
+                                yield from _iter(item, item_path)
+                case dict() as mapping:
+                    for key, item in mapping.items():
+                        if isinstance(item, BaseModel):
+                            item_path = f"{path}[{key!r}]"
+                            yield item_path, item
+                            if recursive:
+                                yield from _iter(item, item_path)
+
+    yield from _iter(model, "")
+
+
+def iter_submodel_types(
+    model_cls: type[BaseModel], *, recursive: bool = True, include_union_members: bool = True
+) -> Iterator[tuple[str, type[BaseModel]]]:
+    """Iterate through all nested BaseModel types in field annotations.
+
+    Supports field types:
+    - BaseModel (direct type)
+    - list[BaseModel]
+    - dict[str, BaseModel]
+    - BaseModel | OtherModel (unions, when include_union_members=True)
+
+    Args:
+        model_cls: The BaseModel class to iterate
+        recursive: If True, also iterate through submodel types of submodels
+        include_union_members: If True, yield each union member separately
+
+    Yields:
+        Tuples of (path, model_type) where path is like "field", "field[]", "field{}"
+    """
+
+    def _extract_model_types(
+        annotation: type, *, expand_unions: bool = True
+    ) -> Iterator[tuple[str, type[BaseModel]]]:
+        """Extract BaseModel types from an annotation."""
+        origin = get_origin(annotation)
+
+        # Handle unions (X | Y or Union[X, Y])
+        if origin is types.UnionType or origin is type(int | str):
+            union_args = [a for a in get_args(annotation) if a is not type(None)]
+            # X | None is Optional, always expand; X | Y is a true union
+            is_optional = len(union_args) == 1
+            if is_optional or expand_unions:
+                for arg in union_args:
+                    yield from _extract_model_types(arg, expand_unions=expand_unions)
+            return
+
+        # Handle list[X]
+        if origin is list:
+            list_args = get_args(annotation)
+            if list_args:
+                for suffix, model_type in _extract_model_types(
+                    list_args[0], expand_unions=expand_unions
+                ):
+                    yield f"[]{suffix}", model_type
+            return
+
+        # Handle dict[str, X]
+        if origin is dict:
+            dict_args = get_args(annotation)
+            if len(dict_args) >= 2:  # noqa: PLR2004
+                for suffix, model_type in _extract_model_types(
+                    dict_args[1], expand_unions=expand_unions
+                ):
+                    yield f"{{}}{suffix}", model_type
+            return
+
+        # Direct BaseModel subclass
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            yield "", annotation
+
+    def _iter(
+        cls: type[BaseModel], prefix: str, seen: set[type[BaseModel]]
+    ) -> Iterator[tuple[str, type[BaseModel]]]:
+        for field_name, field_info in cls.model_fields.items():
+            annotation = field_info.annotation
+            if annotation is None:
+                continue
+            base_path = f"{prefix}.{field_name}" if prefix else field_name
+
+            for suffix, model_type in _extract_model_types(
+                annotation, expand_unions=include_union_members
+            ):
+                path = f"{base_path}{suffix}"
+                yield path, model_type
+                if recursive and model_type not in seen:
+                    seen.add(model_type)
+                    yield from _iter(model_type, path, seen)
+
+    yield from _iter(model_cls, "", set())
