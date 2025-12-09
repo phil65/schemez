@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import anyenv
 import httpx
-from upathtools import to_upath
+from upath import Upath
 import yamling
 
 from schemez.openapi.resolver import resolve_openapi_refs
@@ -32,8 +32,8 @@ def load_openapi_spec(url_or_path: JoinablePathLike, timeout: float = 30.0) -> d
         content = response.text
         base_url = path_str
     else:
-        content = to_upath(url_or_path).read_text(encoding="utf-8")
-        base_url = to_upath(url_or_path).resolve().as_uri()
+        content = Upath(url_or_path).read_text(encoding="utf-8")
+        base_url = Upath(url_or_path).resolve().as_uri()
 
     # Try to detect format and parse accordingly
     try:
