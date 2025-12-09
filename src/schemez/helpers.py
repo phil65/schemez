@@ -423,3 +423,112 @@ def iter_submodel_types(
                     yield from _iter(model_type, path, seen)
 
     yield from _iter(model_cls, "", set())
+
+
+def models_to_markdown_docs(
+    *models: type[BaseModel],
+    header_level: int = 2,
+    expand_mode: Literal["minimal", "maximal", "default"] = "default",
+    seed: int = 0,
+    validate: bool = False,
+    exclude_none: bool = True,
+    exclude_defaults: bool = False,
+    exclude_unset: bool = False,
+    indent: int = 2,
+    sort_keys: bool = True,
+) -> str:
+    """Generate markdown documentation with commented YAML examples for BaseModel classes.
+
+    Creates markdown chapters for each model with:
+    - Model name as header
+    - Model docstring
+    - Commented YAML example with test data
+
+    Args:
+        models: One or more BaseModel classes to document
+        header_level: Starting header level (2 = h2, 3 = h3, etc.)
+        expand_mode: YAML generation mode - "minimal", "maximal", or "default"
+        seed: Seed for deterministic YAML generation
+        validate: Whether to validate the generated test data
+        exclude_none: Exclude fields with None values in YAML
+        exclude_defaults: Exclude fields with default values in YAML
+        exclude_unset: Exclude fields that are not set in YAML
+        indent: Indentation level for YAML output
+        sort_keys: Sort keys in the YAML output
+
+    Returns:
+        Markdown string with chapters for each model
+
+    Example:
+        ```python
+        from pydantic import BaseModel, Field
+
+        class Person(BaseModel):
+            '''A person with basic information.'''
+
+            name: str = Field(description='Full name')
+            age: int = Field(description='Age in years')
+            email: str | None = Field(default=None, description='Email address')
+
+        class Company(BaseModel):
+            '''A company entity.'''
+
+            name: str = Field(description='Company name')
+            founded: int = Field(description='Year founded')
+
+        # Generate documentation
+        docs = models_to_markdown_docs(Person, Company)
+        print(docs)
+        ```
+
+        Output:
+        ```markdown
+        ## Person
+
+        A person with basic information.
+
+        ```yaml
+        age: 0  # Age in years
+        name: a  # Full name
+        ```
+
+        ## Company
+
+        A company entity.
+
+        ```yaml
+        founded: 0  # Year founded
+        name: a  # Company name
+        ```
+        ```
+    """
+    from schemez.commented_yaml import create_yaml_description
+
+    sections = []
+    header_prefix = "#" * header_level
+
+    for model in models:
+        model_name = model.__name__
+        model_doc = model.__doc__ or ""
+        model_doc = model_doc.strip()
+
+        yaml_example = create_yaml_description(
+            model,
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults,
+            exclude_unset=exclude_unset,
+            indent=indent,
+            comments=True,
+            sort_keys=sort_keys,
+            validate=validate,
+            expand_mode=expand_mode,
+        )
+
+        section = f"{header_prefix} {model_name}\n\n"
+        if model_doc:
+            section += f"{model_doc}\n\n"
+        section += f"```yaml\n{yaml_example}\n```"
+
+        sections.append(section)
+
+    return "\n\n".join(sections)

@@ -41,6 +41,7 @@ from schemez.functionschema.typedefs import (
     Property,
 )
 from schemez.code_generation import ToolCodeGenerator, ToolsetCodeGenerator
+from schemez.helpers import models_to_markdown_docs
 
 __version__ = version("schemez")
 
@@ -74,4 +75,5 @@ __all__ = [
     "create_schemas_from_callables",
     "create_schemas_from_class",
     "create_schemas_from_module",
+    "models_to_markdown_docs",
 ]

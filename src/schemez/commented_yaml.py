@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
+
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 
 def get_description(field_schema: dict[str, Any]) -> str | None:
@@ -15,10 +19,7 @@ def get_description(field_schema: dict[str, Any]) -> str | None:
     return None
 
 
-def find_schema_for_path(
-    schema_obj: dict[str, Any],
-    path: list[str],
-) -> dict[str, Any] | None:
+def find_schema_for_path(schema_obj: dict[str, Any], path: list[str]) -> dict[str, Any] | None:
     """Navigate schema to find definition for nested path."""
     current = schema_obj
 
@@ -89,6 +90,80 @@ def find_schema_for_path(
         else:
             return None
     return current
+
+
+def create_yaml_description(
+    model: type[BaseModel],
+    exclude_none: bool = True,
+    exclude_defaults: bool = False,
+    exclude_unset: bool = False,
+    indent: int = 2,
+    default_flow_style: bool | None = None,
+    allow_unicode: bool = True,
+    comments: bool = False,
+    sort_keys: bool = True,
+    validate: bool = False,
+    mode: Literal["json", "python"] = "python",
+    expand_mode: Literal["minimal", "maximal", "default"] = "default",
+) -> str:
+    """Dump configuration to YAML string.
+
+    Args:
+        model: Model to dump
+        exclude_none: Exclude fields with None values
+        exclude_defaults: Exclude fields with default values
+        exclude_unset: Exclude fields that are not set
+        indent: Indentation level for YAML output
+        default_flow_style: Default flow style for YAML output
+        allow_unicode: Allow unicode characters in YAML output
+        comments: Include descriptions as comments in the YAML output
+        sort_keys: Sort keys in the YAML output
+        mode: Output mode, either "json" or "python"
+        validate: Validate the generated YAML against the JSON schema
+        expand_mode: Expand mode, either "minimal", "maximal", or "default"
+
+    Returns:
+        YAML string representation of the model
+    """
+    import yamling
+
+    from schemez.commented_yaml import process_yaml_lines
+    from schemez.generators import SchemaDataGenerator
+
+    json_schema = model.model_json_schema()
+    generator = SchemaDataGenerator(json_schema)
+
+    if expand_mode == "minimal":
+        data = generator.generate_minimal()
+    elif expand_mode == "maximal":
+        data = generator.generate_maximal()
+    else:  # default
+        data = generator.generate()
+
+    if validate:
+        instance = model.model_validate(data)
+    instance = model.model_construct(**data)
+    data = instance.model_dump(
+        exclude_none=exclude_none,
+        exclude_defaults=exclude_defaults,
+        exclude_unset=exclude_unset,
+        mode=mode,
+    )
+    base_yaml = yamling.dump_yaml(
+        data,
+        sort_keys=sort_keys,
+        indent=indent,
+        default_flow_style=default_flow_style,
+        allow_unicode=allow_unicode,
+    )
+    if not comments:
+        return base_yaml
+
+    schema = model.model_json_schema()
+    yaml_lines = base_yaml.strip().split("\n")
+    commented_lines = process_yaml_lines(yaml_lines, schema)
+
+    return "\n".join(commented_lines)
 
 
 def process_yaml_lines(yaml_lines: list[str], schema: dict[str, Any]) -> list[str]:
