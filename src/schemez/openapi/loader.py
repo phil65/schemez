@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import anyenv
 import httpx
-from upath import UPath
+from upathtools import to_upath
 import yamling
 
 from schemez.openapi.resolver import resolve_openapi_refs
 
 
-def load_openapi_spec(url_or_path: str | UPath, timeout: float = 30.0) -> dict[str, Any]:
+if TYPE_CHECKING:
+    from upath.types import JoinablePathLike
+
+
+def load_openapi_spec(url_or_path: JoinablePathLike, timeout: float = 30.0) -> dict[str, Any]:
     """Load and fully dereference an OpenAPI spec.
 
     Args:
@@ -21,18 +26,22 @@ def load_openapi_spec(url_or_path: str | UPath, timeout: float = 30.0) -> dict[s
     Returns:
         Fully dereferenced OpenAPI spec.
     """
-    path_str = str(url_or_path)
-
-    if path_str.startswith(("http://", "https://")):
+    if (path_str := str(url_or_path)).startswith(("http://", "https://")):
         response = httpx.get(path_str, follow_redirects=True, timeout=timeout)
         response.raise_for_status()
-        spec = yamling.load_yaml(response.text, verify_type=dict)
+        content = response.text
         base_url = path_str
     else:
-        content = UPath(url_or_path).read_text(encoding="utf-8")
+        content = to_upath(url_or_path).read_text(encoding="utf-8")
+        base_url = to_upath(url_or_path).resolve().as_uri()
+
+    # Try to detect format and parse accordingly
+    try:
+        # First try JSON (faster to fail if not JSON)
+        spec = anyenv.load_json(content)
+    except anyenv.JsonLoadError:
+        # Fall back to YAML
         spec = yamling.load_yaml(content, verify_type=dict)
-        # For local files, use file:// URL as base
-        base_url = UPath(url_or_path).resolve().as_uri()
 
     return resolve_openapi_refs(spec, base_url, timeout)
 
