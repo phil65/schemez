@@ -515,8 +515,12 @@ def model_to_markdown(
         # Build output with header and docstring
         result_parts = []
 
+        # Get model title from schema or use class name
+        json_schema = model.model_json_schema()
+        model_title = json_schema.get("title", model.__name__)
+
         # Add markdown header
-        result_parts.append(f"{'#' * header_level} {model.__name__}\n\n")
+        result_parts.append(f"{'#' * header_level} {model_title}\n\n")
 
         # Add class docstring if available
         if model.__doc__:
@@ -530,7 +534,7 @@ def model_to_markdown(
             1,
             len(commented_lines),
             style=header_style,
-            title=f"{model.__name__} (YAML)",
+            title=f"{model_title} (YAML)",
             language="yaml",
         )
         result_parts.append(f"{header}\n{yaml_content}\n```\n")
@@ -651,8 +655,11 @@ def instance_to_markdown(
         model_class = type(instance)
         result_parts = []
 
+        # Get model title from schema or use class name
+        model_title = json_schema.get("title", model_class.__name__)
+
         # Add markdown header
-        result_parts.append(f"{'#' * header_level} {model_class.__name__}\n\n")
+        result_parts.append(f"{'#' * header_level} {model_title}\n\n")
 
         # Add class docstring if available
         if model_class.__doc__:
@@ -666,7 +673,7 @@ def instance_to_markdown(
             1,
             len(commented_lines),
             style=header_style,
-            title=f"{model_class.__name__} (YAML)",
+            title=f"{model_title} (YAML)",
             language="yaml",
         )
         result_parts.append(f"{header}\n{yaml_content}\n```\n")
