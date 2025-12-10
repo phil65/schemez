@@ -265,32 +265,40 @@ def schema_to_markdown_context(
     }
 
 
+def _resolve_from_import_path(import_path: str) -> Any:
+    """Resolve any object from an import path.
+
+    Supports both 'module.submodule:Name' and 'module.submodule.Name' formats.
+    """
+    if ":" in import_path:
+        # Format: module.path:Name
+        module_path, attr_name = import_path.split(":", 1)
+    else:
+        # Format: module.path.Name - split on last dot
+        if "." not in import_path:
+            msg = f"Import path must contain module and attribute, got: {import_path}"
+            raise ValueError(msg)
+        module_path, attr_name = import_path.rsplit(".", 1)
+
+    module = importlib.import_module(module_path)
+
+    if not hasattr(module, attr_name):
+        msg = f"'{attr_name}' not found in module '{module_path}'"
+        raise AttributeError(msg)
+
+    return getattr(module, attr_name)
+
+
 def _resolve_model_from_import_path(import_path: str) -> type[BaseModel]:
     """Resolve a model class from an import path.
 
     Supports both 'module.submodule:ClassName' and 'module.submodule.ClassName' formats.
     """
-    if ":" in import_path:
-        # Format: module.path:ClassName
-        module_path, class_name = import_path.split(":", 1)
-    else:
-        # Format: module.path.ClassName - split on last dot
-        if "." not in import_path:
-            msg = f"Import path must contain module and class, got: {import_path}"
-            raise ValueError(msg)
-        module_path, class_name = import_path.rsplit(".", 1)
-
-    module = importlib.import_module(module_path)
-
-    if not hasattr(module, class_name):
-        msg = f"Class '{class_name}' not found in module '{module_path}'"
-        raise AttributeError(msg)
-
-    model_class = getattr(module, class_name)
+    model_class = _resolve_from_import_path(import_path)
 
     # Basic check that it's a BaseModel - we can't do full isinstance check due to imports
     if not hasattr(model_class, "model_json_schema"):
-        msg = f"'{class_name}' is not a Pydantic BaseModel class"
+        msg = f"'{import_path}' is not a Pydantic BaseModel class"
         raise TypeError(msg)
 
     return model_class  # type: ignore[no-any-return]
@@ -410,7 +418,7 @@ def model_union_to_markdown(
     """
     # Resolve import path if string
     if isinstance(union_type, str):
-        union_type = _resolve_model_from_import_path(union_type)
+        union_type = _resolve_from_import_path(union_type)
 
     # Check if it's a Union type
     origin = get_origin(union_type)
