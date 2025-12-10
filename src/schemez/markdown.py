@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 OutputMode = Literal["table", "python_code", "yaml"]
 HeaderStyle = Literal["default", "pymdownx"]
+SerializationMode = Literal["json", "python"]
 
 
 def _format_code_header(
@@ -360,6 +361,7 @@ def model_to_markdown(
     indent: int = 2,
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
+    serialization_mode: SerializationMode = "json",
 ) -> str:
     """Convert a Pydantic model class to Markdown documentation.
 
@@ -380,6 +382,7 @@ def model_to_markdown(
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
+        serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
     Returns:
         Markdown string documenting the model
@@ -429,7 +432,7 @@ def model_to_markdown(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
-            mode="python",
+            mode=serialization_mode,
         )
 
         base_yaml = yamling.dump_yaml(
@@ -486,6 +489,7 @@ def instance_to_markdown(
     indent: int = 2,
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
+    serialization_mode: SerializationMode = "json",
 ) -> str:
     """Convert a Pydantic model instance to Markdown documentation.
 
@@ -506,6 +510,7 @@ def instance_to_markdown(
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
+        serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
     Returns:
         Markdown string documenting the model instance
@@ -543,7 +548,7 @@ def instance_to_markdown(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults_yaml,
             exclude_unset=exclude_unset,
-            mode="python",
+            mode=serialization_mode,
         )
 
         base_yaml = yamling.dump_yaml(
@@ -610,6 +615,7 @@ def model_union_to_markdown(
     indent: int = 2,
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
+    serialization_mode: SerializationMode = "json",
 ) -> str:
     """Convert a Union type containing Pydantic models to Markdown documentation.
 
@@ -632,6 +638,7 @@ def model_union_to_markdown(
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
+        serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
     Returns:
         Markdown string documenting all models in the union
@@ -679,6 +686,7 @@ def model_union_to_markdown(
             indent=indent,
             sort_keys=sort_keys,
             header_style=header_style,
+            serialization_mode=serialization_mode,
         )
         markdown_parts.append(model_md)
 

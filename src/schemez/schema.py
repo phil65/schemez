@@ -57,6 +57,7 @@ class Schema(BaseModel):
         indent: int = 2,
         sort_keys: bool = True,
         header_style: Literal["default", "pymdownx"] = "default",
+        serialization_mode: Literal["json", "python"] = "json",
     ) -> str:
         """Dump model instance to Markdown documentation.
 
@@ -74,6 +75,7 @@ class Schema(BaseModel):
             indent: YAML indentation
             sort_keys: Sort keys in YAML output
             header_style: Code block header style - "default" or "pymdownx"
+            serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
         Returns:
             Markdown string documenting the model
@@ -95,6 +97,7 @@ class Schema(BaseModel):
             indent=indent,
             sort_keys=sort_keys,
             header_style=header_style,
+            serialization_mode=serialization_mode,
         )
 
     @classmethod
@@ -115,6 +118,7 @@ class Schema(BaseModel):
         indent: int = 2,
         sort_keys: bool = True,
         header_style: Literal["default", "pymdownx"] = "default",
+        serialization_mode: Literal["json", "python"] = "json",
     ) -> str:
         """Dump model class schema to Markdown documentation.
 
@@ -133,6 +137,7 @@ class Schema(BaseModel):
             indent: YAML indentation
             sort_keys: Sort keys in YAML output
             header_style: Code block header style - "default" or "pymdownx"
+            serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
         Returns:
             Markdown string documenting the model schema
@@ -155,6 +160,7 @@ class Schema(BaseModel):
             indent=indent,
             sort_keys=sort_keys,
             header_style=header_style,
+            serialization_mode=serialization_mode,
         )
 
     def merge(self, other: Self) -> Self:
