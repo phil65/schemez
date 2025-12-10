@@ -50,6 +50,12 @@ class Schema(BaseModel):
         include_examples: bool = True,
         include_constraints: bool = True,
         include_values: bool = True,
+        display_mode: Literal["table", "python_code", "yaml"] = "table",
+        exclude_none: bool = True,
+        exclude_defaults_yaml: bool = False,
+        exclude_unset: bool = False,
+        indent: int = 2,
+        sort_keys: bool = True,
     ) -> str:
         """Dump model instance to Markdown documentation.
 
@@ -60,6 +66,12 @@ class Schema(BaseModel):
             include_examples: Include examples section
             include_constraints: Include constraints section
             include_values: Include current instance values
+            display_mode: Output format - "table", "python_code", or "yaml"
+            exclude_none: Exclude None values from YAML
+            exclude_defaults_yaml: Exclude default values from YAML
+            exclude_unset: Exclude unset values from YAML
+            indent: YAML indentation
+            sort_keys: Sort keys in YAML output
 
         Returns:
             Markdown string documenting the model
@@ -74,6 +86,12 @@ class Schema(BaseModel):
             include_examples=include_examples,
             include_constraints=include_constraints,
             include_values=include_values,
+            display_mode=display_mode,
+            exclude_none=exclude_none,
+            exclude_defaults_yaml=exclude_defaults_yaml,
+            exclude_unset=exclude_unset,
+            indent=indent,
+            sort_keys=sort_keys,
         )
 
     @classmethod
@@ -85,6 +103,14 @@ class Schema(BaseModel):
         include_defaults: bool = True,
         include_examples: bool = True,
         include_constraints: bool = True,
+        display_mode: Literal["table", "python_code", "yaml"] = "table",
+        seed: int = 0,
+        mode: Literal["minimal", "maximal", "default"] = "default",
+        exclude_none: bool = True,
+        exclude_defaults: bool = False,
+        exclude_unset: bool = False,
+        indent: int = 2,
+        sort_keys: bool = True,
     ) -> str:
         """Dump model class schema to Markdown documentation.
 
@@ -94,6 +120,14 @@ class Schema(BaseModel):
             include_defaults: Include default values in the table
             include_examples: Include examples section
             include_constraints: Include constraints section
+            display_mode: Output format - "table", "python_code", or "yaml"
+            seed: Seed for YAML example generation
+            mode: Generation mode for YAML examples
+            exclude_none: Exclude None values from YAML
+            exclude_defaults: Exclude default values from YAML
+            exclude_unset: Exclude unset values from YAML
+            indent: YAML indentation
+            sort_keys: Sort keys in YAML output
 
         Returns:
             Markdown string documenting the model schema
@@ -107,6 +141,14 @@ class Schema(BaseModel):
             include_defaults=include_defaults,
             include_examples=include_examples,
             include_constraints=include_constraints,
+            display_mode=display_mode,
+            seed=seed,
+            mode=mode,
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults,
+            exclude_unset=exclude_unset,
+            indent=indent,
+            sort_keys=sort_keys,
         )
 
     def merge(self, other: Self) -> Self:

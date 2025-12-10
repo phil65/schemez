@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 
 
 if TYPE_CHECKING:
     import jinja2
     from pydantic import BaseModel
+
+OutputMode = Literal["table", "python_code", "yaml"]
 
 DEFAULT_TEMPLATE = """\
 {%- macro render_model(model, level) %}
@@ -312,6 +314,14 @@ def model_to_markdown(
     include_defaults: bool = True,
     include_examples: bool = True,
     include_constraints: bool = True,
+    display_mode: OutputMode = "table",
+    seed: int = 0,
+    mode: Literal["minimal", "maximal", "default"] = "default",
+    exclude_none: bool = True,
+    exclude_defaults: bool = False,
+    exclude_unset: bool = False,
+    indent: int = 2,
+    sort_keys: bool = True,
 ) -> str:
     """Convert a Pydantic model class to Markdown documentation.
 
@@ -323,6 +333,14 @@ def model_to_markdown(
         include_defaults: Include default values in the table
         include_examples: Include examples section
         include_constraints: Include constraints section
+        display_mode: Output format - "table", "python_code", or "yaml"
+        seed: Seed for YAML example generation
+        mode: Generation mode for YAML examples
+        exclude_none: Exclude None values from YAML
+        exclude_defaults: Exclude default values from YAML
+        exclude_unset: Exclude unset values from YAML
+        indent: YAML indentation
+        sort_keys: Sort keys in YAML output
 
     Returns:
         Markdown string documenting the model
@@ -332,6 +350,52 @@ def model_to_markdown(
     if isinstance(model, str):
         model = _resolve_model_from_import_path(model)
 
+    if display_mode == "python_code":
+        source = inspect.getsource(model)
+        return (
+            f"```{model.__module__}.{model.__name__}#L1-{len(source.splitlines())}\n{source}```\n"
+        )
+
+    if display_mode == "yaml":
+        import yamling
+
+        from schemez.commented_yaml import process_yaml_lines
+        from schemez.generators import SchemaDataGenerator
+
+        json_schema = model.model_json_schema()
+        generator = SchemaDataGenerator(json_schema, seed=seed)
+
+        if mode == "minimal":
+            data = generator.generate_minimal()
+        elif mode == "maximal":
+            data = generator.generate_maximal()
+        else:  # default
+            data = generator.generate()
+
+        instance = model.model_construct(**data)
+
+        yaml_data = instance.model_dump(
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults,
+            exclude_unset=exclude_unset,
+            mode="python",
+        )
+
+        base_yaml = yamling.dump_yaml(
+            yaml_data,
+            sort_keys=sort_keys,
+            indent=indent,
+            default_flow_style=None,
+            allow_unicode=True,
+        )
+
+        yaml_lines = base_yaml.strip().split("\n")
+        commented_lines = process_yaml_lines(yaml_lines, json_schema)
+        yaml_content = "\n".join(commented_lines)
+
+        return f"```{model.__module__}.{model.__name__}.yaml#L1-{len(commented_lines)}\n{yaml_content}```\n"  # noqa: E501
+
+    # Default table mode
     context = schema_to_markdown_context(
         model,
         header_level=header_level,
@@ -355,6 +419,12 @@ def instance_to_markdown(
     include_examples: bool = True,
     include_constraints: bool = True,
     include_values: bool = True,
+    display_mode: OutputMode = "table",
+    exclude_none: bool = True,
+    exclude_defaults_yaml: bool = False,
+    exclude_unset: bool = False,
+    indent: int = 2,
+    sort_keys: bool = True,
 ) -> str:
     """Convert a Pydantic model instance to Markdown documentation.
 
@@ -368,10 +438,50 @@ def instance_to_markdown(
         include_examples: Include examples section
         include_constraints: Include constraints section
         include_values: Include current instance values
+        display_mode: Output format - "table", "python_code", or "yaml"
+        exclude_none: Exclude None values from YAML
+        exclude_defaults_yaml: Exclude default values from YAML
+        exclude_unset: Exclude unset values from YAML
+        indent: YAML indentation
+        sort_keys: Sort keys in YAML output
 
     Returns:
         Markdown string documenting the model instance
     """
+    if display_mode == "python_code":
+        model_class = type(instance)
+        source = inspect.getsource(model_class)
+        return f"```{model_class.__module__}.{model_class.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+
+    if display_mode == "yaml":
+        import yamling
+
+        from schemez.commented_yaml import process_yaml_lines
+
+        yaml_data = instance.model_dump(
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults_yaml,
+            exclude_unset=exclude_unset,
+            mode="python",
+        )
+
+        base_yaml = yamling.dump_yaml(
+            yaml_data,
+            sort_keys=sort_keys,
+            indent=indent,
+            default_flow_style=None,
+            allow_unicode=True,
+        )
+
+        json_schema = instance.model_json_schema()
+        yaml_lines = base_yaml.strip().split("\n")
+        commented_lines = process_yaml_lines(yaml_lines, json_schema)
+        yaml_content = "\n".join(commented_lines)
+
+        model_class = type(instance)
+        return f"```{model_class.__module__}.{model_class.__name__}.yaml#L1-{len(commented_lines)}\n{yaml_content}```\n"  # noqa: E501
+
+    # Default table mode
     result = model_to_markdown(
         type(instance),
         template=template,
@@ -379,6 +489,7 @@ def instance_to_markdown(
         include_defaults=include_defaults,
         include_examples=include_examples,
         include_constraints=include_constraints,
+        display_mode="table",
     )
 
     if include_values:
@@ -399,6 +510,14 @@ def model_union_to_markdown(
     include_defaults: bool = True,
     include_examples: bool = True,
     include_constraints: bool = True,
+    display_mode: OutputMode = "table",
+    seed: int = 0,
+    mode: Literal["minimal", "maximal", "default"] = "default",
+    exclude_none: bool = True,
+    exclude_defaults: bool = False,
+    exclude_unset: bool = False,
+    indent: int = 2,
+    sort_keys: bool = True,
 ) -> str:
     """Convert a Union type containing Pydantic models to Markdown documentation.
 
@@ -412,6 +531,14 @@ def model_union_to_markdown(
         include_defaults: Include default values in the table
         include_examples: Include examples section
         include_constraints: Include constraints section
+        display_mode: Output format - "table", "python_code", or "yaml"
+        seed: Seed for YAML example generation
+        mode: Generation mode for YAML examples
+        exclude_none: Exclude None values from YAML
+        exclude_defaults: Exclude default values from YAML
+        exclude_unset: Exclude unset values from YAML
+        indent: YAML indentation
+        sort_keys: Sort keys in YAML output
 
     Returns:
         Markdown string documenting all models in the union
@@ -450,11 +577,22 @@ def model_union_to_markdown(
             include_defaults=include_defaults,
             include_examples=include_examples,
             include_constraints=include_constraints,
+            display_mode=display_mode,
+            seed=seed,
+            mode=mode,
+            exclude_none=exclude_none,
+            exclude_defaults=exclude_defaults,
+            exclude_unset=exclude_unset,
+            indent=indent,
+            sort_keys=sort_keys,
         )
         markdown_parts.append(model_md)
 
     # Combine all markdown with separators
-    result = "\n\n---\n\n".join(markdown_parts)
+    if display_mode in ("python_code", "yaml"):
+        result = "\n\n".join(markdown_parts)
+    else:
+        result = "\n\n---\n\n".join(markdown_parts)
     return _clean_markdown(result)
 
 
