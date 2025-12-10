@@ -658,7 +658,7 @@ def instance_to_markdown(
 
 
 def model_union_to_markdown(
-    union_type: type | str,
+    union_type: Any,  # type | str | types.UnionType | typing._SpecialForm,
     *,
     template: str | None = None,
     header_level: int = 1,
