@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
+import types
+from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
 
 
 if TYPE_CHECKING:
@@ -351,10 +352,12 @@ def model_to_markdown(
         model = _resolve_model_from_import_path(model)
 
     if display_mode == "python_code":
-        source = inspect.getsource(model)
-        return (
-            f"```{model.__module__}.{model.__name__}#L1-{len(source.splitlines())}\n{source}```\n"
-        )
+        try:
+            source = inspect.getsource(model)
+            return f"```{model.__module__}.{model.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+        except OSError:
+            # Source code not available (e.g., dynamically created classes)
+            return f"```{model.__module__}.{model.__name__}#L1-1\n# Source code not available for {model.__name__}\n```\n"  # noqa: E501
 
     if display_mode == "yaml":
         import yamling
@@ -450,8 +453,12 @@ def instance_to_markdown(
     """
     if display_mode == "python_code":
         model_class = type(instance)
-        source = inspect.getsource(model_class)
-        return f"```{model_class.__module__}.{model_class.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+        try:
+            source = inspect.getsource(model_class)
+            return f"```{model_class.__module__}.{model_class.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+        except OSError:
+            # Source code not available (e.g., dynamically created classes)
+            return f"```{model_class.__module__}.{model_class.__name__}#L1-1\n# Source code not available for {model_class.__name__}\n```\n"  # noqa: E501
 
     if display_mode == "yaml":
         import yamling
@@ -549,7 +556,7 @@ def model_union_to_markdown(
 
     # Check if it's a Union type
     origin = get_origin(union_type)
-    if origin is not type(str | int):  # Check if it's a Union
+    if origin not in (Union, types.UnionType):  # Check if it's a Union
         msg = f"Expected Union type, got: {union_type}"
         raise TypeError(msg)
 
