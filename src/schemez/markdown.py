@@ -497,6 +497,10 @@ def model_to_markdown(
             mode="python",
         )
 
+        # Filter out synthetic example_name field added by generator
+        yaml_data.pop("example_name", None)
+        yaml_data.pop("example_name_", None)  # In case of collision
+
         # Convert SecretStr objects to masked strings
         yaml_data = _process_secret_str(yaml_data, model, mask_value=mask_value)
 
@@ -512,6 +516,18 @@ def model_to_markdown(
         commented_lines = process_yaml_lines(yaml_lines, json_schema)
         yaml_content = "\n".join(commented_lines)
 
+        # Build output with header and docstring
+        result_parts = []
+
+        # Add markdown header
+        result_parts.append(f"{'#' * header_level} {model.__name__}\n\n")
+
+        # Add class docstring if available
+        if model.__doc__:
+            docstring = inspect.cleandoc(model.__doc__)
+            result_parts.append(f"{docstring}\n\n")
+
+        # Add YAML code block
         path = f"{model.__module__}.{model.__name__}.yaml"
         header = _format_code_header(
             path,
@@ -521,7 +537,9 @@ def model_to_markdown(
             title=f"{model.__name__} (YAML)",
             language="yaml",
         )
-        return f"{header}\n{yaml_content}\n```\n"
+        result_parts.append(f"{header}\n{yaml_content}\n```\n")
+
+        return "".join(result_parts)
 
     # Default table mode
     context = schema_to_markdown_context(
@@ -618,6 +636,10 @@ def instance_to_markdown(
             mode=serialization_mode,
         )
 
+        # Filter out synthetic example_name field added by generator
+        yaml_data.pop("example_name", None)
+        yaml_data.pop("example_name_", None)  # In case of collision
+
         base_yaml = yamling.dump_yaml(
             yaml_data,
             sort_keys=sort_keys,
@@ -631,7 +653,19 @@ def instance_to_markdown(
         commented_lines = process_yaml_lines(yaml_lines, json_schema)
         yaml_content = "\n".join(commented_lines)
 
+        # Build output with header and docstring
         model_class = type(instance)
+        result_parts = []
+
+        # Add markdown header
+        result_parts.append(f"{'#' * header_level} {model_class.__name__}\n\n")
+
+        # Add class docstring if available
+        if model_class.__doc__:
+            docstring = inspect.cleandoc(model_class.__doc__)
+            result_parts.append(f"{docstring}\n\n")
+
+        # Add YAML code block
         path = f"{model_class.__module__}.{model_class.__name__}.yaml"
         header = _format_code_header(
             path,
@@ -641,7 +675,9 @@ def instance_to_markdown(
             title=f"{model_class.__name__} (YAML)",
             language="yaml",
         )
-        return f"{header}\n{yaml_content}\n```\n"
+        result_parts.append(f"{header}\n{yaml_content}\n```\n")
+
+        return "".join(result_parts)
 
     # Default table mode
     result = model_to_markdown(
