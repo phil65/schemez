@@ -18,7 +18,7 @@ from schemez.helpers import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from llmling_agent.models.content import BaseContent
+    from pydantic_ai import UserContent
     from upath.types import JoinablePathLike
 
     from schemez.helpers import PythonVersionStr
@@ -194,41 +194,9 @@ class Schema(BaseModel):
         )
 
     @classmethod
-    async def from_vision_llm(
-        cls,
-        file_content: bytes,
-        source_type: SourceType = "pdf",
-        model: str = "google-gla:gemini-2.0-flash",
-        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-        user_prompt: str = DEFAULT_USER_PROMPT,
-    ) -> Self:
-        """Create a schema model from a document using AI.
-
-        Args:
-            file_content: The document content to create a schema from
-            source_type: The type of the document
-            model: The AI model to use for schema extraction
-            system_prompt: The system prompt to use for schema extraction
-            user_prompt: The user prompt to use for schema extraction
-
-        Returns:
-            A new schema model class based on the document
-        """
-        from llmling_agent import Agent, ImageBase64Content, PDFBase64Content
-
-        if source_type == "pdf":
-            content: BaseContent = PDFBase64Content.from_bytes(file_content)
-        else:
-            content = ImageBase64Content.from_bytes(file_content)
-        prompt = system_prompt.format(name=cls.__name__)
-        agent = Agent(model=model, system_prompt=prompt, output_type=cls)
-        chat_message = await agent.run(user_prompt, content)
-        return chat_message.content
-
-    @classmethod
     async def from_llm(
         cls,
-        text: str,
+        *prompts: JoinablePathLike | str | UserContent,
         model: str = "google-gla:gemini-2.0-flash",
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         user_prompt: str = DEFAULT_USER_PROMPT,
@@ -236,7 +204,7 @@ class Schema(BaseModel):
         """Create a schema model from a text snippet using AI.
 
         Args:
-            text: The text to create a schema from
+            prompts: The text to create a schema from
             model: The AI model to use for schema extraction
             system_prompt: The system prompt to use for schema extraction
             user_prompt: The user prompt to use for schema extraction
@@ -248,7 +216,7 @@ class Schema(BaseModel):
 
         prompt = system_prompt.format(name=cls.__name__)
         agent = Agent(model=model, system_prompt=prompt, output_type=cls)
-        chat_message = await agent.run(user_prompt, text)
+        chat_message = await agent.run(user_prompt, prompts)
         return chat_message.content
 
     @classmethod
@@ -421,6 +389,13 @@ class Schema(BaseModel):
         if validate:
             return cls.model_validate(data)
         return cls.model_construct(**data)  # type: ignore[return-value]
+
+
+class ConfigSchema(Schema):
+    @classmethod
+    def required_python_packages(cls) -> list[str]:
+        """Can get overriden in order to specify required packages."""
+        return []
 
 
 if __name__ == "__main__":

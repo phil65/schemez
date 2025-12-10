@@ -16,7 +16,7 @@ __copyright__ = "Copyright (c) 2025 Philipp Temminghoff"
 __license__ = "MIT"
 __url__ = "https://github.com/phil65/schemez"
 
-from schemez.schema import Schema
+from schemez.schema import Schema, ConfigSchema
 from schemez.storage import ModelStore
 from schemez.code import PythonCode, JSONCode, TOMLCode, YAMLCode
 from schemez.schemadef.schemadef import (
@@ -47,6 +47,7 @@ __version__ = version("schemez")
 
 
 __all__ = [
+    "ConfigSchema",
     "ExecutableFunction",
     "FunctionSchema",
     "FunctionType",
