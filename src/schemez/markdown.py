@@ -149,11 +149,11 @@ def _extract_constraints(field_schema: dict[str, Any]) -> list[str]:
         if key in field_schema:
             value = field_schema[key]
             if key == "uniqueItems" and value:
-                constraints.append(label)
+                constraints.append(f"`{label}`")
             elif key == "pattern":
-                constraints.append(f'{label}="{value}"')
+                constraints.append(f'{label}=`"{value}"`')
             else:
-                constraints.append(f"{label}={value}")
+                constraints.append(f"{label}=`{value}`")
     return constraints
 
 
