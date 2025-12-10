@@ -408,13 +408,11 @@ def model_to_markdown(
     include_examples: bool = True,
     include_constraints: bool = True,
     display_mode: OutputMode = "table",
-    seed: int = 0,
     mode: Literal["minimal", "maximal", "default"] = "default",
     exclude_none: bool = True,
     exclude_defaults: bool = False,
     exclude_unset: bool = False,
     indent: int = 2,
-    sort_keys: bool = False,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
@@ -430,13 +428,11 @@ def model_to_markdown(
         include_examples: Include examples section
         include_constraints: Include constraints section
         display_mode: Output format - "table", "python_code", or "yaml"
-        seed: Seed for YAML example generation
         mode: Generation mode for YAML examples
         exclude_none: Exclude None values from YAML
         exclude_defaults: Exclude default values from YAML
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
-        sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Mask value for SecretStr objects
@@ -474,7 +470,7 @@ def model_to_markdown(
         from schemez.generators import SchemaDataGenerator
 
         json_schema = model.model_json_schema()
-        generator = SchemaDataGenerator(json_schema, seed=seed)
+        generator = SchemaDataGenerator(json_schema)
 
         if mode == "minimal":
             data = generator.generate_minimal()
@@ -506,7 +502,7 @@ def model_to_markdown(
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
-            sort_keys=sort_keys,
+            sort_keys=False,
             indent=indent,
             default_flow_style=None,
             allow_unicode=True,
@@ -570,7 +566,6 @@ def instance_to_markdown(
     exclude_defaults_yaml: bool = False,
     exclude_unset: bool = False,
     indent: int = 2,
-    sort_keys: bool = False,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
@@ -592,7 +587,6 @@ def instance_to_markdown(
         exclude_defaults_yaml: Exclude default values from YAML
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
-        sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
@@ -642,7 +636,7 @@ def instance_to_markdown(
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
-            sort_keys=sort_keys,
+            sort_keys=False,
             indent=indent,
             default_flow_style=None,
             allow_unicode=True,
@@ -711,13 +705,11 @@ def model_union_to_markdown(
     include_examples: bool = True,
     include_constraints: bool = True,
     display_mode: OutputMode = "table",
-    seed: int = 0,
     mode: Literal["minimal", "maximal", "default"] = "default",
     exclude_none: bool = True,
     exclude_defaults: bool = False,
     exclude_unset: bool = False,
     indent: int = 2,
-    sort_keys: bool = False,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
@@ -735,13 +727,11 @@ def model_union_to_markdown(
         include_examples: Include examples section
         include_constraints: Include constraints section
         display_mode: Output format - "table", "python_code", or "yaml"
-        seed: Seed for YAML example generation
         mode: Generation mode for YAML examples
         exclude_none: Exclude None values from YAML
         exclude_defaults: Exclude default values from YAML
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
-        sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
@@ -790,13 +780,11 @@ def model_union_to_markdown(
             include_examples=include_examples,
             include_constraints=include_constraints,
             display_mode=display_mode,
-            seed=seed,
             mode=mode,
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
             indent=indent,
-            sort_keys=sort_keys,
             header_style=header_style,
             serialization_mode=serialization_mode,
             mask_value=mask_value,
