@@ -154,7 +154,8 @@ def _extract_constraints(field_schema: dict[str, Any]) -> list[str]:
             if key == "uniqueItems" and value:
                 constraints.append(f"`{label}`")
             elif key == "pattern":
-                constraints.append(f'{label}=`"{value}"`')
+                # Use inline code for pattern to preserve regex
+                constraints.append(f"{label}=`{value}`")
             else:
                 constraints.append(f"{label}=`{value}`")
     return constraints
