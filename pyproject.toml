@@ -58,6 +58,9 @@ Documentation = "https://phil65.github.io/schemez/"
 Issues = "https://github.com/phil65/schemez/issues"
 Source = "https://github.com/phil65/schemez"
 
+[project.entry-points."jinjarope.environment"]
+schemez = "schemez.markdown:setup_jinjarope_filters"
+
 [project.optional-dependencies]
 ai = ["llmling-agent", "anyenv>=0.4.14"]
 codegen = ["datamodel-code-generator"]

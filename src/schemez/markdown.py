@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import importlib
+import inspect
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 
 if TYPE_CHECKING:
+    import jinja2
     from pydantic import BaseModel
 
 DEFAULT_TEMPLATE = """\
@@ -262,8 +265,39 @@ def schema_to_markdown_context(
     }
 
 
+def _resolve_model_from_import_path(import_path: str) -> type[BaseModel]:
+    """Resolve a model class from an import path.
+
+    Supports both 'module.submodule:ClassName' and 'module.submodule.ClassName' formats.
+    """
+    if ":" in import_path:
+        # Format: module.path:ClassName
+        module_path, class_name = import_path.split(":", 1)
+    else:
+        # Format: module.path.ClassName - split on last dot
+        if "." not in import_path:
+            msg = f"Import path must contain module and class, got: {import_path}"
+            raise ValueError(msg)
+        module_path, class_name = import_path.rsplit(".", 1)
+
+    module = importlib.import_module(module_path)
+
+    if not hasattr(module, class_name):
+        msg = f"Class '{class_name}' not found in module '{module_path}'"
+        raise AttributeError(msg)
+
+    model_class = getattr(module, class_name)
+
+    # Basic check that it's a BaseModel - we can't do full isinstance check due to imports
+    if not hasattr(model_class, "model_json_schema"):
+        msg = f"'{class_name}' is not a Pydantic BaseModel class"
+        raise TypeError(msg)
+
+    return model_class  # type: ignore[no-any-return]
+
+
 def model_to_markdown(
-    model: type[BaseModel],
+    model: type[BaseModel] | str,
     *,
     template: str | None = None,
     header_level: int = 1,
@@ -274,7 +308,8 @@ def model_to_markdown(
     """Convert a Pydantic model class to Markdown documentation.
 
     Args:
-        model: The Pydantic model class to document
+        model: The Pydantic model class to document or import path string
+            like 'module.path:ClassName' or 'module.path.ClassName'
         template: Custom Jinja2 template string (uses DEFAULT_TEMPLATE if None)
         header_level: Starting header level (1 = h1, 2 = h2, etc.)
         include_defaults: Include default values in the table
@@ -284,7 +319,10 @@ def model_to_markdown(
     Returns:
         Markdown string documenting the model
     """
-    from jinja2 import Environment
+    import jinja2
+
+    if isinstance(model, str):
+        model = _resolve_model_from_import_path(model)
 
     context = schema_to_markdown_context(
         model,
@@ -294,7 +332,7 @@ def model_to_markdown(
         include_constraints=include_constraints,
     )
 
-    env = Environment(autoescape=False)
+    env = jinja2.Environment(autoescape=False)
     tmpl = env.from_string(template or DEFAULT_TEMPLATE)
     result = tmpl.render(**context).strip() + "\n"
     return _clean_markdown(result)
@@ -343,3 +381,85 @@ def instance_to_markdown(
         result = result.rstrip() + "\n" + values_md
 
     return result
+
+
+def model_union_to_markdown(
+    union_type: type | str,
+    *,
+    template: str | None = None,
+    header_level: int = 1,
+    include_defaults: bool = True,
+    include_examples: bool = True,
+    include_constraints: bool = True,
+) -> str:
+    """Convert a Union type containing Pydantic models to Markdown documentation.
+
+    Runtime-inspects the Union and generates markdown for all included BaseModel types.
+
+    Args:
+        union_type: A Union type containing Pydantic model classes or import path string
+            like 'module.path:UnionAlias' or 'module.path.UnionAlias'
+        template: Custom Jinja2 template string (uses DEFAULT_TEMPLATE if None)
+        header_level: Starting header level (1 = h1, 2 = h2, etc.)
+        include_defaults: Include default values in the table
+        include_examples: Include examples section
+        include_constraints: Include constraints section
+
+    Returns:
+        Markdown string documenting all models in the union
+    """
+    # Resolve import path if string
+    if isinstance(union_type, str):
+        union_type = _resolve_model_from_import_path(union_type)
+
+    # Check if it's a Union type
+    origin = get_origin(union_type)
+    if origin is not type(str | int):  # Check if it's a Union
+        msg = f"Expected Union type, got: {union_type}"
+        raise TypeError(msg)
+
+    # Get all types in the union
+    union_args = get_args(union_type)
+
+    # Filter for BaseModel classes
+    model_classes = [
+        i
+        for i in union_args
+        if inspect.isclass(i) and hasattr(i, "model_json_schema") and i is not type(None)
+    ]
+
+    if not model_classes:
+        msg = f"No Pydantic BaseModel classes found in union: {union_type}"
+        raise ValueError(msg)
+
+    # Generate markdown for each model
+    markdown_parts = []
+    for model_class in model_classes:
+        model_md = model_to_markdown(
+            model_class,
+            template=template,
+            header_level=header_level,
+            include_defaults=include_defaults,
+            include_examples=include_examples,
+            include_constraints=include_constraints,
+        )
+        markdown_parts.append(model_md)
+
+    # Combine all markdown with separators
+    result = "\n\n---\n\n".join(markdown_parts)
+    return _clean_markdown(result)
+
+
+def setup_jinjarope_filters(env: jinja2.Environment) -> None:
+    """Set up schemez markdown filters for jinjarope.
+
+    This function is used as an entry point for the jinjarope.environment
+    extension group to add markdown-related filters to Jinja2 environments.
+
+    Args:
+        env: The Jinja2 environment to modify
+    """
+    # Add filters to the environment
+    env.filters["schema_to_markdown"] = model_to_markdown
+    env.filters["instance_to_markdown"] = instance_to_markdown
+    env.filters["union_to_markdown"] = model_union_to_markdown
