@@ -226,7 +226,7 @@ def test_model_to_markdown_python_code_mode():
 
 def test_model_to_markdown_yaml_mode():
     """Test yaml display mode."""
-    md = model_to_markdown(Outer, display_mode="yaml", seed=42)
+    md = model_to_markdown(Outer, display_mode="yaml")
 
     # Should start with header
     assert md.startswith("# Outer")
@@ -278,7 +278,7 @@ def test_schema_class_methods_with_display_mode():
     md_python = Outer.dump_markdown_schema(display_mode="python_code")
     assert "class Outer(Schema):" in md_python
 
-    md_yaml = Outer.dump_markdown_schema(display_mode="yaml", seed=42)
+    md_yaml = Outer.dump_markdown_schema(display_mode="yaml")
     assert "name:" in md_yaml
 
     # Test instance method
@@ -312,11 +312,11 @@ def test_header_style_pymdownx():
 def test_header_style_yaml_mode():
     """Test header styles with yaml display mode."""
     # Default style
-    md_default = model_to_markdown(Outer, display_mode="yaml", header_style="default", seed=42)
+    md_default = model_to_markdown(Outer, display_mode="yaml", header_style="default")
     assert ".yaml#L1-" in md_default
 
     # Pymdownx style
-    md_pymdownx = model_to_markdown(Outer, display_mode="yaml", header_style="pymdownx", seed=42)
+    md_pymdownx = model_to_markdown(Outer, display_mode="yaml", header_style="pymdownx")
     assert 'title="Outer (YAML)"' in md_pymdownx
     assert "```yaml" in md_pymdownx
 

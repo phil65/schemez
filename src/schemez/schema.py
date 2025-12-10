@@ -55,7 +55,6 @@ class Schema(BaseModel):
         exclude_defaults_yaml: bool = False,
         exclude_unset: bool = False,
         indent: int = 2,
-        sort_keys: bool = True,
         header_style: Literal["default", "pymdownx"] = "default",
         serialization_mode: Literal["json", "python"] = "json",
     ) -> str:
@@ -73,7 +72,6 @@ class Schema(BaseModel):
             exclude_defaults_yaml: Exclude default values from YAML
             exclude_unset: Exclude unset values from YAML
             indent: YAML indentation
-            sort_keys: Sort keys in YAML output
             header_style: Code block header style - "default" or "pymdownx"
             serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
@@ -95,7 +93,6 @@ class Schema(BaseModel):
             exclude_defaults_yaml=exclude_defaults_yaml,
             exclude_unset=exclude_unset,
             indent=indent,
-            sort_keys=sort_keys,
             header_style=header_style,
             serialization_mode=serialization_mode,
         )
@@ -110,13 +107,11 @@ class Schema(BaseModel):
         include_examples: bool = True,
         include_constraints: bool = True,
         display_mode: Literal["table", "python_code", "yaml"] = "table",
-        seed: int = 0,
         mode: Literal["minimal", "maximal", "default"] = "default",
         exclude_none: bool = True,
         exclude_defaults: bool = False,
         exclude_unset: bool = False,
         indent: int = 2,
-        sort_keys: bool = True,
         header_style: Literal["default", "pymdownx"] = "default",
         serialization_mode: Literal["json", "python"] = "json",
     ) -> str:
@@ -129,13 +124,11 @@ class Schema(BaseModel):
             include_examples: Include examples section
             include_constraints: Include constraints section
             display_mode: Output format - "table", "python_code", or "yaml"
-            seed: Seed for YAML example generation
             mode: Generation mode for YAML examples
             exclude_none: Exclude None values from YAML
             exclude_defaults: Exclude default values from YAML
             exclude_unset: Exclude unset values from YAML
             indent: YAML indentation
-            sort_keys: Sort keys in YAML output
             header_style: Code block header style - "default" or "pymdownx"
             serialization_mode: Pydantic serialization mode - "json" (default) or "python"
 
@@ -152,13 +145,11 @@ class Schema(BaseModel):
             include_examples=include_examples,
             include_constraints=include_constraints,
             display_mode=display_mode,
-            seed=seed,
             mode=mode,
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
             indent=indent,
-            sort_keys=sort_keys,
             header_style=header_style,
             serialization_mode=serialization_mode,
         )

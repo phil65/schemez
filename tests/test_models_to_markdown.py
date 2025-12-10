@@ -101,7 +101,7 @@ def test_model_without_docstring():
 
 def test_yaml_options():
     """Test various YAML formatting options."""
-    result = models_to_markdown_docs(SimpleModel, exclude_defaults=True, sort_keys=False, indent=4)
+    result = models_to_markdown_docs(SimpleModel, exclude_defaults=True, indent=4)
 
     assert "## SimpleModel" in result
     assert "```yaml" in result
