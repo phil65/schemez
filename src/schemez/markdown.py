@@ -779,8 +779,30 @@ def setup_jinjarope_filters(env: jinja2.Environment) -> None:
 
 
 if __name__ == "__main__":
+    # Test with llmling-agent configs
+    from llmling_agent_config.event_handlers import EventHandlerConfig
+    from llmling_agent_config.mcp_server import MCPServerConfig
+    from llmling_agent_config.teams import TeamConfig
+
+    print("# MCPServerConfig Union\n")
     md = model_union_to_markdown(
-        "upathtools.configs.custom_fs_configs.CustomFilesystemConfig",
+        MCPServerConfig,
+        display_mode="yaml",
+        header_style="pymdownx",
+    )
+    print(md)
+
+    print("\n# EventHandlerConfig Union\n")
+    md = model_union_to_markdown(
+        EventHandlerConfig,
+        display_mode="yaml",
+        header_style="pymdownx",
+    )
+    print(md)
+
+    print("\n# TeamConfig Model\n")
+    md = model_to_markdown(
+        TeamConfig,
         display_mode="yaml",
         header_style="pymdownx",
     )
