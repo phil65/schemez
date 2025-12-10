@@ -122,30 +122,34 @@ def _get_secret_fields(model: type[BaseModel]) -> set[str]:
     return secret_fields
 
 
-def _process_secret_str(data: Any, model: type[BaseModel] | None = None) -> Any:
+def _process_secret_str(
+    data: Any, model: type[BaseModel] | None = None, mask_value: str | None = None
+) -> Any:
     """Recursively convert SecretStr objects to masked strings.
 
     Args:
         data: Data structure potentially containing SecretStr objects
         model: Optional Pydantic model to identify SecretStr fields
+        mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
 
     Returns:
         Data with SecretStr objects converted to strings
     """
     from pydantic import SecretStr
 
+    mask_value = mask_value or "!ENV ENV_VAR_NAME"
     if isinstance(data, SecretStr):
-        return "**********"
+        return mask_value
     if isinstance(data, dict) and model is not None:
         secret_fields = _get_secret_fields(model)
         return {
-            k: "**********" if k in secret_fields else _process_secret_str(v)
+            k: mask_value if k in secret_fields else _process_secret_str(v, mask_value=mask_value)
             for k, v in data.items()
         }
     if isinstance(data, dict):
-        return {k: _process_secret_str(v) for k, v in data.items()}
+        return {k: _process_secret_str(v, mask_value=mask_value) for k, v in data.items()}
     if isinstance(data, list):
-        return [_process_secret_str(item) for item in data]
+        return [_process_secret_str(item, mask_value=mask_value) for item in data]
     return data
 
 
@@ -413,6 +417,7 @@ def model_to_markdown(
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
+    mask_value: str | None = None,
 ) -> str:
     """Convert a Pydantic model class to Markdown documentation.
 
@@ -434,6 +439,7 @@ def model_to_markdown(
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
+        mask_value: Mask value for SecretStr objects
 
     Returns:
         Markdown string documenting the model
@@ -492,7 +498,7 @@ def model_to_markdown(
         )
 
         # Convert SecretStr objects to masked strings
-        yaml_data = _process_secret_str(yaml_data, model)
+        yaml_data = _process_secret_str(yaml_data, model, mask_value=mask_value)
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
@@ -549,6 +555,7 @@ def instance_to_markdown(
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
+    mask_value: str | None = None,
 ) -> str:
     """Convert a Pydantic model instance to Markdown documentation.
 
@@ -570,6 +577,7 @@ def instance_to_markdown(
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
+        mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
 
     Returns:
         Markdown string documenting the model instance
@@ -645,6 +653,7 @@ def instance_to_markdown(
         include_constraints=include_constraints,
         display_mode="table",
         header_style=header_style,
+        mask_value=mask_value,
     )
 
     if include_values:
@@ -675,6 +684,7 @@ def model_union_to_markdown(
     sort_keys: bool = True,
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
+    mask_value: str | None = None,
 ) -> str:
     """Convert a Union type containing Pydantic models to Markdown documentation.
 
@@ -698,6 +708,7 @@ def model_union_to_markdown(
         sort_keys: Sort keys in YAML output
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
+        mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
 
     Returns:
         Markdown string documenting all models in the union
@@ -752,6 +763,7 @@ def model_union_to_markdown(
             sort_keys=sort_keys,
             header_style=header_style,
             serialization_mode=serialization_mode,
+            mask_value=mask_value,
         )
         markdown_parts.append(model_md)
 
