@@ -294,7 +294,12 @@ def _extract_field_info(
     }
 
 
-def _extract_model_info(name: str, schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, Any]:
+def _extract_model_info(
+    name: str,
+    schema: dict[str, Any],
+    defs: dict[str, Any],
+    model_path: str | None = None,
+) -> dict[str, Any]:
     """Extract model information from a JSON schema."""
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
@@ -312,9 +317,22 @@ def _extract_model_info(name: str, schema: dict[str, Any], defs: dict[str, Any])
         if field["examples"]:
             examples[field["name"]] = field["examples"]
 
+    # Use title from schema if available, otherwise use name
+    display_name = schema.get("x-doc-title", schema.get("title", name))
+
+    # Get description and prepend model path if available
+    description = schema.get("description", "")
+    if model_path and display_name != name:
+        # Only add model path line if we're using a custom title
+        description = (
+            f"Model path: `{model_path}`\n\n{description}"
+            if description
+            else f"Model path: `{model_path}`"
+        )
+
     return {
-        "name": name,
-        "description": schema.get("description", ""),
+        "name": display_name,
+        "description": description,
         "fields": fields,
         "constraints": constraints,
         "examples": examples,
@@ -344,7 +362,9 @@ def schema_to_markdown_context(
     schema = model.model_json_schema()
     defs = schema.get("$defs", {})
 
-    root = _extract_model_info(model.__name__, schema, defs)
+    # Build model path for the root model
+    model_path = f"{model.__module__}.{model.__qualname__}"
+    root = _extract_model_info(model.__name__, schema, defs, model_path=model_path)
 
     nested_models: dict[str, dict[str, Any]] = {}
     for def_name, def_schema in defs.items():
@@ -517,7 +537,7 @@ def model_to_markdown(
 
         # Get model title from schema or use class name
         json_schema = model.model_json_schema()
-        model_title = json_schema.get("title", model.__name__)
+        model_title = json_schema.get("x-doc-title", json_schema.get("title", model.__name__))
 
         # Add markdown header
         result_parts.append(f"{'#' * header_level} {model_title}\n\n")
@@ -650,17 +670,13 @@ def instance_to_markdown(
         yaml_lines = base_yaml.strip().split("\n")
         commented_lines = process_yaml_lines(yaml_lines, json_schema)
         yaml_content = "\n".join(commented_lines)
-
         # Build output with header and docstring
         model_class = type(instance)
         result_parts = []
-
         # Get model title from schema or use class name
-        model_title = json_schema.get("title", model_class.__name__)
-
+        model_title = json_schema.get("x-doc-title", json_schema.get("title", model_class.__name__))
         # Add markdown header
         result_parts.append(f"{'#' * header_level} {model_title}\n\n")
-
         # Add class docstring if available
         if model_class.__doc__:
             docstring = inspect.cleandoc(model_class.__doc__)
