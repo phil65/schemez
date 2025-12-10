@@ -13,6 +13,40 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
 OutputMode = Literal["table", "python_code", "yaml"]
+HeaderStyle = Literal["default", "pymdownx"]
+
+
+def _format_code_header(
+    path: str,
+    line_start: int,
+    line_end: int,
+    style: HeaderStyle = "default",
+    title: str | None = None,
+) -> str:
+    """Format code block header based on style.
+
+    Args:
+        path: File path or identifier
+        line_start: Starting line number
+        line_end: Ending line number
+        style: Header style - "default" or "pymdownx"
+        title: Optional title (for pymdownx style)
+
+    Returns:
+        Formatted header string for the code block
+    """
+    if style == "pymdownx":
+        # Format: ```python title="filename" linenums="1"
+        lang = path.split(".")[-1] if "." in path else "python"
+        header = f"```{lang}"
+        if title:
+            header += f' title="{title}"'
+        if line_start > 0:
+            header += f' linenums="{line_start}"'
+        return header
+    # Format: ```path#L1-10
+    return f"```{path}#L{line_start}-{line_end}"
+
 
 DEFAULT_TEMPLATE = """\
 {%- macro render_model(model, level) %}
@@ -324,6 +358,7 @@ def model_to_markdown(
     exclude_unset: bool = False,
     indent: int = 2,
     sort_keys: bool = True,
+    header_style: HeaderStyle = "default",
 ) -> str:
     """Convert a Pydantic model class to Markdown documentation.
 
@@ -343,6 +378,7 @@ def model_to_markdown(
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
+        header_style: Code block header style - "default" or "pymdownx"
 
     Returns:
         Markdown string documenting the model
@@ -355,10 +391,18 @@ def model_to_markdown(
     if display_mode == "python_code":
         try:
             source = inspect.getsource(model)
-            return f"```{model.__module__}.{model.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+            num_lines = len(source.splitlines())
+            path = f"{model.__module__}.{model.__name__}"
+            header = _format_code_header(
+                path, 1, num_lines, style=header_style, title=model.__name__
+            )
         except OSError:
             # Source code not available (e.g., dynamically created classes)
-            return f"```{model.__module__}.{model.__name__}#L1-1\n# Source code not available for {model.__name__}\n```\n"  # noqa: E501
+            path = f"{model.__module__}.{model.__name__}"
+            header = _format_code_header(path, 1, 1, style=header_style, title=model.__name__)
+            return f"{header}\n# Source code not available for {model.__name__}\n```\n"
+        else:
+            return f"{header}\n{source}```\n"
 
     if display_mode == "yaml":
         import yamling
@@ -397,7 +441,11 @@ def model_to_markdown(
         commented_lines = process_yaml_lines(yaml_lines, json_schema)
         yaml_content = "\n".join(commented_lines)
 
-        return f"```{model.__module__}.{model.__name__}.yaml#L1-{len(commented_lines)}\n{yaml_content}```\n"  # noqa: E501
+        path = f"{model.__module__}.{model.__name__}.yaml"
+        header = _format_code_header(
+            path, 1, len(commented_lines), style=header_style, title=f"{model.__name__} (YAML)"
+        )
+        return f"{header}\n{yaml_content}```\n"
 
     # Default table mode
     context = schema_to_markdown_context(
@@ -429,6 +477,7 @@ def instance_to_markdown(
     exclude_unset: bool = False,
     indent: int = 2,
     sort_keys: bool = True,
+    header_style: HeaderStyle = "default",
 ) -> str:
     """Convert a Pydantic model instance to Markdown documentation.
 
@@ -448,6 +497,7 @@ def instance_to_markdown(
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
+        header_style: Code block header style - "default" or "pymdownx"
 
     Returns:
         Markdown string documenting the model instance
@@ -456,10 +506,18 @@ def instance_to_markdown(
         model_class = type(instance)
         try:
             source = inspect.getsource(model_class)
-            return f"```{model_class.__module__}.{model_class.__name__}#L1-{len(source.splitlines())}\n{source}```\n"  # noqa: E501
+            num_lines = len(source.splitlines())
+            path = f"{model_class.__module__}.{model_class.__name__}"
+            header = _format_code_header(
+                path, 1, num_lines, style=header_style, title=model_class.__name__
+            )
         except OSError:
             # Source code not available (e.g., dynamically created classes)
-            return f"```{model_class.__module__}.{model_class.__name__}#L1-1\n# Source code not available for {model_class.__name__}\n```\n"  # noqa: E501
+            path = f"{model_class.__module__}.{model_class.__name__}"
+            header = _format_code_header(path, 1, 1, style=header_style, title=model_class.__name__)
+            return f"{header}\n# Source code not available for {model_class.__name__}\n```\n"
+        else:
+            return f"{header}\n{source}```\n"
 
     if display_mode == "yaml":
         import yamling
@@ -487,7 +545,15 @@ def instance_to_markdown(
         yaml_content = "\n".join(commented_lines)
 
         model_class = type(instance)
-        return f"```{model_class.__module__}.{model_class.__name__}.yaml#L1-{len(commented_lines)}\n{yaml_content}```\n"  # noqa: E501
+        path = f"{model_class.__module__}.{model_class.__name__}.yaml"
+        header = _format_code_header(
+            path,
+            1,
+            len(commented_lines),
+            style=header_style,
+            title=f"{model_class.__name__} (YAML)",
+        )
+        return f"{header}\n{yaml_content}```\n"
 
     # Default table mode
     result = model_to_markdown(
@@ -498,6 +564,7 @@ def instance_to_markdown(
         include_examples=include_examples,
         include_constraints=include_constraints,
         display_mode="table",
+        header_style=header_style,
     )
 
     if include_values:
@@ -526,6 +593,7 @@ def model_union_to_markdown(
     exclude_unset: bool = False,
     indent: int = 2,
     sort_keys: bool = True,
+    header_style: HeaderStyle = "default",
 ) -> str:
     """Convert a Union type containing Pydantic models to Markdown documentation.
 
@@ -547,6 +615,7 @@ def model_union_to_markdown(
         exclude_unset: Exclude unset values from YAML
         indent: YAML indentation
         sort_keys: Sort keys in YAML output
+        header_style: Code block header style - "default" or "pymdownx"
 
     Returns:
         Markdown string documenting all models in the union
@@ -593,6 +662,7 @@ def model_union_to_markdown(
             exclude_unset=exclude_unset,
             indent=indent,
             sort_keys=sort_keys,
+            header_style=header_style,
         )
         markdown_parts.append(model_md)
 

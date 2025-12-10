@@ -56,6 +56,7 @@ class Schema(BaseModel):
         exclude_unset: bool = False,
         indent: int = 2,
         sort_keys: bool = True,
+        header_style: Literal["default", "pymdownx"] = "default",
     ) -> str:
         """Dump model instance to Markdown documentation.
 
@@ -72,6 +73,7 @@ class Schema(BaseModel):
             exclude_unset: Exclude unset values from YAML
             indent: YAML indentation
             sort_keys: Sort keys in YAML output
+            header_style: Code block header style - "default" or "pymdownx"
 
         Returns:
             Markdown string documenting the model
@@ -92,6 +94,7 @@ class Schema(BaseModel):
             exclude_unset=exclude_unset,
             indent=indent,
             sort_keys=sort_keys,
+            header_style=header_style,
         )
 
     @classmethod
@@ -111,6 +114,7 @@ class Schema(BaseModel):
         exclude_unset: bool = False,
         indent: int = 2,
         sort_keys: bool = True,
+        header_style: Literal["default", "pymdownx"] = "default",
     ) -> str:
         """Dump model class schema to Markdown documentation.
 
@@ -128,6 +132,7 @@ class Schema(BaseModel):
             exclude_unset: Exclude unset values from YAML
             indent: YAML indentation
             sort_keys: Sort keys in YAML output
+            header_style: Code block header style - "default" or "pymdownx"
 
         Returns:
             Markdown string documenting the model schema
@@ -149,6 +154,7 @@ class Schema(BaseModel):
             exclude_unset=exclude_unset,
             indent=indent,
             sort_keys=sort_keys,
+            header_style=header_style,
         )
 
     def merge(self, other: Self) -> Self:

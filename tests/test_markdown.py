@@ -274,3 +274,50 @@ def test_schema_class_methods_with_display_mode():
 
     md_yaml = instance.model_dump_markdown(display_mode="yaml")
     assert 'name: "test"' in md_yaml or "name: test" in md_yaml
+
+
+def test_header_style_default():
+    """Test default header style."""
+    md = model_to_markdown(Outer, display_mode="python_code", header_style="default")
+
+    # Default style uses path#L1-N format
+    assert "#L1-" in md
+    assert "tests.test_markdown.Outer" in md
+
+
+def test_header_style_pymdownx():
+    """Test pymdownx header style."""
+    md = model_to_markdown(Outer, display_mode="python_code", header_style="pymdownx")
+
+    # Pymdownx style uses title and linenums
+    assert 'title="Outer"' in md
+    assert 'linenums="1"' in md
+    assert "```Outer" in md or "```py" in md
+
+
+def test_header_style_yaml_mode():
+    """Test header styles with yaml display mode."""
+    # Default style
+    md_default = model_to_markdown(Outer, display_mode="yaml", header_style="default", seed=42)
+    assert ".yaml#L1-" in md_default
+
+    # Pymdownx style
+    md_pymdownx = model_to_markdown(Outer, display_mode="yaml", header_style="pymdownx", seed=42)
+    assert 'title="Outer (YAML)"' in md_pymdownx
+    assert "```yaml" in md_pymdownx
+
+
+def test_header_style_instance():
+    """Test header styles with instance markdown."""
+    instance = Outer(name="test", count=5)
+
+    # Default style
+    md_default = instance_to_markdown(instance, display_mode="python_code", header_style="default")
+    assert "#L1-" in md_default
+
+    # Pymdownx style
+    md_pymdownx = instance_to_markdown(
+        instance, display_mode="python_code", header_style="pymdownx"
+    )
+    assert 'title="Outer"' in md_pymdownx
+    assert 'linenums="1"' in md_pymdownx
