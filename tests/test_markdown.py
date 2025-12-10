@@ -228,12 +228,19 @@ def test_model_to_markdown_yaml_mode():
     """Test yaml display mode."""
     md = model_to_markdown(Outer, display_mode="yaml", seed=42)
 
-    assert md.startswith("```")
+    # Should start with header
+    assert md.startswith("# Outer")
+    # Should contain docstring
+    assert "An outer model with nested schema." in md
+    # Should contain YAML code block
+    assert "```" in md
     assert ".yaml#L" in md
     assert "name:" in md
     assert "count:" in md
     # Should have comments from schema
     assert "# Name field" in md or "# A counter" in md
+    # Should not have example_name synthetic field
+    assert "example_name" not in md
 
 
 def test_instance_to_markdown_python_code_mode():
@@ -250,12 +257,19 @@ def test_instance_to_markdown_yaml_mode():
     instance = Outer(name="test", count=5, inner=Inner(value=10))
     md = instance_to_markdown(instance, display_mode="yaml")
 
-    assert md.startswith("```")
+    # Should start with header
+    assert md.startswith("# Outer")
+    # Should contain docstring
+    assert "An outer model with nested schema." in md
+    # Should contain YAML code block
+    assert "```" in md
     assert ".yaml#L" in md
     assert 'name: "test"' in md or "name: test" in md
     assert "count: 5" in md
     assert "inner:" in md
     assert "value: 10" in md
+    # Should not have example_name synthetic field
+    assert "example_name" not in md
 
 
 def test_schema_class_methods_with_display_mode():
