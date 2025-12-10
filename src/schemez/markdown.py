@@ -521,7 +521,7 @@ def model_to_markdown(
             title=f"{model.__name__} (YAML)",
             language="yaml",
         )
-        return f"{header}\n{yaml_content}```\n"
+        return f"{header}\n{yaml_content}\n```\n"
 
     # Default table mode
     context = schema_to_markdown_context(
@@ -641,7 +641,7 @@ def instance_to_markdown(
             title=f"{model_class.__name__} (YAML)",
             language="yaml",
         )
-        return f"{header}\n{yaml_content}```\n"
+        return f"{header}\n{yaml_content}\n```\n"
 
     # Default table mode
     result = model_to_markdown(
