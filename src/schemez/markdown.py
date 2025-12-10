@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import types
-from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, get_args, get_origin
 
 
 if TYPE_CHECKING:
@@ -96,6 +96,57 @@ def _clean_markdown(text: str) -> str:
 
     # Replace 3+ newlines with 2 newlines
     return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def _get_secret_fields(model: type[BaseModel]) -> set[str]:
+    """Get field names that are SecretStr types.
+
+    Args:
+        model: Pydantic model class
+
+    Returns:
+        Set of field names that are SecretStr or Optional[SecretStr]
+    """
+    from pydantic import SecretStr
+
+    secret_fields = set()
+    for field_name, field_info in model.model_fields.items():
+        annotation = field_info.annotation
+        # Check if field is SecretStr or Optional[SecretStr]
+        if annotation is SecretStr:
+            secret_fields.add(field_name)
+        elif get_origin(annotation) is Union:
+            args = get_args(annotation)
+            if SecretStr in args:
+                secret_fields.add(field_name)
+    return secret_fields
+
+
+def _process_secret_str(data: Any, model: type[BaseModel] | None = None) -> Any:
+    """Recursively convert SecretStr objects to masked strings.
+
+    Args:
+        data: Data structure potentially containing SecretStr objects
+        model: Optional Pydantic model to identify SecretStr fields
+
+    Returns:
+        Data with SecretStr objects converted to strings
+    """
+    from pydantic import SecretStr
+
+    if isinstance(data, SecretStr):
+        return "**********"
+    if isinstance(data, dict) and model is not None:
+        secret_fields = _get_secret_fields(model)
+        return {
+            k: "**********" if k in secret_fields else _process_secret_str(v)
+            for k, v in data.items()
+        }
+    if isinstance(data, dict):
+        return {k: _process_secret_str(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_process_secret_str(item) for item in data]
+    return data
 
 
 def _resolve_type_name(type_schema: dict[str, Any], defs: dict[str, Any]) -> str:  # noqa: PLR0911
@@ -426,14 +477,22 @@ def model_to_markdown(
         else:  # default
             data = generator.generate()
 
-        instance = model.model_construct(**data)
+        try:
+            instance = model.model_validate(data)
+        except Exception:  # noqa: BLE001
+            # Validation may fail due to constraints, fall back to model_construct
+            instance = model.model_construct(**data)
 
+        # Use 'python' mode to avoid SecretStr serialization issues
         yaml_data = instance.model_dump(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
-            mode=serialization_mode,
+            mode="python",
         )
+
+        # Convert SecretStr objects to masked strings
+        yaml_data = _process_secret_str(yaml_data, model)
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
@@ -647,8 +706,14 @@ def model_union_to_markdown(
     if isinstance(union_type, str):
         union_type = _resolve_from_import_path(union_type)
 
-    # Check if it's a Union type
+    # Unwrap Annotated if needed
     origin = get_origin(union_type)
+    if origin is Annotated:
+        # Get the actual type from Annotated[Union[...], ...]
+        union_type = get_args(union_type)[0]
+        origin = get_origin(union_type)
+
+    # Check if it's a Union type
     if origin not in (Union, types.UnionType):  # Check if it's a Union
         msg = f"Expected Union type, got: {union_type}"
         raise TypeError(msg)
