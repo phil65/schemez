@@ -711,3 +711,12 @@ def setup_jinjarope_filters(env: jinja2.Environment) -> None:
     env.filters["schema_to_markdown"] = model_to_markdown
     env.filters["instance_to_markdown"] = instance_to_markdown
     env.filters["union_to_markdown"] = model_union_to_markdown
+
+
+if __name__ == "__main__":
+    md = model_union_to_markdown(
+        "upathtools.configs.custom_fs_configs.CustomFilesystemConfig",
+        display_mode="yaml",
+        header_style="pymdownx",
+    )
+    print(md)
