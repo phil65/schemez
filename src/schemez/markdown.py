@@ -436,6 +436,8 @@ def model_to_markdown(
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
+    as_listitem: bool = True,
+    wrapped_in: str | None = None,
 ) -> str:
     """Convert a Pydantic model class to Markdown documentation.
 
@@ -456,6 +458,8 @@ def model_to_markdown(
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Mask value for SecretStr objects
+        as_listitem: Wrap the YAML config in a list (default: True)
+        wrapped_in: Wrap the config in a dict with this key (default: None)
 
     Returns:
         Markdown string documenting the model
@@ -506,7 +510,7 @@ def model_to_markdown(
             instance = model.model_construct(**data)
 
         # Use 'python' mode to avoid SecretStr serialization issues
-        yaml_data = instance.model_dump(
+        yaml_data: dict[str, Any] | list[Any] = instance.model_dump(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults,
             exclude_unset=exclude_unset,
@@ -514,11 +518,19 @@ def model_to_markdown(
         )
 
         # Filter out synthetic example_name field added by generator
-        yaml_data.pop("example_name", None)
-        yaml_data.pop("example_name_", None)  # In case of collision
+        if isinstance(yaml_data, dict):
+            yaml_data.pop("example_name", None)
+            yaml_data.pop("example_name_", None)  # In case of collision
 
         # Convert SecretStr objects to masked strings
-        yaml_data = _process_secret_str(yaml_data, model, mask_value=mask_value)
+        if isinstance(yaml_data, dict):
+            yaml_data = _process_secret_str(yaml_data, model, mask_value=mask_value)
+
+        # Apply wrapping options
+        if as_listitem:
+            yaml_data = [yaml_data]
+        if wrapped_in:
+            yaml_data = {wrapped_in: yaml_data}
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
@@ -593,6 +605,8 @@ def instance_to_markdown(
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
+    as_listitem: bool = True,
+    wrapped_in: str | None = None,
 ) -> str:
     """Convert a Pydantic model instance to Markdown documentation.
 
@@ -614,6 +628,8 @@ def instance_to_markdown(
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
+        as_listitem: Wrap the YAML config in a list (default: True)
+        wrapped_in: Wrap the config in a dict with this key (default: None)
 
     Returns:
         Markdown string documenting the model instance
@@ -647,7 +663,7 @@ def instance_to_markdown(
 
         from schemez.commented_yaml import process_yaml_lines
 
-        yaml_data = instance.model_dump(
+        yaml_data: dict[str, Any] | list[Any] = instance.model_dump(
             exclude_none=exclude_none,
             exclude_defaults=exclude_defaults_yaml,
             exclude_unset=exclude_unset,
@@ -655,8 +671,15 @@ def instance_to_markdown(
         )
 
         # Filter out synthetic example_name field added by generator
-        yaml_data.pop("example_name", None)
-        yaml_data.pop("example_name_", None)  # In case of collision
+        if isinstance(yaml_data, dict):
+            yaml_data.pop("example_name", None)
+            yaml_data.pop("example_name_", None)  # In case of collision
+
+        # Apply wrapping options
+        if as_listitem:
+            yaml_data = [yaml_data]
+        if wrapped_in:
+            yaml_data = {wrapped_in: yaml_data}
 
         base_yaml = yamling.dump_yaml(
             yaml_data,
@@ -736,6 +759,8 @@ def model_union_to_markdown(
     header_style: HeaderStyle = "default",
     serialization_mode: SerializationMode = "json",
     mask_value: str | None = None,
+    as_listitem: bool = True,
+    wrapped_in: str | None = None,
 ) -> str:
     """Convert a Union type containing Pydantic models to Markdown documentation.
 
@@ -758,6 +783,8 @@ def model_union_to_markdown(
         header_style: Code block header style - "default" or "pymdownx"
         serialization_mode: Pydantic serialization mode - "json" (default) or "python"
         mask_value: Placeholder string to use for masked values. Defaults to "!ENV ENV_VAR_NAME"
+        as_listitem: Wrap the YAML config in a list (default: True)
+        wrapped_in: Wrap the config in a dict with this key (default: None)
 
     Returns:
         Markdown string documenting all models in the union
@@ -811,6 +838,8 @@ def model_union_to_markdown(
             header_style=header_style,
             serialization_mode=serialization_mode,
             mask_value=mask_value,
+            as_listitem=as_listitem,
+            wrapped_in=wrapped_in,
         )
         markdown_parts.append(model_md)
 
