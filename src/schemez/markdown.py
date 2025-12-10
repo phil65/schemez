@@ -22,6 +22,7 @@ def _format_code_header(
     line_end: int,
     style: HeaderStyle = "default",
     title: str | None = None,
+    language: str = "python",
 ) -> str:
     """Format code block header based on style.
 
@@ -31,14 +32,14 @@ def _format_code_header(
         line_end: Ending line number
         style: Header style - "default" or "pymdownx"
         title: Optional title (for pymdownx style)
+        language: Language for syntax highlighting (for pymdownx style)
 
     Returns:
         Formatted header string for the code block
     """
     if style == "pymdownx":
         # Format: ```python title="filename" linenums="1"
-        lang = path.split(".")[-1] if "." in path else "python"
-        header = f"```{lang}"
+        header = f"```{language}"
         if title:
             header += f' title="{title}"'
         if line_start > 0:
@@ -394,12 +395,14 @@ def model_to_markdown(
             num_lines = len(source.splitlines())
             path = f"{model.__module__}.{model.__name__}"
             header = _format_code_header(
-                path, 1, num_lines, style=header_style, title=model.__name__
+                path, 1, num_lines, style=header_style, title=model.__name__, language="python"
             )
         except OSError:
             # Source code not available (e.g., dynamically created classes)
             path = f"{model.__module__}.{model.__name__}"
-            header = _format_code_header(path, 1, 1, style=header_style, title=model.__name__)
+            header = _format_code_header(
+                path, 1, 1, style=header_style, title=model.__name__, language="python"
+            )
             return f"{header}\n# Source code not available for {model.__name__}\n```\n"
         else:
             return f"{header}\n{source}```\n"
@@ -443,7 +446,12 @@ def model_to_markdown(
 
         path = f"{model.__module__}.{model.__name__}.yaml"
         header = _format_code_header(
-            path, 1, len(commented_lines), style=header_style, title=f"{model.__name__} (YAML)"
+            path,
+            1,
+            len(commented_lines),
+            style=header_style,
+            title=f"{model.__name__} (YAML)",
+            language="yaml",
         )
         return f"{header}\n{yaml_content}```\n"
 
@@ -509,12 +517,19 @@ def instance_to_markdown(
             num_lines = len(source.splitlines())
             path = f"{model_class.__module__}.{model_class.__name__}"
             header = _format_code_header(
-                path, 1, num_lines, style=header_style, title=model_class.__name__
+                path,
+                1,
+                num_lines,
+                style=header_style,
+                title=model_class.__name__,
+                language="python",
             )
         except OSError:
             # Source code not available (e.g., dynamically created classes)
             path = f"{model_class.__module__}.{model_class.__name__}"
-            header = _format_code_header(path, 1, 1, style=header_style, title=model_class.__name__)
+            header = _format_code_header(
+                path, 1, 1, style=header_style, title=model_class.__name__, language="python"
+            )
             return f"{header}\n# Source code not available for {model_class.__name__}\n```\n"
         else:
             return f"{header}\n{source}```\n"
@@ -552,6 +567,7 @@ def instance_to_markdown(
             len(commented_lines),
             style=header_style,
             title=f"{model_class.__name__} (YAML)",
+            language="yaml",
         )
         return f"{header}\n{yaml_content}```\n"
 
