@@ -328,7 +328,7 @@ class Schema(BaseModel):
 
         schema = self.model_json_schema()
         yaml_lines = base_yaml.strip().split("\n")
-        commented_lines = process_yaml_lines(yaml_lines, schema)
+        commented_lines = process_yaml_lines(yaml_lines, schema, as_listitem=False, wrapped_in=None)
 
         return "\n".join(commented_lines)
 

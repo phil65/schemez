@@ -541,7 +541,9 @@ def model_to_markdown(
         )
 
         yaml_lines = base_yaml.strip().split("\n")
-        commented_lines = process_yaml_lines(yaml_lines, json_schema)
+        commented_lines = process_yaml_lines(
+            yaml_lines, json_schema, as_listitem=as_listitem, wrapped_in=wrapped_in
+        )
         yaml_content = "\n".join(commented_lines)
 
         # Build output with header and docstring

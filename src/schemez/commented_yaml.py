@@ -161,48 +161,62 @@ def create_yaml_description(
 
     schema = model.model_json_schema()
     yaml_lines = base_yaml.strip().split("\n")
-    commented_lines = process_yaml_lines(yaml_lines, schema)
+    commented_lines = process_yaml_lines(yaml_lines, schema, as_listitem=False, wrapped_in=None)
 
     return "\n".join(commented_lines)
 
 
-def process_yaml_lines(yaml_lines: list[str], schema: dict[str, Any]) -> list[str]:
+def process_yaml_lines(
+    yaml_lines: list[str],
+    schema: dict[str, Any],
+    as_listitem: bool = True,
+    wrapped_in: str | None = None,
+) -> list[str]:
     """Add comments to YAML lines based on schema descriptions."""
     result: list[str] = []
     path_stack: list[str] = []
+
+    # Determine the base indent level for root model fields based on wrapping options
+    base_indent = 0
+    if wrapped_in:
+        base_indent += 1
+    if as_listitem:
+        base_indent += 1
 
     for line in yaml_lines:
         original_line = line
         stripped = line.lstrip()
         indent_level = (len(line) - len(stripped)) // 2
 
-        # Adjust path stack based on indentation
-        while len(path_stack) > indent_level:
+        # Check if this is a list item start
+        if stripped.startswith("- "):
+            result.append(original_line)
+            continue
+
+        # Adjust path stack based on indentation relative to base
+        effective_indent = indent_level - base_indent
+        while len(path_stack) > effective_indent:
             path_stack.pop()
 
         # Check if this is a field definition
-        if ":" in stripped and not stripped.startswith("#") and not stripped.startswith("-"):
+        if ":" in stripped and not stripped.startswith("#"):
             field_match = re.match(r"^([^:]+):\s*(.*)", stripped)
             if field_match:
-                field_name, value = field_match.groups()
+                field_name, _value = field_match.groups()
                 field_name = field_name.strip().strip('"').strip("'")
 
                 # Update path stack
-                if len(path_stack) == indent_level:
+                if len(path_stack) == effective_indent:
                     path_stack.append(field_name)
                 else:
-                    path_stack = [*path_stack[:indent_level], field_name]
+                    path_stack = [*path_stack[:effective_indent], field_name]
 
-                # Find schema for this field
+                # Find schema for this field and add comment if description exists
                 field_schema = find_schema_for_path(schema, path_stack)
                 if field_schema:
                     desc = get_description(field_schema)
                     if desc:
-                        # Add comment
-                        if value.strip() and not value.strip().startswith("|"):
-                            result.append(f"{line}  # {desc}")
-                        else:
-                            result.append(f"{line}  # {desc}")
+                        result.append(f"{line}  # {desc}")
                         continue
 
         # Keep original line if no comment added
