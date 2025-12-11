@@ -174,10 +174,8 @@ async def test_generate_tools_code_caching(
 ):
     """Test that tools code generation is cached."""
     executor = HttpToolExecutor([weather_schema], mock_handler)
-
     code1 = await executor.generate_tools_code()
     code2 = await executor.generate_tools_code()
-
     # Should be the same object (cached)
     assert code1 is code2
 
@@ -185,11 +183,8 @@ async def test_generate_tools_code_caching(
 async def test_generate_server_app(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test generating FastAPI server."""
     pytest.importorskip("fastapi")  # Skip if FastAPI not available
-
     executor = HttpToolExecutor([weather_schema], mock_handler)
-
     app = await executor.generate_server_app()
-
     assert app.title == "Tool Server"
     assert app.version == "1.0.0"
 
@@ -197,9 +192,7 @@ async def test_generate_server_app(weather_schema: dict[str, Any], mock_handler:
 async def test_get_tool_functions(weather_schema: dict[str, Any], mock_handler: MockToolHandler):
     """Test getting ready-to-use tool functions."""
     executor = HttpToolExecutor([weather_schema], mock_handler)
-
     tools = await executor.get_tool_functions()
-
     assert "get_weather" in tools
     assert callable(tools["get_weather"])
 
@@ -208,19 +201,14 @@ async def test_save_to_files(weather_schema: dict[str, Any], mock_handler: MockT
     """Test saving generated code to files."""
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = Path(temp_dir) / "output"
-
         executor = HttpToolExecutor([weather_schema], mock_handler)
         saved_files = await executor.save_to_files(output_dir)
-
         assert "tools" in saved_files
         assert "server_example" in saved_files
-
         tools_file = saved_files["tools"]
         server_file = saved_files["server_example"]
-
         assert tools_file.exists()
         assert server_file.exists()
-
         tools_content = tools_file.read_text("utf-8")
         assert "GetWeatherInput" in tools_content
         assert "async def get_weather" in tools_content

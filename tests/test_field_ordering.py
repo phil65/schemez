@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from pydantic import Field
+
 from schemez.schema import Schema
 
 
@@ -176,7 +178,6 @@ class TestFieldOrdering:
 
     def test_with_field_alias(self):
         """Test ordering with field aliases."""
-        from pydantic import Field
 
         class Base(Schema):
             base_field: str = Field(default="base", alias="base_alias")
@@ -186,7 +187,6 @@ class TestFieldOrdering:
 
         instance = Sub()
         keys = list(instance.model_dump(by_alias=False).keys())
-
         assert keys == ["sub_field", "base_field"]
 
     def test_multiple_inheritance_same_level(self):
@@ -203,7 +203,6 @@ class TestFieldOrdering:
 
         instance = Combined()
         keys = list(instance.model_dump().keys())
-
         # Combined class fields first, then mixins in MRO order
         assert keys[0] == "combined_field"
         assert "mixin1_field" in keys
@@ -222,11 +221,7 @@ class TestFieldOrdering:
 
         instance = Sub(base_a="custom_a", sub_x="custom_x", sub_y=99)
         dumped = instance.model_dump()
-
-        # Check order
         assert list(dumped.keys()) == ["sub_x", "sub_y", "base_a", "base_b"]
-
-        # Check values
         assert dumped["sub_x"] == "custom_x"
         assert dumped["sub_y"] == 99  # noqa: PLR2004
         assert dumped["base_a"] == "custom_a"
