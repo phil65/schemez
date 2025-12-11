@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 import upath
 
 from schemez.generators import SchemaDataGenerator
@@ -40,6 +40,25 @@ class Schema(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", use_attribute_docstrings=True)
+
+    @model_serializer(mode="wrap")
+    def _serialize_with_subclass_fields_first(self, serializer: Any, info: Any) -> dict[str, Any]:
+        """Serialize with subclass fields appearing before base class fields."""
+        data = serializer(self)
+
+        # Get fields from most derived class to base class
+        field_order: list[str] = []
+        for cls in type(self).__mro__:
+            if cls is BaseModel or not issubclass(cls, BaseModel):
+                continue
+            # Get fields defined in this specific class
+            cls_fields = getattr(cls, "__annotations__", {})
+            for field_name in cls_fields:
+                if field_name not in field_order and field_name in data:
+                    field_order.append(field_name)
+
+        # Reorder the dictionary
+        return {k: data[k] for k in field_order if k in data}
 
     def model_dump_markdown(
         self,
