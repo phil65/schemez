@@ -175,6 +175,8 @@ def process_yaml_lines(
     """Add comments to YAML lines based on schema descriptions."""
     result: list[str] = []
     path_stack: list[str] = []
+    in_multiline_string = False
+    multiline_quote_char = None
 
     # Determine the base indent level for root model fields based on wrapping options
     base_indent = 0
@@ -188,6 +190,32 @@ def process_yaml_lines(
         stripped = line.lstrip()
         indent_level = (len(line) - len(stripped)) // 2
 
+        # Check if we're entering or exiting a multi-line quoted string
+        if not in_multiline_string:
+            # Check if line starts a multi-line quoted string (ends with opening quote)
+            if ":" in stripped and not stripped.startswith("#"):
+                field_match = re.match(r"^([^:]+):\s*(.*)$", stripped)
+                if field_match:
+                    _field_name, value_part = field_match.groups()
+                    # Check if value starts with a quote but doesn't end with matching quote
+                    if value_part.startswith("'") and not (
+                        len(value_part) > 1 and value_part.endswith("'")
+                    ):
+                        in_multiline_string = True
+                        multiline_quote_char = "'"
+                    elif value_part.startswith('"') and not (
+                        len(value_part) > 1 and value_part.endswith('"')
+                    ):
+                        in_multiline_string = True
+                        multiline_quote_char = '"'
+        else:
+            # Check if this line ends the multi-line string
+            if multiline_quote_char and stripped.endswith(multiline_quote_char):
+                in_multiline_string = False
+                multiline_quote_char = None
+            result.append(original_line)
+            continue
+
         # Check if this is a list item start
         if stripped.startswith("- "):
             result.append(original_line)
@@ -195,7 +223,7 @@ def process_yaml_lines(
 
         # Adjust path stack based on indentation relative to base
         effective_indent = indent_level - base_indent
-        while len(path_stack) > effective_indent:
+        while len(path_stack) > effective_indent and path_stack:
             path_stack.pop()
 
         # Check if this is a field definition
