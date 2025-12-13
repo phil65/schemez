@@ -267,16 +267,58 @@ def model_to_python_code(
     )
 
 
-if __name__ == "__main__":
+def openapi_to_code(input_path: str, class_name: str | None = None) -> str:
+    """Generate Pydantic model code from an OpenAPI specification URL."""
+    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator.model import get_data_model_types
+    from datamodel_code_generator.parser.openapi import OpenAPIParser
 
-    class TestModel(BaseModel):
-        test_int: int = 1
-        test_str: str = "test"
-        test_float: float = 1.1
-        test_bool: bool = True
+    data_model_types = get_data_model_types(
+        DataModelType.PydanticV2BaseModel,
+        target_python_version=PythonVersion.PY_312,
+    )
+    parser = OpenAPIParser(
+        source=input_path,
+        data_model_type=data_model_types.data_model,
+        data_model_root_type=data_model_types.root_model,
+        data_model_field_type=data_model_types.field_model,
+        data_type_manager_type=data_model_types.data_type_manager,
+        dump_resolve_reference_action=data_model_types.dump_resolve_reference_action,
+        class_name=class_name,
+        use_union_operator=True,
+        use_schema_description=True,
+        enum_field_as_literal=LiteralType.All,
+    )
+    return str(parser.parse())
 
-    code = model_to_python_code(TestModel)
-    print(code)
+
+def jsonschema_to_code(
+    schema_json: str,
+    class_name: str | None = None,
+    input_path: str | None = None,
+) -> str:
+    """Generate Pydantic model code from a JSON schema."""
+    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator.model import get_data_model_types
+    from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
+
+    data_model_types = get_data_model_types(
+        DataModelType.PydanticV2BaseModel,
+        target_python_version=PythonVersion.PY_312,
+    )
+    parser = JsonSchemaParser(
+        source=schema_json,
+        data_model_type=data_model_types.data_model,
+        data_model_root_type=data_model_types.root_model,
+        data_model_field_type=data_model_types.field_model,
+        data_type_manager_type=data_model_types.data_type_manager,
+        dump_resolve_reference_action=data_model_types.dump_resolve_reference_action,
+        class_name=class_name or (input_path or "DefaultClass").split(".")[-1],
+        use_union_operator=True,
+        use_schema_description=True,
+        enum_field_as_literal=LiteralType.All,
+    )
+    return str(parser.parse())
 
 
 def get_object_name(fn: Callable[..., Any] | types.ModuleType, fallback: str = "<unknown>") -> str:
@@ -532,3 +574,15 @@ def models_to_markdown_docs(
         sections.append(section)
 
     return "\n\n".join(sections)
+
+
+if __name__ == "__main__":
+
+    class TestModel(BaseModel):
+        test_int: int = 1
+        test_str: str = "test"
+        test_float: float = 1.1
+        test_bool: bool = True
+
+    code = model_to_python_code(TestModel)
+    print(code)
