@@ -62,8 +62,8 @@ Source = "https://github.com/phil65/schemez"
 schemez = "schemez.markdown:setup_jinjarope_filters"
 
 [project.optional-dependencies]
-ai = ["llmling-agent", "anyenv>=0.4.14"]
-codegen = ["datamodel-code-generator"]
+ai = ["agentpool", "anyenv>=0.4.14"]
+codegen = ["datamodel-code-generator[ruff]"]
 markdown = ["jinja2>=3.1.0"]
 storage = ["aiosqlite>=0.20.0"]
 tool_execution = ["fastapi>=0.118.2"]
