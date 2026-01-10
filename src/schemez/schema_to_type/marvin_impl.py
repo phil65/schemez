@@ -52,10 +52,7 @@ FORMAT_TYPES: dict[str, Any] = {
 _classes: dict[tuple[str, Any], type | None] = {}
 
 
-def jsonschema_to_type(
-    schema: Mapping[str, Any],
-    name: str | None = None,
-) -> type:
+def jsonschema_to_type(schema: Mapping[str, Any], name: str | None = None) -> type:
     """Convert JSON schema to appropriate Python type with validation.
 
     Args:
@@ -195,8 +192,6 @@ def create_array_type(
     if isinstance(items, list):
         # Handle positional item schemas
         item_types = [schema_to_type(s, schemas) for s in items]
-        from typing import Union
-
         combined = Union[tuple(item_types)]  # type: ignore[valid-type] # noqa: UP007
         base = list[combined]  # type: ignore[valid-type]
     else:
@@ -237,10 +232,7 @@ def _get_from_type_handler(
     return type_handlers.get(schema.get("type", None), _return_any)
 
 
-def schema_to_type(  # noqa: PLR0911
-    schema: Mapping[str, Any],
-    schemas: Mapping[str, Any],
-) -> type:
+def schema_to_type(schema: Mapping[str, Any], schemas: Mapping[str, Any]) -> type:  # noqa: PLR0911
     """Convert schema to appropriate Python type."""
     if not schema:
         return object
@@ -276,12 +268,8 @@ def schema_to_type(  # noqa: PLR0911
         has_null = type(None) in types
         types = [t for t in types if t is not type(None)]
         if has_null:
-            from typing import Union
-
             combined = Union[tuple(types)] if len(types) > 1 else types[0]  # noqa: UP007
             return combined | None  # type: ignore[return-value]
-        from typing import Union
-
         return Union[tuple(types)]  # type: ignore  # noqa: UP007
 
     return _get_from_type_handler(schema, schemas)(schema)  # type: ignore[no-any-return]
@@ -316,11 +304,7 @@ def get_default_value(
     return schema.get("default")
 
 
-def create_field_with_default(
-    field_type: type,
-    default_value: Any,
-    schema: dict[str, Any],
-) -> Any:
+def create_field_with_default(field_type: type, default_value: Any, schema: dict[str, Any]) -> Any:
     """Create a field with simplified default handling."""
     # Always use None as default for complex types
     if isinstance(default_value, (dict, list)) or default_value is None:

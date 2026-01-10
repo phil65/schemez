@@ -276,7 +276,7 @@ class Schema(BaseModel):
         Returns:
             A new schema model class based on the document
         """
-        from llmling_agent import Agent
+        from agentpool import Agent
 
         prompt = system_prompt.format(name=cls.__name__)
         agent = Agent(model=model, system_prompt=prompt, output_type=cls)

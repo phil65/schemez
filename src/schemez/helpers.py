@@ -92,23 +92,19 @@ def import_callable(path: str) -> Callable[..., Any]:
         ValueError: If path cannot be imported or result isn't callable
     """
     if not path:
-        msg = "Import path cannot be empty"
-        raise ValueError(msg)
+        raise ValueError("Import path cannot be empty")
 
     # Normalize path - replace colon with dot if present
     normalized_path = path.replace(":", ".")
     parts = normalized_path.split(".")
-
     # Try importing progressively smaller module paths
     for i in range(len(parts), 0, -1):
         try:
             # Try current module path
             module_path = ".".join(parts[:i])
             module = importlib.import_module(module_path)
-
-            # Walk remaining parts as attributes
             obj = module
-            for part in parts[i:]:
+            for part in parts[i:]:  # Walk remaining parts as attributes
                 obj = getattr(obj, part)
 
             if callable(obj):

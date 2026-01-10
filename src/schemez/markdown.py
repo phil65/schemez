@@ -869,7 +869,7 @@ def setup_jinjarope_filters(env: jinja2.Environment) -> None:
 
 
 if __name__ == "__main__":
-    # Test with llmling-agent configs
+    # Test with agentpool configs
     from llmling_agent_config.event_handlers import EventHandlerConfig
     from llmling_agent_config.mcp_server import MCPServerConfig
     from llmling_agent_config.teams import TeamConfig

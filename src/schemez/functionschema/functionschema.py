@@ -25,8 +25,9 @@ from schemez.functionschema.typedefs import (
     OpenAIFunctionDefinition,
     OpenAIFunctionTool,
     ToolParameters,
+    clean_property,
 )
-from schemez.helpers import get_object_name
+from schemez.helpers import get_object_name, json_schema_to_pydantic_code
 
 
 if typing.TYPE_CHECKING:
@@ -150,8 +151,6 @@ class FunctionSchema(pydantic.BaseModel):
         Returns:
             Generated Python code string
         """
-        from schemez.helpers import json_schema_to_pydantic_code
-
         name = class_name or f"{self.name.title()}Response"
         return json_schema_to_pydantic_code(
             self.returns,
@@ -168,8 +167,6 @@ class FunctionSchema(pydantic.BaseModel):
         Returns:
             Generated Python code string
         """
-        from schemez.helpers import json_schema_to_pydantic_code
-
         name = class_name or f"{self.name.title()}Params"
         return json_schema_to_pydantic_code(
             self.parameters,
@@ -209,8 +206,6 @@ class FunctionSchema(pydantic.BaseModel):
         Raises:
             ValueError: If schema format is invalid or missing required fields
         """
-        from schemez.functionschema.typedefs import clean_property
-
         # Handle tool wrapper format
         if "type" in schema and schema["type"] == "function":
             if "function" not in schema:

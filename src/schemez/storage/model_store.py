@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     import aiosqlite
 
+# see https://github.com/koaning/diskdantic/tree/main/src/diskdantic for file-backed
 
 # SQLite type mapping for Python types
 TYPE_MAP: dict[type, str] = {

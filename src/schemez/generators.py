@@ -377,7 +377,7 @@ def _int_gen_maximal(schema: dict[str, Any]) -> int:
 
 
 if __name__ == "__main__":
-    from llmling_agent import AgentsManifest
+    from agentpool import AgentsManifest
 
     data = AgentsManifest.generate_test_data(mode="maximal")
     print(data)
