@@ -35,7 +35,8 @@ def json_schema_to_pydantic_code(
     Returns:
         Generated Python code string
     """
-    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator import LiteralType, PythonVersion
+    from datamodel_code_generator.enums import DataModelType
     from datamodel_code_generator.model import get_data_model_types
     from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
     from pydantic_core import to_json
@@ -265,7 +266,8 @@ def model_to_python_code(
 
 def openapi_to_code(input_path: str, class_name: str | None = None) -> str:
     """Generate Pydantic model code from an OpenAPI specification URL."""
-    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator import LiteralType, PythonVersion
+    from datamodel_code_generator.enums import DataModelType
     from datamodel_code_generator.model import get_data_model_types
     from datamodel_code_generator.parser.openapi import OpenAPIParser
 
@@ -294,7 +296,8 @@ def jsonschema_to_code(
     input_path: str | None = None,
 ) -> str:
     """Generate Pydantic model code from a JSON schema."""
-    from datamodel_code_generator import DataModelType, LiteralType, PythonVersion
+    from datamodel_code_generator import LiteralType, PythonVersion
+    from datamodel_code_generator.enums import DataModelType
     from datamodel_code_generator.model import get_data_model_types
     from datamodel_code_generator.parser.jsonschema import JsonSchemaParser
 

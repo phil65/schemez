@@ -870,9 +870,9 @@ def setup_jinjarope_filters(env: jinja2.Environment) -> None:
 
 if __name__ == "__main__":
     # Test with agentpool configs
-    from llmling_agent_config.event_handlers import EventHandlerConfig
-    from llmling_agent_config.mcp_server import MCPServerConfig
-    from llmling_agent_config.teams import TeamConfig
+    from agentpool_config.event_handlers import EventHandlerConfig
+    from agentpool_config.mcp_server import MCPServerConfig
+    from agentpool_config.teams import TeamConfig
 
     print("# MCPServerConfig Union\n")
     md = model_union_to_markdown(

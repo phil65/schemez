@@ -23,7 +23,7 @@ from schemez.schema import Schema
 
 
 if TYPE_CHECKING:
-    from llmling_agent.common_types import AnyCallable
+    from agentpool.common_types import AnyCallable
     from pydantic.fields import FieldInfo
 
 

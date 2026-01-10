@@ -111,7 +111,7 @@ async def _execute_tool_function(tool_callable: Callable[..., Any], **kwargs: An
 
 
 if __name__ == "__main__":
-    from llmling_agent.tools.base import Tool
+    from agentpool.tools.base import Tool
 
     def greet(name: str, greeting: str = "Hello") -> str:
         """Greet someone."""
