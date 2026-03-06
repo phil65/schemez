@@ -45,7 +45,7 @@ classifiers = [
 ]
 dependencies = [
   "docstring-parser>=0.17.0",
-  "griffe>=1.7.3",
+  "griffelib",
   "pydantic",
   # Only add below (Copier)
   "universal-pathlib>=0.2.6",

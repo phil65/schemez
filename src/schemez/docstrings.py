@@ -8,7 +8,11 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from griffe import Docstring, DocstringSectionKind, Object as GriffeObject
+from griffe import (  # type: ignore[import-untyped]
+    Docstring,
+    DocstringSectionKind,
+    Object as GriffeObject,
+)
 
 
 if TYPE_CHECKING:
