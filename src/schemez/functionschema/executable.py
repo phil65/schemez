@@ -177,7 +177,7 @@ def create_executable[T_co](
 ) -> ExecutableFunction[T_co]: ...
 
 
-def create_executable(
+def create_executable[T_co](
     func: (
         Callable[..., T_co] | Callable[..., Generator[T_co]] | Callable[..., AsyncGenerator[T_co]]
     ),
