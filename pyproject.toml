@@ -2,7 +2,7 @@
 
 [project]
 name = "schemez"
-version = "2.2.27"
+version = "2.2.28"
 description = "Pydantic shim for config stuff"
 readme = "README.md"
 requires-python = ">=3.13"
