@@ -8,7 +8,7 @@ from collections.abc import (
 )
 import inspect
 import typing
-from typing import Any, Literal, get_args
+from typing import Any, Literal, cast, get_args
 
 import pydantic
 from pydantic.fields import FieldInfo
@@ -169,7 +169,7 @@ class FunctionSchema(pydantic.BaseModel):
         """
         name = class_name or f"{self.name.title()}Params"
         return json_schema_to_pydantic_code(
-            self.parameters,
+            dict(self.parameters),
             class_name=name,
             target_python_version="3.13",
         )
@@ -365,17 +365,18 @@ def _create_schema_pydantic(
         # Convert to our format - now we can use the rich JSON schema directly
         json_schema = pydantic_ai_schema.json_schema
         # Create ToolParameters directly from the rich JSON schema
-        parameters: ToolParameters = {
+        # Copy extra fields like $defs alongside the standard ones
+        extra = {
+            k: v for k, v in json_schema.items() if k not in {"type", "properties", "required"}
+        }
+        params: dict[str, Any] = {
             "type": "object",
             "properties": json_schema.get("properties", {}),
+            **extra,
         }
-
         if "required" in json_schema:
-            parameters["required"] = json_schema["required"]
-        # Copy over any extra fields like $defs
-        for key, value in json_schema.items():
-            if key not in {"type", "properties", "required"}:
-                parameters[key] = value
+            params["required"] = json_schema["required"]
+        parameters = cast(ToolParameters, params)
         required_fields = json_schema.get("required", [])
 
     except ImportError:

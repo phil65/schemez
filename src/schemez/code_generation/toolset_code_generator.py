@@ -323,7 +323,9 @@ async def close_all_mcp_connections():
                     words = [word.title() for word in generator.name.split("_")]
                     input_class_name = f"{''.join(words)}Input"
 
-                    model_code = model_to_python_code(params_schema, class_name=input_class_name)
+                    model_code = model_to_python_code(
+                        dict(params_schema), class_name=input_class_name
+                    )
                     if model_code:
                         cleaned_model = clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
