@@ -9,7 +9,6 @@
 [![Implementation](https://img.shields.io/pypi/implementation/schemez.svg)](https://pypi.org/project/schemez/)
 [![Releases](https://img.shields.io/github/downloads/phil65/schemez/total.svg)](https://github.com/phil65/schemez/releases)
 [![Github Contributors](https://img.shields.io/github/contributors/phil65/schemez)](https://github.com/phil65/schemez/graphs/contributors)
-[![Github Discussions](https://img.shields.io/github/discussions/phil65/schemez)](https://github.com/phil65/schemez/discussions)
 [![Github Forks](https://img.shields.io/github/forks/phil65/schemez)](https://github.com/phil65/schemez/forks)
 [![Github Issues](https://img.shields.io/github/issues/phil65/schemez)](https://github.com/phil65/schemez/issues)
 [![Github Issues](https://img.shields.io/github/issues-pr/phil65/schemez)](https://github.com/phil65/schemez/pulls)
