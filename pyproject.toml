@@ -3,7 +3,7 @@
 [project]
 name = "schemez"
 version = "2.2.29"
-description = "Pydantic shim for config stuff"
+description = "Pydantic toolkit for function schemas, JSON Schema to model conversion, tool code generation and config models"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -38,6 +38,8 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development",
+  "Topic :: Software Development :: Code Generators",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
@@ -55,6 +57,7 @@ dependencies = [
 "Code coverage" = "https://app.codecov.io/gh/phil65/schemez"
 Discussions = "https://github.com/phil65/schemez/discussions"
 Documentation = "https://phil65.github.io/schemez/"
+Homepage = "https://github.com/phil65/schemez"
 Issues = "https://github.com/phil65/schemez/issues"
 Source = "https://github.com/phil65/schemez"
 
