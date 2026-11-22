@@ -46,6 +46,8 @@ dependencies = [
   "griffelib",
   "pydantic",
   # Only add below (Copier)
+  "pydantic-core",
+  "typing-extensions>=4.12.0",
   "universal-pathlib>=0.2.6",
 ]
 
@@ -60,11 +62,11 @@ Source = "https://github.com/phil65/schemez"
 schemez = "schemez.markdown:setup_jinjarope_filters"
 
 [project.optional-dependencies]
-ai = ["agentpool", "anyenv>=0.4.14"]
+ai = ["agentpool", "anyenv>=0.4.14", "httpx>=0.27.0", "pydantic-ai-slim>=1.0.0"]
 codegen = ["datamodel-code-generator[ruff]"]
 markdown = ["jinja2>=3.1.0"]
 storage = ["aiosqlite>=0.20.0"]
-tool_execution = ["fastapi>=0.118.2"]
+tool_execution = ["fastapi>=0.118.2", "uvicorn>=0.30.0"]
 yaml = ["yamling"]
 
 [dependency-groups]
@@ -101,6 +103,10 @@ exclude_lines = [
   "except ImportError",
   'if __name__ == "__main__":',
 ]
+
+[tool.deptry.per_rule_ignores]
+# devtools is only used in `if __name__ == "__main__":` demo blocks.
+DEP004 = ["devtools"]
 
 [tool.mknodes]
 allowed-commit-types = [
