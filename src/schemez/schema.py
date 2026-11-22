@@ -31,12 +31,14 @@ DEFAULT_USER_PROMPT = "Extract information from this document:"
 
 
 class Schema(BaseModel):
-    """Base class configuration models.
+    """Base class for configuration models.
 
     Provides:
-    - Common Pydantic settings
-    - YAML serialization
-    - Basic merge functionality
+    - Common Pydantic settings (`extra="forbid"`, attribute docstrings as descriptions)
+    - YAML loading and dumping (optionally with field descriptions as comments)
+    - Markdown documentation, Python code and test data generation
+    - Model creation from functions, class constructors and JSON Schema
+    - Merging and sub-model iteration
     """
 
     model_config = ConfigDict(extra="forbid", use_attribute_docstrings=True)
@@ -456,9 +458,11 @@ class Schema(BaseModel):
 
 
 class ConfigSchema(Schema):
+    """Schema for configuration objects that may declare required packages."""
+
     @classmethod
     def required_python_packages(cls) -> list[str]:
-        """Can get overriden in order to specify required packages."""
+        """Return the Python packages this config needs. Override in subclasses."""
         return []
 
 
