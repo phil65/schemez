@@ -220,7 +220,7 @@ class ModelStore[T: BaseModel]:
             msg = f"Database not found: {path}"
             raise FileNotFoundError(msg)
 
-        return cls(model_type=None, path=path)  # type: ignore[return-value]
+        return cls(model_type=None, path=path)  # ty: ignore[invalid-explicit-return]
 
     @property
     def model_type(self) -> type[T]:
@@ -341,7 +341,7 @@ class ModelStore[T: BaseModel]:
         self._import_path = meta.get("import_path")
 
         # Reconstruct the model class
-        self._model_type = json_schema_to_pydantic_class(schema, class_name=model_name)  # type: ignore[assignment]
+        self._model_type = json_schema_to_pydantic_class(schema, class_name=model_name)  # ty: ignore[invalid-assignment]
         self._columns = self._build_column_definitions()
 
     async def __aenter__(self) -> Self:
@@ -421,7 +421,9 @@ class ModelStore[T: BaseModel]:
         sql = f"INSERT INTO {self._table_name} ({columns}) VALUES ({placeholders})"
         cursor = await conn.execute(sql, list(row.values()))
         await conn.commit()
-        return cursor.lastrowid  # type: ignore[return-value]
+        row_id = cursor.lastrowid
+        assert row_id is not None  # always set after a successful INSERT
+        return row_id
 
     async def insert_many(self, instances: Sequence[T]) -> list[int]:
         """Insert multiple model instances.

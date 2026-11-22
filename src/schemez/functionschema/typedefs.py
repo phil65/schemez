@@ -165,7 +165,7 @@ def clean_property(
             first_type = "string"
 
         return _create_simple_property(
-            type_str=first_type,  # type: ignore # Valid since we checked above
+            type_str=first_type,  # Valid since we checked above
             description=description or prop.get("description"),
             default=prop.get("default"),
         )

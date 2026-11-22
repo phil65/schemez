@@ -260,11 +260,8 @@ class SchemaField(Schema):
     @field_validator("max_length")
     @classmethod
     def validate_max_min_length(cls, v: int | None, info: ValidationInfo) -> int | None:
-        if (
-            v is not None
-            and info.data.get("min_length") is not None
-            and v < info.data.get("min_length")  # type:ignore[operator]
-        ):
+        min_length = info.data.get("min_length")
+        if v is not None and min_length is not None and v < min_length:
             msg = "max_length must be ≥ min_length"
             raise ValueError(msg)
         return v
@@ -355,9 +352,9 @@ class InlineSchemaDef(BaseSchemaDef):
         field = self.fields[field_name]
         field.add_schema_dependency(dependent_on, schema)
 
-    def get_schema(self) -> type[BaseModel]:  # type: ignore[valid-type]
+    def get_schema(self) -> type[BaseModel]:
         """Create Pydantic model from inline definition."""
-        fields = {}
+        fields: dict[str, Any] = {}
         model_dependencies: dict[str, dict[str, Any]] = {}
 
         # First pass: collect all field information
@@ -378,7 +375,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     key = value if isinstance(value, str) and value.isidentifier() else f"VALUE_{i}"
                     enum_members[key] = value
 
-                enum_class = Enum(enum_name, enum_members)  # type: ignore[misc]
+                enum_class = Enum(enum_name, enum_members)  # ty: ignore[mismatched-type-name]
                 python_type: Any = enum_class
 
                 if field.default is not None:  # Handle enum default value specially
@@ -471,7 +468,7 @@ class InlineSchemaDef(BaseSchemaDef):
             **fields,
             __base__=BaseModel,
             __doc__=self.description,
-        )  # type: ignore[call-overload]
+        )
 
         # Add model-level JSON Schema extras for dependencies
         if model_dependencies:
@@ -493,7 +490,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     model.model_config["json_schema_extra"] = wrapped_extra
 
         # Return the created model
-        return model  # type: ignore[no-any-return]
+        return model
 
 
 class ImportedSchemaDef(BaseSchemaDef):
@@ -528,7 +525,7 @@ class ImportedSchemaDef(BaseSchemaDef):
 
     # mypy is confused about "type"
     # TODO: convert BaseModel to Schema?
-    def get_schema(self) -> type[BaseModel]:  # type: ignore[valid-type]
+    def get_schema(self) -> type[BaseModel]:
         """Import and return the model class."""
         try:
             model_class = helpers.import_class(self.import_path)

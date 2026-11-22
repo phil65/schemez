@@ -211,7 +211,7 @@ from datetime import datetime
         logger.info("Starting tool functions generation")
         tools_code = await self.generate_tools_code()
         logger.debug("Generated %s characters of code", len(tools_code))
-        namespace = {
+        namespace: dict[str, Any] = {
             "BaseModel": BaseModel,
             "Field": BaseModel.model_fields_set,
             "Literal": Any,
@@ -226,17 +226,18 @@ from datetime import datetime
 
         # Extract tool functions
         tool_mappings = await self._get_tool_mappings()
-        self._tool_functions = {
+        tool_functions: dict[str, Callable[..., Any]] = {
             tool_name: namespace[tool_name] for tool_name in tool_mappings if tool_name in namespace
         }
+        self._tool_functions = tool_functions
 
         elapsed = time.time() - start_time
         logger.info(f"Tool functions generation completed in {elapsed:.2f}s")  # noqa: G004
-        return self._tool_functions
+        return tool_functions
 
     async def start_server(
         self, host: str = "0.0.0.0", port: int = 8000, background: bool = False
-    ) -> None | asyncio.Task[None]:
+    ) -> asyncio.Task[None] | None:
         """Start the FastAPI server.
 
         Args:

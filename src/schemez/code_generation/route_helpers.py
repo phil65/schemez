@@ -42,11 +42,11 @@ def generate_func_code(model_fields: dict[str, FieldInfo]) -> str:
     """
     route_params = []
     for name, field_info in model_fields.items():
-        field_type = field_info.annotation
+        type_name = getattr(field_info.annotation, "__name__", "Any")
         if field_info.is_required():
-            route_params.append(f"{name}: {field_type.__name__}")  # type: ignore[union-attr]
+            route_params.append(f"{name}: {type_name}")
         else:
-            route_params.append(f"{name}: {field_type.__name__} = None")  # type: ignore[union-attr]
+            route_params.append(f"{name}: {type_name} = None")
 
     # Create function signature dynamically
     param_str = ", ".join(route_params)
@@ -111,16 +111,14 @@ async def _execute_tool_function(tool_callable: Callable[..., Any], **kwargs: An
 
 
 if __name__ == "__main__":
-    from agentpool.tools.base import Tool
+    from schemez import create_schema
 
     def greet(name: str, greeting: str = "Hello") -> str:
         """Greet someone."""
         return f"{greeting}, {name}!"
 
-    # Create a tool and demonstrate helper functions
-    tool = Tool.from_callable(greet)
-    schema = tool.schema["function"]
-    parameters_schema = schema.get("parameters", {})
+    # Create a schema and demonstrate helper functions
+    parameters_schema = create_schema(greet).parameters
     param_cls = create_param_model(dict(parameters_schema))
     print(f"Generated parameter model: {param_cls}")
 

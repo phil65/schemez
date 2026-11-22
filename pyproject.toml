@@ -35,10 +35,8 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
-  "Topic :: Documentation",
   "Topic :: Software Development",
   "Topic :: Utilities",
   "Typing :: Typed",
@@ -71,6 +69,7 @@ yaml = ["yamling"]
 
 [dependency-groups]
 dev = [
+  "deptry",
   "devtools",
   "pyreadline3",
   "pytest",
@@ -85,9 +84,8 @@ docs = [
   # Only add below (Copier)
 ]
 lint = [
-  "mypy; python_version >= '3.14'",
-  "mypy[faster-cache]; python_version < '3.14'",
   "ruff",
+  "ty",
   # Only add below (Copier)
 ]
 
@@ -115,14 +113,6 @@ allowed-commit-types = [
   "chore",
 ]
 docstring-style = "google"
-
-[tool.mypy]
-python_version = "3.13"
-strict = true
-pretty = true
-check_untyped_defs = true
-exclude = ["venv/", ".venv/", "tests/"]
-plugins = ["pydantic.mypy"]
 
 [tool.pyright]
 venvPath = "."
@@ -252,6 +242,7 @@ ignore = [
   "PLR0912",  # Too many branches
   "PLR0913",  # Too many arguments to function call
   "PLR0915",  # Too many statements
+  "PLR0917",  # Too many positional arguments
   # "PLR2004", # Magic values instead of named consts
   "SLF001",  # Private member accessed
   "TRY003",  # Avoid specifying long messages outside the exception class
@@ -298,7 +289,19 @@ preview = true
 python-version = "3.13"
 python-platform = "all"
 
+[tool.ty.src]
+# `ty check` (hooks, CI, editors) type-checks the package code only.
+include = ["src"]
+
+[tool.ty.analysis]
+# Optional dependencies that are not always installed, e.g. "numpy", "numpy.**".
+# Unresolved imports are errors otherwise, so broken imports are caught.
+allowed-unresolved-imports = []
+
 [tool.ty.rules]
+# Narrowing an overridden class attribute (e.g. pydantic discriminators,
+# `Config` attributes) is an intentional pattern.
+incompatible-mutable-override = "ignore"
 invalid-type-form = "ignore"
 
 [tool.uv]

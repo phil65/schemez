@@ -206,7 +206,7 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         }
 
         try:
-            return eval(type_string, {"__builtins__": {}}, type_context)  # type: ignore[no-any-return]
+            return eval(type_string, {"__builtins__": {}}, type_context)
         except Exception as e:
             msg = f"Failed to resolve type {type_string} in safe mode"
             raise ValueError(msg) from e
@@ -217,11 +217,11 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
         type_context = {
             **vars(typing),
             **vars(collections.abc),
-            **{t.__name__: t for t in __builtins__.values() if isinstance(t, type)},  # type: ignore[attr-defined]
+            **{t.__name__: t for t in __builtins__.values() if isinstance(t, type)},
         }
 
         try:
-            return eval(type_string, {"__builtins__": {}}, type_context)  # type: ignore[no-any-return]
+            return eval(type_string, {"__builtins__": {}}, type_context)
         except Exception as e:
             msg = f"Failed to resolve type {type_string} in unsafe mode"
             raise ValueError(msg) from e
@@ -406,7 +406,7 @@ def iter_submodel_types(
     """
 
     def _extract_model_types(
-        annotation: type, *, expand_unions: bool = True
+        annotation: Any, *, expand_unions: bool = True
     ) -> Iterator[tuple[str, type[BaseModel]]]:
         """Extract BaseModel types from an annotation."""
         origin = get_origin(annotation)

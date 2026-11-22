@@ -87,13 +87,13 @@ class OpenAPICallableFactory:
             case "array":
                 if items := schema.get("items"):
                     item_type = self.get_type_for_schema(items)
-                    return list[item_type]  # type: ignore
+                    return list[item_type]
                 return list[Any]
 
             case "object":
                 if additional_props := schema.get("additionalProperties"):
                     value_type = self.get_type_for_schema(additional_props)
-                    type DictType = dict[str, value_type]  # type: ignore
+                    type DictType = dict[str, value_type]
                     return DictType
                 return dict[str, Any]
 

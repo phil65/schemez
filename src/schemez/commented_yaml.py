@@ -15,7 +15,7 @@ def get_description(field_schema: dict[str, Any]) -> str | None:
     desc = field_schema.get("description", "")
     if desc:
         first_line = desc.split("\n")[0].strip()
-        return first_line[:100] + "..." if len(first_line) > 100 else first_line  # type: ignore[no-any-return]  # noqa: PLR2004
+        return first_line[:100] + "..." if len(first_line) > 100 else first_line  # noqa: PLR2004
     return None
 
 
@@ -28,7 +28,7 @@ def find_schema_for_path(schema_obj: dict[str, Any], path: list[str]) -> dict[st
         if "$ref" in schema_part:
             ref_path = schema_part["$ref"].replace("#/$defs/", "")
             if "$defs" in schema_obj and ref_path in schema_obj["$defs"]:
-                return schema_obj["$defs"][ref_path]  # type: ignore[no-any-return]
+                return schema_obj["$defs"][ref_path]
         return None
 
     def resolve_anyof_oneof(schema_part: dict[str, Any]) -> dict[str, Any] | None:
@@ -44,7 +44,7 @@ def find_schema_for_path(schema_obj: dict[str, Any], path: list[str]) -> dict[st
                         if resolved:
                             return resolved
                     elif option.get("type") == "object" and "properties" in option:
-                        return option  # type: ignore[no-any-return]
+                        return option
         return None
 
     for i, segment in enumerate(path):
@@ -54,7 +54,7 @@ def find_schema_for_path(schema_obj: dict[str, Any], path: list[str]) -> dict[st
 
             # If this is the last segment, return the field directly
             if i == len(path) - 1:
-                return current  # type: ignore[no-any-return]
+                return current
 
             # For non-last segments, we need to resolve to continue navigation
             # First try direct $ref

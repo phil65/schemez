@@ -452,7 +452,7 @@ class Schema(BaseModel):
 
         if validate:
             return cls.model_validate(data)
-        return cls.model_construct(**data)  # type: ignore[return-value]
+        return cls.model_construct(**data)
 
 
 class ConfigSchema(Schema):

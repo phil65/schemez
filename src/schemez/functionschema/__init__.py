@@ -30,7 +30,6 @@ __all__ = [
     "FunctionType",
     "OpenAIFunctionDefinition",
     "OpenAIFunctionTool",
-    "OpenAIFunctionTool",
     "Property",
     "SchemaType",
     "SimpleProperty",

@@ -181,7 +181,7 @@ def create_enum(name: str, values: list[Any]) -> type | Enum:
     """Create enum type from list of values."""
     if all(isinstance(v, str) for v in values):
         return Enum(name, {v.upper(): v for v in values})
-    return Literal[tuple(values)]  # type: ignore[return-value]
+    return Literal[tuple(values)]
 
 
 def create_array_type(
@@ -192,13 +192,13 @@ def create_array_type(
     if isinstance(items, list):
         # Handle positional item schemas
         item_types = [schema_to_type(s, schemas) for s in items]
-        combined = Union[tuple(item_types)]  # type: ignore[valid-type] # noqa: UP007
-        base = list[combined]  # type: ignore[valid-type]
+        combined = Union[tuple(item_types)]  # noqa: UP007
+        base = list[combined]
     else:
         # Handle single item schema
         item_type = schema_to_type(items, schemas)
-        base = set if schema.get("uniqueItems") else list  # type: ignore[assignment, misc]
-        base = base[item_type]  # type: ignore[valid-type, type-arg, misc]
+        base = set if schema.get("uniqueItems") else list
+        base = base[item_type]
 
     constraints = {
         k: v
@@ -245,14 +245,14 @@ def schema_to_type(schema: Mapping[str, Any], schemas: Mapping[str, Any]) -> typ
         ref = schema["$ref"]
         # Handle self-reference
         if ref == "#":
-            return ForwardRef(schema.get("title", "Root"))  # type: ignore[return-value]
+            return ForwardRef(schema.get("title", "Root"))  # ty: ignore[invalid-explicit-return]
         return schema_to_type(resolve_ref(ref, schemas), schemas)
 
     if "const" in schema:
-        return Literal[schema["const"]]  # type: ignore[return-value]
+        return Literal[schema["const"]]
 
     if "enum" in schema:
-        return create_enum(f"Enum_{len(_classes)}", schema["enum"])  # type: ignore[return-value]
+        return create_enum(f"Enum_{len(_classes)}", schema["enum"])  # ty: ignore[invalid-explicit-return]
 
     schema_type = schema.get("type")
     if not schema_type:
@@ -269,10 +269,10 @@ def schema_to_type(schema: Mapping[str, Any], schemas: Mapping[str, Any]) -> typ
         types = [t for t in types if t is not type(None)]
         if has_null:
             combined = Union[tuple(types)] if len(types) > 1 else types[0]  # noqa: UP007
-            return combined | None  # type: ignore[return-value]
+            return combined | None  # ty: ignore[unsupported-operator]
         return Union[tuple(types)]  # type: ignore  # noqa: UP007
 
-    return _get_from_type_handler(schema, schemas)(schema)  # type: ignore[no-any-return]
+    return _get_from_type_handler(schema, schemas)(schema)
 
 
 def sanitize_name(name: str) -> str:
@@ -331,7 +331,7 @@ def create_dataclass(
     if cache_key in _classes:
         existing = _classes[cache_key]
         if existing is None:
-            return ForwardRef(sanitized_name)  # type: ignore[return-value]
+            return ForwardRef(sanitized_name)  # ty: ignore[invalid-explicit-return]
         return existing
 
     # Place placeholder for recursive references
@@ -340,7 +340,7 @@ def create_dataclass(
     if "$ref" in schema:
         ref = schema["$ref"]
         if ref == "#":
-            return ForwardRef(sanitized_name)  # type: ignore[return-value]
+            return ForwardRef(sanitized_name)  # ty: ignore[invalid-explicit-return]
         schema = resolve_ref(ref, schemas or {})
 
     properties = schema.get("properties", {})
@@ -354,7 +354,7 @@ def create_dataclass(
         if prop_schema.get("$ref") == "#":
             field_type = ForwardRef(sanitized_name)
         else:
-            field_type = schema_to_type(prop_schema, schemas or {})  # type: ignore[assignment]
+            field_type = schema_to_type(prop_schema, schemas or {})
 
         default_val = prop_schema.get("default", MISSING)
         is_required = prop_name in required
@@ -365,7 +365,7 @@ def create_dataclass(
         if default_val is not MISSING:
             if isinstance(default_val, (dict, list)):
                 field_def = field(
-                    default_factory=lambda d=default_val: deepcopy(d),  # type: ignore[misc]
+                    default_factory=lambda d=default_val: deepcopy(d),
                     metadata=meta,
                 )
             else:
@@ -385,14 +385,14 @@ def create_dataclass(
     cls = make_dataclass(sanitized_name, fields, kw_only=True)
 
     # Add model validator for defaults
-    @model_validator(mode="before")  # type: ignore[misc]
+    @model_validator(mode="before")
     @classmethod
     def _apply_defaults(cls: type[BaseModel], data: Mapping[str, Any]) -> Mapping[str, Any]:
         if isinstance(data, dict):
             return merge_defaults(data, original_schema)
         return data
 
-    cls._apply_defaults = _apply_defaults  # type: ignore[attr-defined]
+    cls._apply_defaults = _apply_defaults  # ty: ignore[missing-attribute]
 
     # Store completed class
     _classes[cache_key] = cls

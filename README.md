@@ -38,15 +38,17 @@ pip install schemez
 ```python
 from schemez import create_schema
 
+
 def get_weather(location: str, unit: str = "C") -> dict:
     """Get weather for a location."""
     return {"temp": 22, "location": location}
 
+
 # Create schema from function
 schema = create_schema(get_weather)
-print(schema.name)          # "get_weather"
-print(schema.description)   # "Get weather for a location."
-print(schema.parameters)    # Full parameter schema
+print(schema.name)  # "get_weather"
+print(schema.description)  # "Get weather for a location."
+print(schema.parameters)  # Full parameter schema
 ```
 
 ## FunctionSchema - The Core
@@ -59,14 +61,15 @@ The `FunctionSchema` class is the heart of schemez, providing a rich representat
 from schemez import create_schema
 from typing import Literal
 
+
 def search_users(
     query: str,
     limit: int = 10,
     status: Literal["active", "inactive"] = "active",
-    include_details: bool = False
+    include_details: bool = False,
 ) -> list[dict]:
     """Search for users with filters.
-    
+
     Args:
         query: Search query string
         limit: Maximum number of results
@@ -74,6 +77,7 @@ def search_users(
         include_details: Include detailed user information
     """
     return []
+
 
 # Create schema
 schema = create_schema(search_users)
@@ -102,11 +106,11 @@ model_code = schema.to_pydantic_model_code("SearchResponse")
 #### Schema Inspection
 ```python
 # Access schema components
-print(schema.name)                    # Function name
-print(schema.description)             # Function docstring
-print(schema.parameters)              # Parameter schema dict
-print(schema.returns)                 # Return type schema
-print(schema.get_annotations())       # Python type annotations
+print(schema.name)  # Function name
+print(schema.description)  # Function docstring
+print(schema.parameters)  # Parameter schema dict
+print(schema.returns)  # Return type schema
+print(schema.get_annotations())  # Python type annotations
 ```
 
 ### Bulk Schema Generation
@@ -115,22 +119,25 @@ print(schema.get_annotations())       # Python type annotations
 from schemez.functionschema import (
     create_schemas_from_module,
     create_schemas_from_class,
-    create_schemas_from_callables
+    create_schemas_from_callables,
 )
 
 # From module
 import math
-schemas = create_schemas_from_module(math, include_functions=['sin', 'cos'])
+
+schemas = create_schemas_from_module(math, include_functions=["sin", "cos"])
+
 
 # From class
 class Calculator:
     def add(self, x: int, y: int) -> int:
         """Add two numbers."""
         return x + y
-    
+
     def multiply(self, x: int, y: int) -> int:
         """Multiply two numbers."""
         return x * y
+
 
 schemas = create_schemas_from_class(Calculator)
 
@@ -158,12 +165,12 @@ generator = ToolsetCodeGenerator.from_callables(functions)
 client_code = generator.generate_code(
     mode="models",  # Rich Pydantic models for validation
     base_url="https://api.example.com",
-    path_prefix="/v1/tools"
+    path_prefix="/v1/tools",
 )
 
 # Available modes:
 # - "models": Rich Pydantic models with validation
-# - "simple": Clean natural function signatures  
+# - "simple": Clean natural function signatures
 # - "stubs": Function stubs for LLM consumption
 
 # Generated code includes:
@@ -181,22 +188,23 @@ from __future__ import annotations
 from pydantic import BaseModel
 import httpx
 
+
 class GetWeatherInput(BaseModel):
     location: str
-    unit: str | None = 'C'
+    unit: str | None = "C"
+
 
 async def get_weather(input: GetWeatherInput) -> str:
     """Get weather for a location."""
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            "https://api.example.com/v1/tools/get_weather",
-            params=input.model_dump(),
-            timeout=30.0
+            "https://api.example.com/v1/tools/get_weather", params=input.model_dump(), timeout=30.0
         )
         response.raise_for_status()
         return response.text
 
-__all__ = ['GetWeatherInput', 'get_weather', ...]
+
+__all__ = ["GetWeatherInput", "get_weather", ...]
 ```
 
 ### FastAPI Route Setup
@@ -226,15 +234,15 @@ Create sandboxed execution environments with tool functions:
 
 ```python
 # Generate different modes of client code
-models_code = generator.generate_code(mode="models")    # With Pydantic models
-simple_code = generator.generate_code(mode="simple")    # Clean signatures
-stubs_code = generator.generate_code(mode="stubs")      # For LLM consumption
+models_code = generator.generate_code(mode="models")  # With Pydantic models
+simple_code = generator.generate_code(mode="simple")  # Clean signatures
+stubs_code = generator.generate_code(mode="stubs")  # For LLM consumption
 
 # For advanced use, get structured components
 structured = generator.generate_structured_code()
-print(structured.models)          # Just the Pydantic models
-print(structured.clean_methods)   # Just the clean method signatures
-print(structured.exports)         # List of exported names
+print(structured.models)  # Just the Pydantic models
+print(structured.clean_methods)  # Just the clean method signatures
+print(structured.exports)  # List of exported names
 
 # Use any mode as needed
 exec(simple_code, globals())
@@ -270,12 +278,12 @@ Generate comprehensive documentation for your tools:
 documentation = generator.generate_tool_description()
 
 # Generate different formats for different needs
-stubs = generator.generate_code(mode="stubs")        # Clean stubs for LLMs
-simple = generator.generate_code(mode="simple")      # Natural signatures
-models = generator.generate_code(mode="models")      # Rich validation
+stubs = generator.generate_code(mode="stubs")  # Clean stubs for LLMs
+simple = generator.generate_code(mode="simple")  # Natural signatures
+models = generator.generate_code(mode="models")  # Rich validation
 
 # Includes:
-# - Function signatures with type hints  
+# - Function signatures with type hints
 # - Docstrings and parameter descriptions
 # - Usage examples and constraints
 # - Available return type models
@@ -345,13 +353,14 @@ Example generated interface:
 class SearchUsersInput(BaseModel):
     query: str
     limit: int = 10
-    
+
+
 async def search_users(input: SearchUsersInput) -> list[dict]:
     """Search for users with filters.
-    
+
     Args:
         input: Function parameters
-        
+
     Returns:
         List of user dictionaries
     """
@@ -369,24 +378,28 @@ from typing import Literal, Optional, Union
 from enum import Enum
 from dataclasses import dataclass
 
+
 class Status(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
+
 
 @dataclass
 class User:
     name: str
     email: str
 
+
 def complex_function(
-    users: list[User],                    # -> Nested object arrays
-    status: Status,                       # -> Enum values
-    mode: Literal["fast", "detailed"],    # -> String literals
-    metadata: dict[str, Any],             # -> Objects with any properties
-    optional: Optional[str] = None,       # -> Optional parameters
-) -> Union[dict, list]:                   # -> Union return types
+    users: list[User],  # -> Nested object arrays
+    status: Status,  # -> Enum values
+    mode: Literal["fast", "detailed"],  # -> String literals
+    metadata: dict[str, Any],  # -> Objects with any properties
+    optional: Optional[str] = None,  # -> Optional parameters
+) -> Union[dict, list]:  # -> Union return types
     """Handle complex types."""
     pass
+
 
 schema = create_schema(complex_function)
 ```
@@ -401,9 +414,7 @@ schema = create_schema(my_function, exclude_types=[Context, Session])
 
 # Override names and descriptions
 schema = create_schema(
-    my_function,
-    name_override="custom_name",
-    description_override="Custom description"
+    my_function, name_override="custom_name", description_override="Custom description"
 )
 ```
 

@@ -24,7 +24,6 @@ from schemez.schema import Schema
 
 if TYPE_CHECKING:
     from agentpool.common_types import AnyCallable
-    from pydantic.fields import FieldInfo
 
 
 def get_union_args(tp: Any) -> tuple[Any, ...]:
@@ -60,7 +59,7 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
     """
     sig = inspect.signature(func)
     hints = get_type_hints(func, include_extras=True)
-    fields: dict[str, tuple[type, FieldInfo]] = {}
+    fields: dict[str, Any] = {}
     description, param_docs = get_docstring_info(func, sig)
 
     for param_name, param in sig.parameters.items():
@@ -83,7 +82,7 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
         fields[param_name] = (type_hint, field)
     name = get_object_name(func, "unknown")
     model_name = name or f"{name}Params"
-    return create_model(model_name, **fields, __base__=Schema, __doc__=description)  # type: ignore[no-any-return, call-overload]
+    return create_model(model_name, **fields, __base__=Schema, __doc__=description)
 
 
 def get_ctor_basemodel(cls: type) -> type[Schema]:
@@ -107,20 +106,20 @@ def get_ctor_basemodel(cls: type) -> type[Schema]:
             return cls
 
         # Create a new Schema-based model with the same fields
-        fields = {}
+        fields: dict[str, Any] = {}
         for field_name, field_info in cls.model_fields.items():
             field_type = field_info.annotation
             field_default = field_info.default if field_info.default is not Ellipsis else ...
             fields[field_name] = (field_type, field_default)
 
-        return create_model(cls.__name__, **fields, __base__=Schema)  # type: ignore[call-overload, no-any-return]
+        return create_model(cls.__name__, **fields, __base__=Schema)
 
     if dataclasses.is_dataclass(cls):
-        fields = {}
+        fields: dict[str, Any] = {}
         hints = get_type_hints(cls)
         for field in dataclasses.fields(cls):
             fields[field.name] = (hints[field.name], ...)
-        return create_model(cls.__name__, __base__=Schema, **fields)  # type: ignore[no-any-return, call-overload]
+        return create_model(cls.__name__, __base__=Schema, **fields)
     return get_function_model(cls.__init__, name=cls.__name__)
 
 
@@ -137,5 +136,5 @@ if __name__ == "__main__":
             """Do something."""
 
     model = get_function_model(Person.func_google)
-    instance = model(name="Test", age=30)  # type: ignore[call-arg]
+    instance = model.model_validate({"name": "Test", "age": 30})
     print(instance, isinstance(instance, BaseModel))

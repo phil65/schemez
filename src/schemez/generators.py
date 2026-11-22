@@ -283,7 +283,7 @@ class SchemaDataGenerator:
 def _str_gen(schema: dict[str, Any], seed: int = 0) -> str:  # noqa: PLR0911
     """Generate a string from a JSON Schema string type."""
     if (min_len := schema.get("minLength")) is not None:
-        return _char(seed=seed) * min_len  # type: ignore[no-any-return]
+        return _char(seed=seed) * min_len
     if schema.get("maxLength") == 0:
         return ""
     if fmt := schema.get("format"):
@@ -306,11 +306,11 @@ def _str_gen_maximal(schema: dict[str, Any], seed: int = 0) -> str:
     if (max_len := schema.get("maxLength")) is not None:
         # Cap at reasonable limit for maximal generation
         effective_max = min(max_len, 100)
-        return _char(seed=seed) * effective_max  # type: ignore[no-any-return]
+        return _char(seed=seed) * effective_max
 
     min_len = schema.get("minLength", 1)
     # For maximal without max constraint, use a reasonable default
-    return _char(seed=seed) * max(min_len, 10)  # type: ignore[no-any-return]
+    return _char(seed=seed) * max(min_len, 10)
 
 
 def _int_gen(schema: dict[str, Any], seed: int = 0) -> int:
@@ -328,11 +328,11 @@ def _int_gen(schema: dict[str, Any], seed: int = 0) -> int:
             minimum = exc_min + 1
 
     if minimum is not None and maximum is not None:
-        return minimum + seed % (maximum - minimum + 1)  # type: ignore[no-any-return]
+        return minimum + seed % (maximum - minimum + 1)
     if minimum is not None:
-        return minimum + seed  # type: ignore[no-any-return]
+        return minimum + seed
     if maximum is not None:
-        return maximum - seed  # type: ignore[no-any-return]
+        return maximum - seed
     return seed
 
 
@@ -362,7 +362,7 @@ def _int_gen_maximal(schema: dict[str, Any]) -> int:
             maximum = exc_max - 1
 
     if maximum is not None:
-        return maximum  # type: ignore[no-any-return]
+        return maximum
 
     minimum = schema.get("minimum")
     if minimum is None:
@@ -372,7 +372,7 @@ def _int_gen_maximal(schema: dict[str, Any]) -> int:
 
     if minimum is not None:
         # For maximal without max constraint, use reasonable large value
-        return minimum + 1000  # type: ignore[no-any-return]
+        return minimum + 1000
     return 1000  # Reasonable maximal default
 
 

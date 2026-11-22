@@ -8,7 +8,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from griffe import (  # type: ignore[import-untyped]
+from griffe import (
     Docstring,
     DocstringSectionKind,
     Object as GriffeObject,
@@ -16,7 +16,7 @@ from griffe import (  # type: ignore[import-untyped]
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
     from inspect import Signature
 
 
@@ -152,7 +152,7 @@ _docstring_style_patterns: list[tuple[str, list[str], DocstringStyle]] = [
 
 
 @contextmanager
-def _disable_griffe_logging() -> Iterator[None]:
+def _disable_griffe_logging() -> Generator[None]:
     # Hacky, but suggested here: https://github.com/mkdocstrings/griffe/issues/293#issuecomment-2167668117
     old_level = logging.root.getEffectiveLevel()
     logging.root.setLevel(logging.ERROR)

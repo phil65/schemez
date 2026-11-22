@@ -302,7 +302,7 @@ def resolve_type_annotation(
         if "properties" in schema:
             prop["properties"] = schema["properties"]
         if "additionalProperties" in schema:
-            prop["additionalProperties"] = schema["additionalProperties"]  # pyright: ignore[reportGeneralTypeIssues]
+            prop["additionalProperties"] = schema["additionalProperties"]  # pyright: ignore[reportGeneralTypeIssues]  # ty: ignore[invalid-assignment]
         if "required" in schema:
             prop["required"] = schema["required"]
         return prop

@@ -51,28 +51,29 @@ class ExecutableFunction[T_co]:
         Returns:
             Either a single result or list of results for generators
         """
+        func: Callable[..., Any] = self.func
         match self.function_type:
             case "sync":
-                return self.func(*args, **kwargs)  # type: ignore[return-value]
+                return func(*args, **kwargs)
             case "async":
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
-                    return asyncio.run(self.func(*args, **kwargs))  # type: ignore[arg-type]
+                    return asyncio.run(func(*args, **kwargs))
                 else:
                     if loop.is_running():
                         new_loop = asyncio.new_event_loop()
                         try:
                             return new_loop.run_until_complete(
-                                self.func(*args, **kwargs),  # type: ignore[arg-type]
+                                func(*args, **kwargs),
                             )
                         finally:
                             new_loop.close()
                     return loop.run_until_complete(
-                        self.func(*args, **kwargs),  # type: ignore[arg-type]
+                        func(*args, **kwargs),
                     )
             case "sync_generator":
-                return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
+                return list(func(*args, **kwargs))
             case "async_generator":
                 try:
                     loop = asyncio.get_running_loop()
@@ -103,7 +104,8 @@ class ExecutableFunction[T_co]:
         Returns:
             List of collected results
         """
-        return [x async for x in self.func(*args, **kwargs)]  # type: ignore[union-attr]
+        func: Callable[..., Any] = self.func
+        return [x async for x in func(*args, **kwargs)]
 
     async def arun(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:
         """Run the function asynchronously.
@@ -118,15 +120,16 @@ class ExecutableFunction[T_co]:
         Raises:
             ValueError: If the function type is unknown
         """
+        func: Callable[..., Any] = self.func
         match self.function_type:
             case "sync":
-                return self.func(*args, **kwargs)  # type: ignore[return-value]
+                return func(*args, **kwargs)
             case "async":
-                return await self.func(*args, **kwargs)  # type: ignore[no-any-return, misc]
+                return await func(*args, **kwargs)
             case "sync_generator":
-                return list(self.func(*args, **kwargs))  # type: ignore[arg-type]
+                return list(func(*args, **kwargs))
             case "async_generator":
-                return [x async for x in self.func(*args, **kwargs)]  # type: ignore[union-attr]
+                return [x async for x in func(*args, **kwargs)]
             case _:
                 msg = f"Unknown function type: {self.function_type}"
                 raise ValueError(msg)
@@ -144,17 +147,18 @@ class ExecutableFunction[T_co]:
         Raises:
             ValueError: If the function type is unknown
         """
+        func: Callable[..., Any] = self.func
         match self.function_type:
             case "sync_generator":
-                for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
+                for x in func(*args, **kwargs):
                     yield x
             case "async_generator":
-                async for x in self.func(*args, **kwargs):  # type: ignore[union-attr]
+                async for x in func(*args, **kwargs):
                     yield x
             case "sync":
-                yield self.func(*args, **kwargs)  # type: ignore[misc]
+                yield func(*args, **kwargs)
             case "async":
-                yield await self.func(*args, **kwargs)  # type: ignore[misc]
+                yield await func(*args, **kwargs)
             case _ as unreachable:
                 assert_never(unreachable)
 
@@ -191,7 +195,7 @@ def create_executable[T_co](
         Executable wrapper with schema
     """
     schema = create_schema(func)
-    return ExecutableFunction(schema, func)
+    return ExecutableFunction[T_co](schema, func)
 
 
 if __name__ == "__main__":

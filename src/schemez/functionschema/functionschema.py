@@ -81,7 +81,7 @@ class FunctionSchema(pydantic.BaseModel):
 
     def create_parameter_model(self) -> type[pydantic.BaseModel]:
         """Create a Pydantic model from the schema parameters."""
-        fields: dict[str, tuple[type[Any] | Literal, pydantic.Field]] = {}  # type: ignore[valid-type]
+        fields: dict[str, Any] = {}
         properties = self.parameters.get("properties", {})
         required = self.parameters.get("required", self.required)
 
@@ -108,7 +108,7 @@ class FunctionSchema(pydantic.BaseModel):
             )
             fields[name] = field
 
-        return pydantic.create_model(f"{self.name}_params", **fields)  # type: ignore[call-overload, no-any-return]
+        return pydantic.create_model(f"{self.name}_params", **fields)
 
     def model_dump_openai(self) -> OpenAIFunctionTool:
         """Convert the schema to OpenAI's function calling format.
@@ -183,9 +183,9 @@ class FunctionSchema(pydantic.BaseModel):
             Dictionary mapping parameter names to their Python types.
         """
         model = self.create_parameter_model()
-        annotations: dict[str, type[Any]] = {}
+        annotations: dict[str, Any] = {}
         for name, field in model.model_fields.items():
-            annotations[name] = field.annotation  # type: ignore[assignment]
+            annotations[name] = field.annotation
         annotations["return"] = return_type
         return annotations
 
@@ -287,16 +287,18 @@ def _wrap_bound_method(bound_method: Callable[..., Any]) -> Callable[..., Any]:
     """Wrap a bound method in a function to allow signature modification."""
     import functools
 
+    underlying = cast("Any", bound_method).__func__
+
     # Create wrapper that delegates to the bound method
-    @functools.wraps(bound_method.__func__)  # type: ignore[attr-defined]
+    @functools.wraps(underlying)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         return bound_method(*args, **kwargs)
 
     # Copy important attributes from the bound method
-    wrapper.__annotations__ = getattr(bound_method.__func__, "__annotations__", {})  # type: ignore[attr-defined]
-    wrapper.__doc__ = bound_method.__func__.__doc__  # type: ignore[attr-defined]
-    wrapper.__name__ = bound_method.__func__.__name__  # type: ignore[attr-defined]
-    wrapper.__qualname__ = bound_method.__func__.__qualname__  # type: ignore[attr-defined]
+    wrapper.__annotations__ = getattr(underlying, "__annotations__", {})
+    wrapper.__doc__ = underlying.__doc__
+    wrapper.__name__ = underlying.__name__
+    wrapper.__qualname__ = underlying.__qualname__
 
     return wrapper
 
@@ -358,8 +360,8 @@ def _create_schema_pydantic(
             if hasattr(func, "__func__") and hasattr(func, "__self__"):
                 func = _wrap_bound_method(func)
 
-            # Type ignore for dynamic signature modification
-            func.__signature__ = new_sig  # type: ignore[attr-defined]
+            # Dynamic signature modification
+            cast("Any", func).__signature__ = new_sig
         # Use pydantic-ai's function_schema
         pydantic_ai_schema = function_schema(func, schema_generator_cls)
         # Convert to our format - now we can use the rich JSON schema directly
@@ -458,7 +460,7 @@ def _create_schema_pydantic(
         }
     else:
         returns = resolve_type_annotation(return_hint, is_parameter=False)
-        returns_dct = dict(returns)  # type: ignore[arg-type]
+        returns_dct = dict(returns)
 
     docstring = docstring_parser.parse(func.__doc__ or "")
 
@@ -547,7 +549,7 @@ def _create_schema_simple(
         returns_dct = {"type": "array", "items": prop}
     else:
         returns = resolve_type_annotation(return_hint, is_parameter=False)
-        returns_dct = dict(returns)  # type: ignore[arg-type]
+        returns_dct = dict(returns)
 
     return FunctionSchema(
         name=name_override or get_object_name(func, "unknown") or "unknown",

@@ -57,7 +57,7 @@ class OpenAPIResolver:
             A new dictionary with all refs resolved.
         """
         self._resolving.clear()
-        return self._resolve_value(spec, self.base_url)  # type: ignore[no-any-return]
+        return self._resolve_value(spec, self.base_url)
 
     def _resolve_value(self, value: Any, current_url: str) -> Any:
         """Recursively resolve refs in a value."""
@@ -100,7 +100,7 @@ class OpenAPIResolver:
             doc = self._fetch_document(abs_url)  # Fetch and cache the external document
             result = _navigate_pointer(doc, pointer) if pointer else doc  # nav to the pointer
             # Recursively resolve any refs in the fetched content
-            return self._resolve_value(result, abs_url)  # type: ignore[no-any-return]
+            return self._resolve_value(result, abs_url)
         finally:
             self._resolving.discard(full_ref)
 
@@ -196,7 +196,7 @@ def _resolve_internal_refs(spec: dict[str, Any]) -> dict[str, Any]:
             case _:
                 return value
 
-    return resolve_value(spec)  # type: ignore[no-any-return]
+    return resolve_value(spec)
 
 
 def _navigate_internal_ref(spec: dict[str, Any], ref: str) -> Any:

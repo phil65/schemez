@@ -139,9 +139,9 @@ class ToolCodeGenerator:
         # Set up the route with proper parameter annotations for FastAPI
         if param_cls:
             func_code = generate_func_code(param_cls.model_fields)
-            namespace = {"route_handler": route_handler, "Any": Any}
+            namespace: dict[str, Any] = {"route_handler": route_handler, "Any": Any}
             exec(func_code, namespace)  # Execute the dynamic function creation
-            dynamic_handler: Callable = namespace["dynamic_handler"]  # type: ignore[assignment, type-arg]
+            dynamic_handler: Callable[..., Any] = namespace["dynamic_handler"]
         else:
 
             async def dynamic_handler() -> dict[str, Any]:

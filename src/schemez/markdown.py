@@ -156,7 +156,7 @@ def _process_secret_str(
 def _resolve_type_name(type_schema: dict[str, Any], defs: dict[str, Any]) -> str:  # noqa: PLR0911
     """Resolve a JSON schema type to a human-readable type name."""
     if "$ref" in type_schema:
-        return type_schema["$ref"].rsplit("/", 1)[-1]  # type: ignore[no-any-return]
+        return type_schema["$ref"].rsplit("/", 1)[-1]
 
     if "anyOf" in type_schema:
         types = []
@@ -416,7 +416,7 @@ def _resolve_model_from_import_path(import_path: str) -> type[BaseModel]:
         msg = f"'{import_path}' is not a Pydantic BaseModel class"
         raise TypeError(msg)
 
-    return model_class  # type: ignore[no-any-return]
+    return model_class
 
 
 def model_to_markdown(
