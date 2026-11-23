@@ -31,6 +31,8 @@ from schemez.helpers import get_object_name, json_schema_to_pydantic_code
 
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from schemez.functionschema.typedefs import Property
 
 
@@ -192,13 +194,14 @@ class FunctionSchema(pydantic.BaseModel):
     @classmethod
     def from_dict(
         cls,
-        schema: dict[str, Any],
+        schema: Mapping[str, Any],
         output_schema: dict[str, Any] | None = None,
     ) -> FunctionSchema:
         """Create a FunctionSchema from a raw schema dictionary.
 
         Args:
-            schema: OpenAI function schema dictionary.
+            schema: OpenAI function schema dictionary (also an ``OpenAIFunctionTool``
+                or ``OpenAIFunctionDefinition``).
                 Can be either a direct function definition or a tool wrapper.
             output_schema: Optional dictionary specifying the return type.
                 If not provided, an object type will be set.
@@ -234,6 +237,9 @@ class FunctionSchema(pydantic.BaseModel):
         for prop_name, prop in properties.items():
             cleaned_props[prop_name] = clean_property(prop)
         required = param_dict.get("required", [])
+        if not isinstance(required, list):
+            msg = "Schema required field must be a list"
+            raise ValueError(msg)  # noqa: TRY004
         parameters: ToolParameters = {"type": "object", "properties": cleaned_props}
         if required:
             parameters["required"] = required

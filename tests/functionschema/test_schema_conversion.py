@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import pytest
 
 from schemez.functionschema import FunctionSchema, create_schema
+
+
+if TYPE_CHECKING:
+    from schemez import OpenAIFunctionTool
 
 
 def test_from_dict_complete_tool() -> None:
@@ -42,6 +46,31 @@ def test_from_dict_complete_tool() -> None:
     assert props["location"]["type"] == "string"
     assert props["unit"]["enum"] == ["C", "F"]
     assert schema.required == ["location"]
+
+
+def test_from_dict_accepts_typed_openai_tool() -> None:
+    """The OpenAI TypedDicts are accepted as they are (also by type checkers)."""
+    tool: OpenAIFunctionTool = {
+        "type": "function",
+        "function": {
+            "name": "greet",
+            "description": "Greet someone",
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+        },
+    }
+    schema = FunctionSchema.from_dict(tool)
+    assert schema.name == "greet"
+    assert schema.required == ["name"]
+
+
+def test_from_dict_rejects_non_list_required() -> None:
+    func = {"name": "f", "parameters": {"type": "object", "properties": {}, "required": "x"}}
+    with pytest.raises(ValueError, match="required"):
+        FunctionSchema.from_dict(func)
 
 
 def test_from_dict_function_only() -> None:
