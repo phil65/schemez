@@ -2,7 +2,7 @@
 
 [project]
 name = "schemez"
-version = "2.3.0"
+version = "2.4.0"
 description = "Pydantic toolkit for function schemas, JSON Schema to model conversion, tool code generation and config models"
 readme = "README.md"
 requires-python = ">=3.13"
