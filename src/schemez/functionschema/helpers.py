@@ -69,11 +69,7 @@ def resolve_type_annotation(
             schema["default"] = default
         if description:
             schema["description"] = description
-        return _create_simple_property(
-            type_str="string",
-            description=description,
-            default=default,
-        )
+        return _create_simple_property("string", description=description, default=default)
 
     # Handle Annotated types first
     if get_origin(typ) is Annotated:
@@ -110,10 +106,7 @@ def resolve_type_annotation(
         properties = {}
         required = []
         for field in fields:
-            properties[field.name] = resolve_type_annotation(
-                field.type,
-                is_parameter=is_parameter,
-            )
+            properties[field.name] = resolve_type_annotation(field.type, is_parameter=is_parameter)
             # Field is required if it has no default value and no default_factory
             if (
                 field.default is dataclasses.MISSING
@@ -187,10 +180,7 @@ def resolve_type_annotation(
     ):
         schema["type"] = "array"
         item_type = args[0] if args else Any
-        schema["items"] = resolve_type_annotation(
-            item_type,
-            is_parameter=is_parameter,
-        )
+        schema["items"] = resolve_type_annotation(item_type, is_parameter=is_parameter)
 
     # Handle literals
     elif origin is typing.Literal:
@@ -383,8 +373,6 @@ def types_match(annotation: Any, exclude_type: type) -> bool:
         if exclude_type_name in annotation_str or exclude_type_full_name in annotation_str:
             # Be more specific to avoid false positives
             # Check if it's the exact type name, not just a substring
-            import re
-
             patterns = [
                 rf"\b{re.escape(exclude_type_name)}\b",
                 rf"\b{re.escape(exclude_type_full_name)}\b",

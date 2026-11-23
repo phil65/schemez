@@ -228,7 +228,7 @@ def resolve_type_string(type_string: str, safe: bool = True) -> type:
 
 
 def model_to_python_code(
-    model: type[BaseModel] | dict[str, Any],
+    model: type[BaseModel] | collections.abc.Mapping[str, Any],
     *,
     class_name: str | None = None,
     target_python_version: PythonVersionStr | None = None,
@@ -237,7 +237,8 @@ def model_to_python_code(
     """Convert a BaseModel or schema dict to Python code.
 
     Args:
-        model: The BaseModel class or schema dictionary to convert
+        model: The BaseModel class or schema mapping to convert (a dict, or a
+            TypedDict like ``ToolParameters``)
         class_name: Optional custom class name for the generated code
         target_python_version: Target Python version for code generation.
             Defaults to current system Python version.
@@ -249,8 +250,8 @@ def model_to_python_code(
     Raises:
         ValueError: If schema parsing fails
     """
-    if isinstance(model, dict):
-        schema = model
+    if isinstance(model, collections.abc.Mapping):
+        schema = dict(model)
         name = class_name or "GeneratedModel"
     else:
         schema = model.model_json_schema()

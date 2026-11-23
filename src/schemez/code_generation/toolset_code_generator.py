@@ -178,10 +178,8 @@ class ToolsetCodeGenerator:
         exclude_types: list[type] | None = None,
     ) -> ToolsetCodeGenerator:
         """Create a ToolsetCodeGenerator from a sequence of callables."""
-        generators = [
-            ToolCodeGenerator.from_callable(i, exclude_types=exclude_types) for i in callables
-        ]
-        return cls(generators, include_docstrings)
+        gens = [ToolCodeGenerator.from_callable(i, exclude_types=exclude_types) for i in callables]
+        return cls(gens, include_docstrings)
 
     @classmethod
     def from_schemas(
@@ -211,16 +209,13 @@ class ToolsetCodeGenerator:
             ValueError: If any generator lacks a callable
         """
         namespace: dict[str, Any] = {"__builtins__": __builtins__, "_result": None}
-
         # Add tool functions - all generators must have callables for execution
         for generator in self.generators:
             namespace[generator.name] = NamespaceCallable.from_generator(generator)
-
         # Add generated model classes to namespace
         if models_code := self.generate_return_models():
             with contextlib.suppress(Exception):
                 exec(models_code, namespace)
-
         return namespace
 
     def generate_return_models(self) -> str:
@@ -239,7 +234,6 @@ class ToolsetCodeGenerator:
             FastMCP client code as string
         """
         server_config_code = "SERVERS = " + repr(server_configs)
-
         return f'''{server_config_code}
 
 # Connection management
@@ -318,15 +312,11 @@ async def close_all_mcp_connections():
             # Generate input model from schema parameters
             input_class_name = None
             try:
-                params_schema = generator.schema.parameters
-                if params_schema.get("properties"):
+                params = generator.schema.parameters
+                if params.get("properties"):
                     words = [word.title() for word in generator.name.split("_")]
                     input_class_name = f"{''.join(words)}Input"
-
-                    model_code = model_to_python_code(
-                        dict(params_schema), class_name=input_class_name
-                    )
-                    if model_code:
+                    if model_code := model_to_python_code(params, class_name=input_class_name):
                         cleaned_model = clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
             except (ValueError, TypeError, AttributeError):
@@ -396,12 +386,10 @@ async def {generator.name}() -> str:
         return response.text
 '''
             http_methods_parts.append(http_method)
-
             # Generate clean method with natural signature
             signature_str = generator.get_function_signature()
-            params_schema = generator.schema.parameters
-            param_names = list(params_schema.get("properties", {}).keys())
-
+            params = generator.schema.parameters
+            param_names = list(params.get("properties", {}).keys())
             if client_type == "fastmcp":
                 clean_method = f'''
 async def {signature_str}:
@@ -435,7 +423,6 @@ async def {signature_str}:
         return result.get("result", response.text)
 '''
             clean_methods_parts.append(clean_method)
-
             # Generate model-based stub
             if input_class_name:
                 model_stub = f'''
@@ -462,10 +449,8 @@ async def {signature_str}:
 
         # Choose appropriate imports based on client type
         imports = FASTMCP_IMPORTS if client_type == "fastmcp" else HTTP_IMPORTS
-
         elapsed = time.time() - start_time
         logger.info("Structured code generation completed in %.2fs", elapsed)
-
         return GeneratedCode(
             models="\n".join(models_parts),
             http_methods="\n".join(http_methods_parts),
@@ -516,13 +501,10 @@ async def {signature_str}:
         """
         # Generate structured code with FastMCP client type
         structured = self.generate_structured_code(client_type="fastmcp")
-
         # Get FastMCP client code
         mcp_client_code = self.get_fastmcp_client_code(server_configs)
-
         # Get the appropriate client code based on format/type
         tools_code = structured.get_client_code(args_format, output_type, client_type="fastmcp")
-
         # Combine client and tools code
         return f"""{FASTMCP_IMPORTS}
 {mcp_client_code}
@@ -546,18 +528,14 @@ if __name__ == "__main__":
         return a + b
 
     generator = ToolsetCodeGenerator.from_callables([greet, add_numbers])
-
     # Test FastMCP code generation
     server_configs = {"test_server": "stdio://npx -y @test/server"}
-
     mcp_code = generator.generate_mcp_code(
         server_configs, args_format="explicit", output_type="implementation"
     )
     print("=== FastMCP Code ===")
     print(mcp_code)
-
     print("\n" + "=" * 50 + "\n")
-
     # Test HTTP code generation
     http_code = generator.generate_code(args_format="explicit", output_type="implementation")
     print("=== HTTP Code ===")
