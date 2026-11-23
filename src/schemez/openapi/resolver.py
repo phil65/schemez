@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Self
 from urllib.parse import urljoin
 
-import httpx
+import httpx2
 import yamling
 
 from schemez.log import get_logger
@@ -27,13 +27,13 @@ class OpenAPIResolver:
         self.base_url = base_url
         self.timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}
-        self._client: httpx.Client | None = None
+        self._client: httpx2.Client | None = None
         self._resolving: set[str] = set()  # Track refs being resolved to detect cycles
 
     @property
-    def client(self) -> httpx.Client:
+    def client(self) -> httpx2.Client:
         if self._client is None:
-            self._client = httpx.Client(timeout=self.timeout, follow_redirects=True)
+            self._client = httpx2.Client(timeout=self.timeout, follow_redirects=True)
         return self._client
 
     def close(self) -> None:

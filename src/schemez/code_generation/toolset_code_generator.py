@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from typing import Any
-import httpx
+import httpx2
 
 '''
 
@@ -359,7 +359,7 @@ async def {generator.name}(input: {input_class_name}) -> str:
     Returns:
         String response from the tool server
     """
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         response = await client.get(
             "{base_url}{path_prefix}/{generator.name}",
             params=input.model_dump() if hasattr(input, 'model_dump') else {{}},
@@ -387,7 +387,7 @@ async def {generator.name}() -> str:
     Returns:
         String response from the tool server
     """
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         response = await client.get(
             "{base_url}{path_prefix}/{generator.name}",
             timeout=30.0
@@ -423,7 +423,7 @@ async def {signature_str}:
     # Remove None values
     clean_params = {{k: v for k, v in params.items() if v is not None}}
 
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         response = await client.get(
             "{base_url}{path_prefix}/{generator.name}",
             params=clean_params,

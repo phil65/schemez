@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import anyenv
-import httpx
+import httpx2
 from upath import UPath
 import yamling
 
@@ -27,7 +27,7 @@ def load_openapi_spec(url_or_path: JoinablePathLike, timeout: float = 30.0) -> d
         Fully dereferenced OpenAPI spec.
     """
     if (path_str := str(url_or_path)).startswith(("http://", "https://")):
-        response = httpx.get(path_str, follow_redirects=True, timeout=timeout)
+        response = httpx2.get(path_str, follow_redirects=True, timeout=timeout)
         response.raise_for_status()
         content = response.text
         base_url = path_str

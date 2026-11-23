@@ -169,7 +169,7 @@ def get_weather(location: str, unit: str = "C") -> dict:
 
 generator = ToolsetCodeGenerator.from_callables([get_weather, search_users])
 
-# Async httpx client functions calling a tool server
+# Async httpx2 client functions calling a tool server
 client_code = generator.generate_code(base_url="https://api.example.com", path_prefix="/tools")
 # Signatures + docstrings only, for LLM prompts
 stubs = generator.generate_code(output_type="stubs")

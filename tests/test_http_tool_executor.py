@@ -165,7 +165,7 @@ async def test_generate_tools_code(weather_schema: dict[str, Any], mock_handler:
     assert len(tools_code) > 0
     assert "GetWeatherInput" in tools_code
     assert "async def get_weather" in tools_code
-    assert "httpx.AsyncClient" in tools_code
+    assert "httpx2.AsyncClient" in tools_code
     assert "__all__" in tools_code
 
 

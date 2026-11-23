@@ -102,8 +102,8 @@ async def {name}(input: {input_class_name}) -> str:
     Returns:
         String response from the tool server
     """
-    import httpx
-    async with httpx.AsyncClient() as client:
+    import httpx2
+    async with httpx2.AsyncClient() as client:
         response = await client.post(
             "{self.base_url}/tools/{name}",
             json=input.model_dump(),

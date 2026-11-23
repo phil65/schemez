@@ -94,7 +94,7 @@ coverage on Python 3.13/3.14 x Linux/macOS/Windows (3.14 is `continue-on-error`)
 - Copier-managed project (`.copier-answers.yml`, template `copier-phil65`): don't hand-edit template-owned
   files (`.github/workflows/*`, `.pre-commit-config.yaml`, `duties.py`, most of `pyproject.toml`).
   Add dependencies below the `# Only add below (Copier)` markers.
-- Extras: `ai` (agentpool, anyenv, httpx, pydantic-ai; needed for `Schema.from_llm`, `create_schema(mode="openai")`,
+- Extras: `ai` (agentpool, anyenv, httpx2, pydantic-ai; needed for `Schema.from_llm`, `create_schema(mode="openai")`,
   `schemez.openapi`), `codegen` (datamodel-code-generator; `json_schema_to_pydantic_class`, `*_to_code`),
   `yaml` (yamling; `Schema.from_yaml`/`model_dump_yaml`), `markdown` (jinja2), `storage` (aiosqlite),
   `tool_execution` (fastapi, uvicorn). `ai` pulls in agentpool, which itself depends on schemez.
