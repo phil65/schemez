@@ -89,6 +89,14 @@ coverage on Python 3.13/3.14 x Linux/macOS/Windows (3.14 is `continue-on-error`)
 - Optional dependencies are imported lazily inside functions (`yamling`, `agentpool`, `fastapi`,
   `uvicorn`, `aiosqlite`, `datamodel_code_generator`, `jinja2`, `pydantic_ai`).
 
+## Specs
+
+| Spec | URL | Targets | Code | Update check |
+|---|---|---|---|---|
+| JSON Schema | https://json-schema.org/draft/2020-12 | draft 2020-12 (`$schema` written by `schema_to_type/*_impl.py`) | `src/schemez/jsonschema_utils.py`, `src/schemez/schema_to_type/`, `src/schemez/schemadef/` | https://json-schema.org/specification |
+| OpenAI function calling (tool schema) | https://platform.openai.com/docs/guides/function-calling | unpinned (tracks latest) | `src/schemez/functionschema/` (`model_dump_openai`, `OpenAIFunctionTool`) | same URL |
+| OpenAPI | https://spec.openapis.org/oas/v3.1.0.html | 3.0 and 3.1 documents (3.0 `nullable` handled in `jsonschema_utils.py`) | `src/schemez/openapi/` | https://spec.openapis.org/oas/latest.html |
+
 ## Pitfalls
 
 - Copier-managed project (`.copier-answers.yml`, template `copier-phil65`): don't hand-edit template-owned
