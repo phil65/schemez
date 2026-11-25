@@ -95,7 +95,7 @@ coverage on Python 3.13/3.14 x Linux/macOS/Windows (3.14 is `continue-on-error`)
 |---|---|---|---|---|
 | JSON Schema | https://json-schema.org/draft/2020-12 | draft 2020-12 (`$schema` written by `schema_to_type/*_impl.py`) | `src/schemez/jsonschema_utils.py`, `src/schemez/schema_to_type/`, `src/schemez/schemadef/` | https://json-schema.org/specification |
 | OpenAI function calling (tool schema) | https://platform.openai.com/docs/guides/function-calling | unpinned (tracks latest) | `src/schemez/functionschema/` (`model_dump_openai`, `OpenAIFunctionTool`) | same URL |
-| OpenAPI | https://spec.openapis.org/oas/v3.1.0.html | 3.0 and 3.1 documents (3.0 `nullable` handled in `jsonschema_utils.py`) | `src/schemez/openapi/` | https://spec.openapis.org/oas/latest.html |
+| OpenAPI | https://spec.openapis.org/oas/latest.html | unpinned (OpenAPI 3.x; 3.0 `nullable` handled in `jsonschema_utils.py`) | `src/schemez/openapi/` | same URL |
 
 ## Pitfalls
 

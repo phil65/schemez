@@ -62,7 +62,7 @@ Issues = "https://github.com/phil65/schemez/issues"
 Source = "https://github.com/phil65/schemez"
 "Spec: JSON Schema 2020-12" = "https://json-schema.org/draft/2020-12"
 "Spec: OpenAI function calling" = "https://platform.openai.com/docs/guides/function-calling"
-"Spec: OpenAPI" = "https://spec.openapis.org/oas/v3.1.0.html"
+"Spec: OpenAPI" = "https://spec.openapis.org/oas/latest.html"
 
 [project.entry-points."jinjarope.environment"]
 schemez = "schemez.markdown:setup_jinjarope_filters"
