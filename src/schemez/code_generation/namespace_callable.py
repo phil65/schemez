@@ -75,7 +75,7 @@ class NamespaceCallable:
         """Get function signature for debugging."""
         try:
             sig = inspect.signature(self.callable)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return f"{self.name}(...)"
         else:
             return f"{self.name}{sig}"

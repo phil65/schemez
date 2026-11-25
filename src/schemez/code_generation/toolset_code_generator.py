@@ -319,7 +319,7 @@ async def close_all_mcp_connections():
                     if model_code := model_to_python_code(params, class_name=input_class_name):
                         cleaned_model = clean_generated_code(model_code)
                         models_parts.append(cleaned_model)
-            except (ValueError, TypeError, AttributeError):
+            except ValueError, TypeError, AttributeError:
                 input_class_name = None
 
             # Generate client method with model

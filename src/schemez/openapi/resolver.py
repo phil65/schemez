@@ -149,7 +149,7 @@ def _navigate_pointer(doc: dict[str, Any], pointer: str) -> Any:
         elif isinstance(current, list):
             try:
                 current = current[int(cleaned)]
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 return {}
         else:
             return {}
