@@ -375,7 +375,7 @@ class InlineSchemaDef(BaseSchemaDef):
                     key = value if isinstance(value, str) and value.isidentifier() else f"VALUE_{i}"
                     enum_members[key] = value
 
-                enum_class = Enum(enum_name, enum_members)  # ty: ignore[mismatched-type-name]
+                enum_class = Enum(enum_name, enum_members)
                 python_type: Any = enum_class
 
                 if field.default is not None:  # Handle enum default value specially
