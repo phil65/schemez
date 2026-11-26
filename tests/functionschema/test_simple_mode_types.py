@@ -155,3 +155,14 @@ def test_unresolvable_annotation_keeps_the_others() -> None:
     assert props["name"] == {"type": "string"}
     assert props["other"] == {}
     assert props["count"] == {"type": "integer", "default": 1}
+
+
+def test_model_dump_openai_preserves_defs() -> None:
+    def f(tree: Tree) -> None:
+        pass
+
+    dumped = create_schema(f).model_dump_openai()
+    params = dumped["function"]["parameters"]
+    assert params["properties"]["tree"] == {"$ref": "#/$defs/Tree"}
+    assert "$defs" in params
+    assert "Tree" in params["$defs"]
