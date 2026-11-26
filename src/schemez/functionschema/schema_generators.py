@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable  # noqa: TC003
 import dataclasses
 import importlib

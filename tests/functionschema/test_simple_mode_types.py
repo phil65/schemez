@@ -1,7 +1,5 @@
 """Simple-mode schemas for postponed annotations, unions, literals and recursion."""
 
-from __future__ import annotations
-
 import dataclasses
 import enum
 from typing import Any, Literal, NotRequired, TypedDict

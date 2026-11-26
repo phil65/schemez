@@ -1,7 +1,5 @@
 """Configuration models for Schemez."""
 
-from __future__ import annotations
-
 from enum import Enum
 import functools
 import operator

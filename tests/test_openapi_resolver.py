@@ -1,7 +1,5 @@
 """OpenAPI $ref resolution: local files, nested and external-internal refs."""
 
-from __future__ import annotations
-
 import json
 from typing import TYPE_CHECKING
 

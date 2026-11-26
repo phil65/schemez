@@ -1,7 +1,5 @@
 """Credits to pydantic-ai."""
 
-from __future__ import annotations as _annotations
-
 from collections.abc import Callable
 from contextlib import contextmanager
 import logging

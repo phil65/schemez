@@ -1,7 +1,5 @@
 """Tests for OpenAI function schema creation."""
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator, Generator  # noqa: TC003
 import dataclasses
 from datetime import date, datetime, time, timedelta, timezone  # noqa: TC003

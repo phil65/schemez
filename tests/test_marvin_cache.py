@@ -1,7 +1,5 @@
 """marvin_impl.create_dataclass class cache: per-thread placeholders, keyed with $defs."""
 
-from __future__ import annotations
-
 import threading
 from typing import Any, ForwardRef
 

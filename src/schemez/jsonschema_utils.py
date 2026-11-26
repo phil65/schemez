@@ -10,8 +10,6 @@ Example:
     >>> part, resolver = normalize_schema(schema["properties"]["child"], resolver)
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 

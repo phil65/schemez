@@ -3,8 +3,6 @@
 Based on code from pydantic-ais TestModel, credits to them.
 """
 
-from __future__ import annotations
-
 from datetime import date, timedelta
 import re
 import string

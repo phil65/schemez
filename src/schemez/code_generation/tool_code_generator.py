@@ -1,7 +1,5 @@
 """Meta-resource provider that exposes tools through Python execution."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 

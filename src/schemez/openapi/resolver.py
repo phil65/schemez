@@ -1,7 +1,5 @@
 """OpenAPI reference resolver with HTTP-aware resolution."""
 
-from __future__ import annotations
-
 from typing import Any, Self
 from urllib.parse import urljoin
 

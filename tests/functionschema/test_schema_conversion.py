@@ -1,7 +1,5 @@
 """Tests for schema conversion between OpenAI and Python formats."""
 
-from __future__ import annotations
-
 import inspect
 from typing import TYPE_CHECKING, Any, Literal
 

@@ -1,7 +1,5 @@
 """Tests for ModelStore."""
 
-from __future__ import annotations
-
 from datetime import date, datetime
 
 from pydantic import BaseModel

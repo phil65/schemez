@@ -1,7 +1,5 @@
 """Tests for function schema creation."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemez.functionschema import create_schema

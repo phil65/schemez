@@ -83,7 +83,9 @@ coverage on Python 3.13/3.14 x Linux/macOS/Windows (3.14 is `continue-on-error`)
 
 ## Conventions
 
-- Python >= 3.13, `from __future__ import annotations` everywhere, PEP 695 generics.
+- Python >= 3.14, PEP 695 generics. No `from __future__ import annotations` (PEP 649 lazy annotations;
+  banned via ruff TID251). Annotations naming `TYPE_CHECKING`-only imports raise `NameError` when
+  evaluated: read user callables through `schemez.introspection`, never plain `inspect.signature`.
 - Ruff with a large rule set (see `[tool.ruff.lint]`), line length 100, preview formatting; Markdown code
   blocks (README) are formatted too.
 - ty must pass with zero warnings. Use targeted `# ty: ignore[rule]` only where dynamic model/type

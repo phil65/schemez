@@ -1,7 +1,5 @@
 """Test enum support in SchemaField."""
 
-from __future__ import annotations
-
 from enum import Enum
 
 from pydantic import ValidationError

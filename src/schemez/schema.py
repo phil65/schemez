@@ -1,7 +1,5 @@
 """Configuration models for Schemez."""
 
-from __future__ import annotations
-
 import annotationlib
 from typing import TYPE_CHECKING, Any, Literal, Self
 

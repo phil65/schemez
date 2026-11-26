@@ -1,7 +1,5 @@
 """Helpers for BaseModels."""
 
-from __future__ import annotations
-
 import collections.abc
 import importlib
 import types

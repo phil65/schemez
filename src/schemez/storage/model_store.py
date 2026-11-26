@@ -1,7 +1,5 @@
 """Async SQLite storage for Pydantic models."""
 
-from __future__ import annotations
-
 from datetime import date, datetime
 import json
 from pathlib import Path

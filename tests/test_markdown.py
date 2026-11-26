@@ -1,7 +1,5 @@
 """Tests for markdown conversion functionality."""
 
-from __future__ import annotations
-
 from pydantic import Field
 
 from schemez import Schema

@@ -1,7 +1,5 @@
 """json_schema_to_base_model on common JSON schema shapes."""
 
-from __future__ import annotations
-
 from typing import Any, Literal
 
 from pydantic import ValidationError

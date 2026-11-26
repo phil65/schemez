@@ -1,7 +1,5 @@
 """Tests for create_constructor_schema function."""
 
-from __future__ import annotations
-
 import dataclasses
 from typing import Literal
 

@@ -1,7 +1,5 @@
 """NamespaceCallable passes results and errors through unchanged."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemez.code_generation.namespace_callable import NamespaceCallable

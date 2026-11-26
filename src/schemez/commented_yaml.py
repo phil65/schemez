@@ -1,7 +1,5 @@
 """Utility functions for schema -> YAML conversion."""
 
-from __future__ import annotations
-
 import re
 from typing import TYPE_CHECKING, Any, Literal
 

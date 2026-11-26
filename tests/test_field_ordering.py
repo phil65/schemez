@@ -1,7 +1,5 @@
 """Test field ordering in Schema subclasses."""
 
-from __future__ import annotations
-
 import json
 
 from pydantic import Field

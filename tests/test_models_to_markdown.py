@@ -1,7 +1,5 @@
 """Test models_to_markdown_docs helper function."""
 
-from __future__ import annotations
-
 from typing import Literal
 
 from pydantic import BaseModel, Field

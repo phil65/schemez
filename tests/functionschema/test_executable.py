@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator, Generator  # noqa: TC003
 
 from schemez.functionschema.executable import create_executable

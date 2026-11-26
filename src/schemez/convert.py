@@ -1,7 +1,5 @@
 """BaseModel tools."""
 
-from __future__ import annotations
-
 import dataclasses
 from types import UnionType
 from typing import (

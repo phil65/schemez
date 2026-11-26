@@ -1,7 +1,5 @@
 """HTTP tool executor for managing tool generation and execution."""
 
-from __future__ import annotations
-
 import asyncio
 from pathlib import Path
 import time

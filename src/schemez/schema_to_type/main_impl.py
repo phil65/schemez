@@ -1,7 +1,5 @@
 """Helpers for BaseModels."""
 
-from __future__ import annotations
-
 from typing import Any, overload
 
 from pydantic import BaseModel

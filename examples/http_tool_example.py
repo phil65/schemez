@@ -7,8 +7,6 @@ This example shows how to:
 4. Start a server to handle tool calls
 """
 
-from __future__ import annotations
-
 import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Any

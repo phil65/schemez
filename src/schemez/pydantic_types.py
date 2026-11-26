@@ -1,7 +1,5 @@
 """Custom field types with 'field_type' metadata for UI rendering hints."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field
