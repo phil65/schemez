@@ -29,6 +29,9 @@ class OpenAPIResolver:
         self._cache: dict[str, dict[str, Any]] = {}
         self._client: httpx2.Client | None = None
         self._resolving: set[str] = set()  # Track refs being resolved to detect cycles
+        # Resolved targets that didn't run into a cycle (shared, not copied)
+        self._resolved: dict[str, Any] = {}
+        self._cycles = 0
 
     @property
     def client(self) -> httpx2.Client:
@@ -50,6 +53,10 @@ class OpenAPIResolver:
     def resolve(self, spec: dict[str, Any]) -> dict[str, Any]:
         """Fully resolve all $ref in the spec.
 
+        Internal refs (`#/...`) resolve against the document they appear in (the spec,
+        or an external document), recursively; a cyclic ref, or one whose target can't
+        be found or fetched, stays a `$ref`.
+
         Args:
             spec: The OpenAPI spec dictionary.
 
@@ -57,13 +64,19 @@ class OpenAPIResolver:
             A new dictionary with all refs resolved.
         """
         self._resolving.clear()
+        self._resolved.clear()
+        self._cache[self.base_url] = spec
         return self._resolve_value(spec, self.base_url)
 
     def _resolve_value(self, value: Any, current_url: str) -> Any:
         """Recursively resolve refs in a value."""
         match value:
-            case dict() if "$ref" in value:
-                return self._resolve_ref(value["$ref"], current_url)
+            case dict() if isinstance(value.get("$ref"), str):
+                resolved = self._resolve_ref(value["$ref"], current_url)
+                siblings = {k: v for k, v in value.items() if k != "$ref"}
+                if siblings and isinstance(resolved, dict) and "$ref" not in resolved:
+                    resolved = {**resolved, **self._resolve_value(siblings, current_url)}
+                return resolved
             case dict():
                 return {k: self._resolve_value(v, current_url) for k, v in value.items()}
             case list():
@@ -71,7 +84,7 @@ class OpenAPIResolver:
             case _:
                 return value
 
-    def _resolve_ref(self, ref: str, current_url: str) -> dict[str, Any]:
+    def _resolve_ref(self, ref: str, current_url: str) -> Any:
         """Resolve a single $ref.
 
         Args:
@@ -83,45 +96,58 @@ class OpenAPIResolver:
         """
         # Split ref into URL part and JSON pointer
         url_part, pointer = ref.split("#", 1) if "#" in ref else (ref, "")
-        # Handle internal refs (same document)
-        if not url_part:
-            # Internal ref like #/components/schemas/Foo
-            # Keep as-is, will be resolved in second pass
-            return {"$ref": ref}
-        # Build absolute URL with pointer for cycle detection
-        abs_url = urljoin(current_url, url_part)
-        full_ref = f"{abs_url}#{pointer}" if pointer else abs_url
+        # Same document for internal refs like #/components/schemas/Foo
+        abs_url = urljoin(current_url, url_part) if url_part else current_url
+        full_ref = f"{abs_url}#{pointer}"
+        if full_ref in self._resolved:
+            return self._resolved[full_ref]
         if full_ref in self._resolving:  # Detect circular references
             logger.debug("Circular reference detected: %s", full_ref)
+            self._cycles += 1
             return {"$ref": ref}  # Keep original ref to break cycle
 
+        doc = self._fetch_document(abs_url)
+        if doc is None:
+            return {"$ref": ref}
+        result = _navigate_pointer(doc, pointer) if pointer else doc
+        if result is _MISSING:
+            logger.warning("Unresolvable reference %r in %s", ref, current_url)
+            return {"$ref": ref}
         self._resolving.add(full_ref)
+        cycles = self._cycles
         try:
-            doc = self._fetch_document(abs_url)  # Fetch and cache the external document
-            result = _navigate_pointer(doc, pointer) if pointer else doc  # nav to the pointer
-            # Recursively resolve any refs in the fetched content
-            return self._resolve_value(result, abs_url)
+            # Recursively resolve any refs in the target, relative to its document
+            resolved = self._resolve_value(result, abs_url)
         finally:
             self._resolving.discard(full_ref)
+        if self._cycles == cycles:
+            self._resolved[full_ref] = resolved
+        return resolved
 
-    def _fetch_document(self, url: str) -> dict[str, Any]:
-        """Fetch and cache an external document."""
+    def _fetch_document(self, url: str) -> dict[str, Any] | None:
+        """Fetch and cache an external document (HTTP or any UPath); None on failure."""
         if url in self._cache:
             return self._cache[url]
 
         logger.debug("Fetching external ref: %s", url)
         try:
-            response = self.client.get(url)
-            response.raise_for_status()
-            content = response.text
+            if url.startswith(("http://", "https://")):
+                response = self.client.get(url)
+                response.raise_for_status()
+                content = response.text
+            else:
+                from upath import UPath
+
+                content = UPath(url).read_text(encoding="utf-8")
             doc = yamling.load_yaml(content, verify_type=dict)
-            self._cache[url] = doc
         except Exception as e:  # noqa: BLE001
             logger.warning("Failed to fetch %s: %s", url, e)
-            # Return empty dict to avoid breaking the whole spec
-            return {}
-        else:
-            return doc
+            return None
+        self._cache[url] = doc
+        return doc
+
+
+_MISSING: Any = object()
 
 
 def _navigate_pointer(doc: dict[str, Any], pointer: str) -> Any:
@@ -132,7 +158,7 @@ def _navigate_pointer(doc: dict[str, Any], pointer: str) -> Any:
         pointer: JSON pointer like '/codes' or '/components/schemas/Foo'.
 
     Returns:
-        The value at the pointer location.
+        The value at the pointer location, or `_MISSING`.
     """
     if not pointer or pointer == "/":
         return doc
@@ -145,14 +171,16 @@ def _navigate_pointer(doc: dict[str, Any], pointer: str) -> Any:
         # Handle JSON pointer escaping
         cleaned = part.replace("~1", "/").replace("~0", "~")
         if isinstance(current, dict):
-            current = current.get(cleaned, {})
+            if cleaned not in current:
+                return _MISSING
+            current = current[cleaned]
         elif isinstance(current, list):
             try:
                 current = current[int(cleaned)]
             except ValueError, IndexError:
-                return {}
+                return _MISSING
         else:
-            return {}
+            return _MISSING
 
     return current
 
@@ -170,50 +198,7 @@ def resolve_openapi_refs(
         timeout: HTTP timeout for fetching external refs.
 
     Returns:
-        Spec with all external refs resolved.
+        Spec with all resolvable refs inlined (cyclic ones stay `$ref`).
     """
     with OpenAPIResolver(base_url, timeout) as resolver:
-        resolved = resolver.resolve(spec)
-
-    # Second pass: resolve internal refs now that externals are inlined
-    return _resolve_internal_refs(resolved)
-
-
-def _resolve_internal_refs(spec: dict[str, Any]) -> dict[str, Any]:
-    """Resolve internal #/components/... refs."""
-
-    def resolve_value(value: Any) -> Any:
-        match value:
-            case dict() if "$ref" in value:
-                ref = value["$ref"]
-                if isinstance(ref, str) and ref.startswith("#/"):
-                    return _navigate_internal_ref(spec, ref)
-                return value
-            case dict():
-                return {k: resolve_value(v) for k, v in value.items()}
-            case list():
-                return [resolve_value(item) for item in value]
-            case _:
-                return value
-
-    return resolve_value(spec)
-
-
-def _navigate_internal_ref(spec: dict[str, Any], ref: str) -> Any:
-    """Navigate an internal ref like #/components/schemas/Foo."""
-    if not ref.startswith("#/"):
-        return {"$ref": ref}
-
-    parts = ref[2:].split("/")
-    current: Any = spec
-
-    for part in parts:
-        cleaned = part.replace("~1", "/").replace("~0", "~")
-        if isinstance(current, dict):
-            current = current.get(cleaned)
-            if current is None:
-                return {"$ref": ref}  # Keep unresolved
-        else:
-            return {"$ref": ref}
-
-    return current
+        return resolver.resolve(spec)
