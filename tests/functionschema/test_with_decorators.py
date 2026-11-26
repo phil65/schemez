@@ -130,7 +130,7 @@ def test_unwrapped_decorator() -> None:
     # When unwrapped, we lose both metadata AND type hints
     # The wrapper function has no type hints, so we get empty properties
     assert schema.parameters == {"type": "object", "properties": {}}
-    assert schema.returns == {"type": "object"}
+    assert schema.returns == {}
 
 
 def test_wrapped_decorator() -> None:

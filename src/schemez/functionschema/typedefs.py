@@ -38,12 +38,17 @@ class ObjectProperty(PropertyBase):
 Property = ArrayProperty | ObjectProperty | SimpleProperty
 
 
-class ToolParameters(TypedDict):
-    """Schema for tool parameters (JSON Schema object type)."""
-
-    type: Literal["object"]
-    properties: dict[str, Any]
-    required: NotRequired[list[str]]
+ToolParameters = TypedDict(
+    "ToolParameters",
+    {
+        "type": Literal["object"],
+        "properties": dict[str, Any],
+        "required": NotRequired[list[str]],
+        # Definitions of recursive types, referenced as `#/$defs/<name>`.
+        "$defs": NotRequired[dict[str, Any]],
+    },
+)
+"""Schema for tool parameters (JSON Schema object type)."""
 
 
 class OpenAIFunctionDefinition(TypedDict):

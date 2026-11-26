@@ -42,11 +42,35 @@ logger = log.get_logger(__name__)
 FunctionType = Literal["sync", "async", "sync_generator", "async_generator"]
 
 
+_EMPTY = inspect.Parameter.empty
+_JSON_SCALARS = (str, int, float, bool, enum.Enum)
+
+
+@dataclasses.dataclass
+class _Context:
+    """State of one schema walk: recursive types end up in `defs` behind a `$ref`."""
+
+    defs: dict[str, Any]
+    stack: list[Any] = dataclasses.field(default_factory=list)
+    recursive: set[Any] = dataclasses.field(default_factory=set)
+    names: dict[Any, str] = dataclasses.field(default_factory=dict)
+
+    def def_name(self, typ: Any) -> str:
+        if typ not in self.names:
+            base = getattr(typ, "__name__", "Model")
+            name, i = base, 2
+            while name in self.names.values():
+                name, i = f"{base}{i}", i + 1
+            self.names[typ] = name
+        return self.names[typ]
+
+
 def resolve_type_annotation(
     typ: Any,
     description: str | None = None,
     default: Any = inspect.Parameter.empty,
     is_parameter: bool = True,
+    defs: dict[str, Any] | None = None,
 ) -> Property:
     """Resolve a type annotation into an OpenAI schema type.
 
@@ -55,73 +79,152 @@ def resolve_type_annotation(
         description: Optional description
         default: Default value if any
         is_parameter: Whether this is for a parameter (affects dict schema)
+        defs: Collects the definitions of recursive types, referenced as
+            `#/$defs/<name>`; the caller puts them at the root of its schema.
+            Without it, they are added to the returned schema as `$defs`.
     """
-    from schemez.functionschema.typedefs import _create_simple_property
+    ctx = _Context(defs={} if defs is None else defs)
+    schema = _resolve(typ, ctx, is_parameter=is_parameter, optional=default is None)
+    if description and (hint := _description_hint(typ)):
+        description = f"{description} ({hint})"
+    schema = _with_meta(schema, description, default)
+    if defs is None and ctx.defs:
+        schema["$defs"] = ctx.defs
+    return typing.cast("Property", schema)
 
-    schema: dict[str, Any] = {}
 
-    # Handle anyOf/oneOf fields
-    if isinstance(typ, dict) and ("anyOf" in typ or "oneOf" in typ):
-        # For simplicity, we'll treat it as a string that can be null
-        # This is a common pattern for optional fields
-        schema["type"] = "string"
-        if default is not None:
-            schema["default"] = default
-        if description:
-            schema["description"] = description
-        return _create_simple_property("string", description=description, default=default)
+def _with_meta(schema: dict[str, Any], description: str | None, default: Any) -> dict[str, Any]:
+    if description is not None:
+        schema["description"] = description
+    if default is not _EMPTY and default is not None:
+        is_scalar = isinstance(default, _JSON_SCALARS)
+        is_container = isinstance(default, list | tuple | dict)
+        if (is_scalar and schema.get("type") not in {"array", "object"}) or (
+            is_container and schema.get("type") in {"array", "object"}
+        ):
+            schema["default"] = default.value if isinstance(default, enum.Enum) else default
+    return schema
 
-    # Handle Annotated types first
-    if get_origin(typ) is Annotated:
-        # Get the underlying type (first argument)
-        base_type = get_args(typ)[0]
-        return resolve_type_annotation(
-            base_type,
-            description=description,
-            default=default,
-            is_parameter=is_parameter,
-        )
 
-    origin = get_origin(typ)
-    args = get_args(typ)
+def _description_hint(typ: Any) -> str | None:
+    """Format hint appended to the description of string-encoded types."""
+    while True:
+        if get_origin(typ) is Annotated:
+            typ = get_args(typ)[0]
+            continue
+        if get_origin(typ) in {typing.Union, types.UnionType}:  # pyright: ignore
+            members = [t for t in get_args(typ) if t is not type(None)]
+            if len(members) == 1:
+                typ = members[0]
+                continue
+        break
+    if typ in {datetime, date, time}:
+        return "ISO 8601 format"
+    hints = {
+        timedelta: "ISO 8601 duration",
+        timezone: "IANA timezone name",
+        bytes: "base64 encoded",
+        bytearray: "base64 encoded",
+    }
+    return hints.get(typ)
 
-    # Handle Union types (including Optional)
-    if origin in {typing.Union, types.UnionType}:  # pyright: ignore
-        # For Optional (union with None), filter out None type
-        non_none_types = [t for t in args if t is not type(None)]
-        if non_none_types:
-            prop = resolve_type_annotation(
-                non_none_types[0],
-                description=description,
-                default=default,
+
+def _json_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    return "string"
+
+
+def _enum_schema(values: list[Any]) -> dict[str, Any]:
+    """`enum` schema whose `type` matches the values (`anyOf` per type if mixed)."""
+    by_type: dict[str, list[Any]] = {}
+    for value in values:
+        by_type.setdefault(_json_type(value), []).append(value)
+    if len(by_type) == 1:
+        [(type_str, vals)] = by_type.items()
+        return {"type": type_str, "enum": vals}
+    return {"anyOf": [{"type": t, "enum": vals} for t, vals in by_type.items()]}
+
+
+def get_resolved_hints(obj: Any, *, include_extras: bool = True) -> dict[str, Any]:
+    """Evaluated annotations of a function or class (also for postponed annotations).
+
+    Names that can't be resolved (e.g. imports under `TYPE_CHECKING`) don't spoil the
+    others: each annotation is evaluated on its own then, unresolvable ones stay strings.
+    """
+    try:
+        return typing.get_type_hints(obj, include_extras=include_extras)
+    except Exception:  # noqa: BLE001
+        import annotationlib
+
+        owners = reversed(obj.__mro__) if isinstance(obj, type) else [obj]
+        hints: dict[str, Any] = {}
+        for owner in owners:
+            try:
+                anns = annotationlib.get_annotations(owner, format=annotationlib.Format.FORWARDREF)
+            except Exception:  # noqa: BLE001
+                continue
+            for name, ann in anns.items():
+                hints[name] = _evaluate_annotation(ann, owner)
+        return hints
+
+
+def _evaluate_annotation(ann: Any, owner: Any) -> Any:
+    if isinstance(ann, str):
+        module = getattr(owner, "__module__", None)
+        ann = typing.ForwardRef(ann, module=module, owner=owner)
+    if isinstance(ann, typing.ForwardRef):
+        try:
+            return typing.evaluate_forward_ref(ann, owner=owner)
+        except Exception:  # noqa: BLE001
+            return ann.__forward_arg__
+    return ann
+
+
+def _resolve_class_fields(typ: Any, ctx: _Context, is_parameter: bool) -> dict[str, Any]:
+    """Object schema of a dataclass, TypedDict or pydantic model (recursion via `$ref`)."""
+    if typ in ctx.stack:
+        ctx.recursive.add(typ)
+        return {"$ref": f"#/$defs/{ctx.def_name(typ)}"}
+    ctx.stack.append(typ)
+    try:
+        schema = _object_schema(typ, ctx, is_parameter)
+    finally:
+        ctx.stack.pop()
+    if typ in ctx.recursive:
+        name = ctx.def_name(typ)
+        ctx.defs[name] = schema
+        return {"$ref": f"#/$defs/{name}"}
+    return schema
+
+
+def _object_schema(typ: Any, ctx: _Context, is_parameter: bool) -> dict[str, Any]:
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    if dataclasses.is_dataclass(typ):
+        hints = get_resolved_hints(typ)
+        for field in dataclasses.fields(typ):
+            has_default = field.default is not dataclasses.MISSING
+            field_default = field.default if has_default else _EMPTY
+            prop = _resolve(
+                hints.get(field.name, field.type),
+                ctx,
                 is_parameter=is_parameter,
+                optional=field_default is None,
             )
-            schema.update(prop)
-        else:
-            schema["type"] = "string"  # Fallback for Union[]
-
-    # Handle dataclasses
-    elif dataclasses.is_dataclass(typ):
-        fields = dataclasses.fields(typ)
-        properties = {}
-        required = []
-        for field in fields:
-            properties[field.name] = resolve_type_annotation(field.type, is_parameter=is_parameter)
-            # Field is required if it has no default value and no default_factory
-            if (
-                field.default is dataclasses.MISSING
-                and field.default_factory is dataclasses.MISSING
-            ):
+            properties[field.name] = _with_meta(prop, None, field_default)
+            if not has_default and field.default_factory is dataclasses.MISSING:
                 required.append(field.name)
-
-        schema = {"type": "object", "properties": properties}
-        if required:
-            schema["required"] = required
     elif typing.is_typeddict(typ):
-        properties = {}
-        required = []
-        for field_name, field_type in typ.__annotations__.items():
-            # Check if field is wrapped in Required/NotRequired
+        hints = get_resolved_hints(typ)
+        required_keys = getattr(typ, "__required_keys__", set(hints))
+        for field_name, field_type in hints.items():
             origin = get_origin(field_type)
             if origin is Required:
                 is_required = True
@@ -130,43 +233,107 @@ def resolve_type_annotation(
                 is_required = False
                 field_type = get_args(field_type)[0]
             else:
-                # Fall back to checking __required_keys__
-                is_required = field_name in getattr(typ, "__required_keys__", {field_name})
-
-            properties[field_name] = resolve_type_annotation(
-                field_type,
-                is_parameter=is_parameter,
-            )
+                is_required = field_name in required_keys
+            properties[field_name] = _resolve(field_type, ctx, is_parameter=is_parameter)
             if is_required:
                 required.append(field_name)
+    else:  # pydantic model
+        for field_name, field_info in typ.model_fields.items():
+            field_default = _EMPTY if field_info.is_required() else field_info.default
+            prop = _resolve(
+                field_info.annotation,
+                ctx,
+                is_parameter=is_parameter,
+                optional=field_default is None,
+            )
+            properties[field_name] = _with_meta(prop, field_info.description, field_default)
+            if field_info.is_required():
+                required.append(field_name)
+    schema: dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        schema["required"] = required
+    return schema
 
-        schema.update({"type": "object", "properties": properties})
-        if required:
-            schema["required"] = required
-    # Handle mappings - updated check
-    elif (
-        origin in {dict, typing.Dict}  # noqa: UP006
-        or (origin is not None and isinstance(origin, type) and issubclass(origin, dict))
+
+def _resolve(  # noqa: PLR0911
+    typ: Any,
+    ctx: _Context,
+    *,
+    is_parameter: bool,
+    optional: bool = False,
+) -> dict[str, Any]:
+    """JSON schema of a type, without description and default.
+
+    `optional`: the value defaults to None, so a `None` union member is dropped
+    (the field can be omitted) instead of becoming `{"type": "null"}`.
+    """
+    # Handle anyOf/oneOf fields
+    if isinstance(typ, dict) and ("anyOf" in typ or "oneOf" in typ):
+        # For simplicity, treat it as a string (common pattern for optional fields)
+        return {"type": "string"}
+
+    if typ is Any or typ is object:
+        return {}
+    if typ is None or typ is type(None):
+        return {"type": "null"}
+    if isinstance(typ, str | typing.ForwardRef):  # unresolvable annotation
+        return {}
+    if isinstance(typ, typing.TypeAliasType):
+        return _resolve(typ.__value__, ctx, is_parameter=is_parameter, optional=optional)
+    if isinstance(typ, typing.NewType):
+        return _resolve(typ.__supertype__, ctx, is_parameter=is_parameter, optional=optional)
+
+    origin = get_origin(typ)
+    args = get_args(typ)
+
+    if origin is Annotated:
+        return _resolve(args[0], ctx, is_parameter=is_parameter, optional=optional)
+
+    # Union types (including Optional)
+    if origin in {typing.Union, types.UnionType}:  # pyright: ignore
+        has_none = type(None) in args
+        members = [t for t in args if t is not type(None)]
+        if not members:
+            return {"type": "null"}
+        variants = [_resolve(t, ctx, is_parameter=is_parameter) for t in members]
+        if has_none and not optional:
+            variants.append({"type": "null"})
+        unique: list[dict[str, Any]] = []
+        for variant in variants:
+            if variant not in unique:
+                unique.append(variant)
+        if any(v == {} for v in unique):
+            return {}
+        return unique[0] if len(unique) == 1 else {"anyOf": unique}
+
+    if origin is Literal:
+        return _enum_schema([a.value if isinstance(a, enum.Enum) else a for a in args])
+
+    if dataclasses.is_dataclass(typ) or typing.is_typeddict(typ):
+        return _resolve_class_fields(typ, ctx, is_parameter)
+
+    # Mappings
+    if origin in {dict, typing.Dict} or (  # noqa: UP006
+        origin is not None and isinstance(origin, type) and issubclass(origin, dict)
     ):
-        schema["type"] = "object"
+        schema: dict[str, Any] = {"type": "object"}
         if is_parameter:  # Only add additionalProperties for parameters
-            # Dict[K, V] should have at least 2 type arguments for key and value
             min_dict_args = 2
-            if len(args) >= min_dict_args:  # Dict[K, V] - use value type for additionalProperties
-                value_type = args[1]
-                # Special case: Any should remain as True for backward compatibility
-                if value_type is Any:
-                    schema["additionalProperties"] = True
-                else:
-                    schema["additionalProperties"] = resolve_type_annotation(
-                        value_type,
-                        is_parameter=is_parameter,
-                    )
+            if len(args) >= min_dict_args and args[1] is not Any:
+                schema["additionalProperties"] = _resolve(args[1], ctx, is_parameter=True)
             else:
                 schema["additionalProperties"] = True
+        return schema
 
-    # Handle sequences
-    elif origin in {
+    # Fixed-length tuples
+    if origin is tuple and args and not (len(args) == 2 and args[1] is Ellipsis):  # noqa: PLR2004
+        if args == ((),):
+            return {"type": "array", "maxItems": 0}
+        items = [_resolve(t, ctx, is_parameter=is_parameter) for t in args]
+        return {"type": "array", "prefixItems": items, "minItems": len(args), "maxItems": len(args)}
+
+    # Sequences
+    if origin in {
         list,
         set,
         tuple,
@@ -178,132 +345,47 @@ def resolve_type_annotation(
         and origin.__module__ == "collections.abc"
         and origin.__name__ in {"Sequence", "MutableSequence", "Collection"}
     ):
-        schema["type"] = "array"
         item_type = args[0] if args else Any
-        schema["items"] = resolve_type_annotation(item_type, is_parameter=is_parameter)
+        return {"type": "array", "items": _resolve(item_type, ctx, is_parameter=is_parameter)}
 
-    # Handle literals
-    elif origin is typing.Literal:
-        schema["type"] = "string"
-        schema["enum"] = list(args)
-
-    # Handle basic types
-    elif isinstance(typ, type):
-        if issubclass(typ, enum.Enum):
-            schema["type"] = "string"
-            schema["enum"] = [e.value for e in typ]
-
-        # Basic types
-        elif typ in {str, Path, UUID, re.Pattern}:
-            schema["type"] = "string"
-        elif typ is int:
-            schema["type"] = "integer"
-        elif typ in {float, decimal.Decimal}:
-            schema["type"] = "number"
-        elif typ is bool:
-            schema["type"] = "boolean"
-
-        # String formats
-        elif typ is datetime:
-            schema["type"] = "string"
-            schema["format"] = "date-time"
-            if description:
-                description = f"{description} (ISO 8601 format)"
-        elif typ is date:
-            schema["type"] = "string"
-            schema["format"] = "date"
-            if description:
-                description = f"{description} (ISO 8601 format)"
-        elif typ is time:
-            schema["type"] = "string"
-            schema["format"] = "time"
-            if description:
-                description = f"{description} (ISO 8601 format)"
-        elif typ is timedelta:
-            schema["type"] = "string"
-            if description:
-                description = f"{description} (ISO 8601 duration)"
-        elif typ is timezone:
-            schema["type"] = "string"
-            if description:
-                description = f"{description} (IANA timezone name)"
-        elif typ is UUID:
-            schema["type"] = "string"
-        elif typ in (bytes, bytearray):
-            schema["type"] = "string"
-            if description:
-                description = f"{description} (base64 encoded)"
-        elif typ is ipaddress.IPv4Address or typ is ipaddress.IPv6Address:
-            schema["type"] = "string"
-        elif typ is complex:
-            schema.update({
-                "type": "object",
-                "properties": {
-                    "real": {"type": "number"},
-                    "imag": {"type": "number"},
-                },
-            })
-        # Check for Pydantic BaseModel
-        elif hasattr(typ, "model_fields"):
-            # It's a Pydantic v1 or v2 model
-            fields = typ.model_fields
-            properties = {}
-            required = []
-            for field_name, field_info in fields.items():
-                field_type = field_info.annotation
-                properties[field_name] = resolve_type_annotation(
-                    field_type,
-                    is_parameter=is_parameter,
-                )
-                if field_info.is_required():
-                    required.append(field_name)
-
-            schema = {"type": "object", "properties": properties}
-            if required:
-                schema["required"] = required
-        # Default to object for unknown types
-        else:
-            schema["type"] = "object"
-    else:
+    if not isinstance(typ, type):
         # Default for unmatched types
-        schema["type"] = "string"
+        return {"type": "string"}
 
-    # Add description if provided
-    if description is not None:
-        schema["description"] = description
-
-    # Add default if provided and not empty
-    if default is not inspect.Parameter.empty:
-        schema["default"] = default
-
-    from schemez.functionschema.typedefs import (
-        _create_array_property,
-        _create_object_property,
-        _create_simple_property,
-    )
-
-    if schema["type"] == "array":
-        return _create_array_property(
-            items=schema["items"],
-            description=schema.get("description"),
-        )
-    if schema["type"] == "object":
-        prop = _create_object_property(description=schema.get("description"))
-        if "properties" in schema:
-            prop["properties"] = schema["properties"]
-        if "additionalProperties" in schema:
-            prop["additionalProperties"] = schema["additionalProperties"]  # pyright: ignore[reportGeneralTypeIssues]  # ty: ignore[invalid-assignment]
-        if "required" in schema:
-            prop["required"] = schema["required"]
-        return prop
-
-    return _create_simple_property(
-        type_str=schema["type"],
-        description=schema.get("description"),
-        enum_values=schema.get("enum"),
-        default=default if default is not inspect.Parameter.empty else None,
-        fmt=schema.get("format"),
-    )
+    if issubclass(typ, enum.Enum):
+        return _enum_schema([e.value for e in typ])
+    if typ in {list, set, frozenset, tuple}:
+        return {"type": "array", "items": {}}
+    if typ is dict:
+        schema = {"type": "object"}
+        if is_parameter:
+            schema["additionalProperties"] = True
+        return schema
+    if typ in {str, Path, UUID, re.Pattern, timedelta, timezone, bytes, bytearray}:
+        return {"type": "string"}
+    if typ in {ipaddress.IPv4Address, ipaddress.IPv6Address}:
+        return {"type": "string"}
+    if typ is bool:
+        return {"type": "boolean"}
+    if typ is int:
+        return {"type": "integer"}
+    if typ in {float, decimal.Decimal}:
+        return {"type": "number"}
+    if typ is datetime:
+        return {"type": "string", "format": "date-time"}
+    if typ is date:
+        return {"type": "string", "format": "date"}
+    if typ is time:
+        return {"type": "string", "format": "time"}
+    if typ is complex:
+        return {
+            "type": "object",
+            "properties": {"real": {"type": "number"}, "imag": {"type": "number"}},
+        }
+    if hasattr(typ, "model_fields"):  # pydantic model
+        return _resolve_class_fields(typ, ctx, is_parameter)
+    # Default to object for unknown types
+    return {"type": "object"}
 
 
 def determine_function_type(func: Callable[..., Any]) -> FunctionType:

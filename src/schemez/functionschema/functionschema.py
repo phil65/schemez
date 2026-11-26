@@ -6,7 +6,9 @@ from collections.abc import (
     Callable,  # noqa: TC003
     Sequence,  # noqa: F401
 )
+import functools
 import inspect
+import operator
 import typing
 from typing import Any, Literal, cast, get_args
 
@@ -17,6 +19,7 @@ from pydantic.json_schema import GenerateJsonSchema
 from schemez import log
 from schemez.functionschema.helpers import (
     determine_function_type,
+    get_resolved_hints,
     pydantic_model_to_signature,
     resolve_type_annotation,
     types_match,
@@ -49,6 +52,18 @@ TYPE_MAP = {
 
 
 SchemaType = Literal["jsonschema", "openai", "simple"]
+
+
+def _schema_to_python_type(details: dict[str, Any]) -> Any:
+    """Python type of a property schema (`enum`, `anyOf`, `type`; `Any` otherwise)."""
+    if "enum" in details:
+        return Literal[tuple(details["enum"])]
+    if "anyOf" in details:
+        members = [_schema_to_python_type(sub) for sub in details["anyOf"]]
+        return functools.reduce(operator.or_, members) if members else Any
+    if details.get("type") == "null":
+        return type(None)
+    return TYPE_MAP.get(details.get("type", ""), Any)
 
 
 class FunctionSchema(pydantic.BaseModel):
@@ -91,12 +106,7 @@ class FunctionSchema(pydantic.BaseModel):
             if name.startswith("_"):  # TODO: kwarg for renaming instead perhaps?
                 logger.debug("Skipping parameter %s due to leading underscore", name)
                 continue
-            # Get base type
-            if "enum" in details:
-                values = tuple(details["enum"])
-                param_type: Any = Literal[values]
-            else:
-                param_type = TYPE_MAP.get(details.get("type", "string"), Any)
+            param_type = _schema_to_python_type(details)
 
             # Handle optional types (if there's a default of None)
             default_value = details.get("default")
@@ -492,16 +502,12 @@ def _create_schema_simple(
     sig = inspect.signature(func)
     docstring = docstring_parser.parse(func.__doc__ or "")
 
-    # Get clean type hints without extras
-    try:
-        hints = typing.get_type_hints(func, localns=locals())
-    except NameError:
-        msg = "Unable to resolve type hints for function %s, skipping"
-        logger.warning(msg, get_object_name(func, "unknown"))
-        hints = {}
+    # Clean type hints without extras; unresolvable ones stay strings (schema `{}`)
+    hints = get_resolved_hints(func, include_extras=False)
 
     parameters: ToolParameters = {"type": "object", "properties": {}}
     required: list[str] = []
+    defs: dict[str, Any] = {}
     params = list(sig.parameters.items())
     skip_first = (
         inspect.isfunction(func)
@@ -535,6 +541,7 @@ def _create_schema_simple(
             description=param_doc,
             default=param.default,
             is_parameter=True,
+            defs=defs,
         )
 
         if param.default is inspect.Parameter.empty:
@@ -542,6 +549,8 @@ def _create_schema_simple(
 
     if required:  # Add required fields to parameters if any exist
         parameters["required"] = required
+    if defs:  # recursive types, referenced as #/$defs/<name>
+        parameters["$defs"] = defs
     # Handle return type with is_parameter=False
     function_type = determine_function_type(func)
     return_hint = hints.get("return", Any)

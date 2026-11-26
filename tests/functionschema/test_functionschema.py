@@ -121,9 +121,13 @@ def test_optional_union_types() -> None:
     schema = create_schema(func)
     props = schema.parameters["properties"]
 
-    assert props["o"] == {"type": "integer", "description": "An optional"}
+    # Required and nullable: null is part of the schema.
+    assert props["o"] == {
+        "anyOf": [{"type": "integer"}, {"type": "null"}],
+        "description": "An optional",
+    }
     assert props["u"] == {
-        "type": "string",  # first type in union
+        "anyOf": [{"type": "string"}, {"type": "integer"}],
         "description": "A union",
     }
     assert props["lit"] == {
@@ -132,7 +136,7 @@ def test_optional_union_types() -> None:
         "description": "A literal",
     }
     assert props["ou"] == {
-        "type": "string",  # first type in union after removing None
+        "anyOf": [{"type": "string"}, {"type": "integer"}, {"type": "null"}],
         "description": "An optional union",
     }
 
@@ -163,7 +167,7 @@ def test_custom_types() -> None:
         "type": "object",
         "properties": {
             "name": {"type": "string"},
-            "age": {"type": "string"},
+            "age": {"type": "integer"},
         },
         "required": ["name", "age"],
         "description": "A dataclass",
@@ -235,23 +239,23 @@ def test_typing_variants() -> None:
         "description": "Traditional typing.Dict",
     }
 
-    # Optional variants should handle None
+    # Required optionals accept null
     assert props["optional_new"] == {
-        "type": "integer",
+        "anyOf": [{"type": "integer"}, {"type": "null"}],
         "description": "Python 3.10+ Optional",
     }
     assert props["optional_old"] == {
-        "type": "integer",
+        "anyOf": [{"type": "integer"}, {"type": "null"}],
         "description": "Traditional Optional",
     }
 
-    # Union variants should take first type
+    # Unions become anyOf
     assert props["union_new"] == {
-        "type": "integer",
+        "anyOf": [{"type": "integer"}, {"type": "string"}],
         "description": "Python 3.10+ Union",
     }
     assert props["union_old"] == {
-        "type": "integer",
+        "anyOf": [{"type": "integer"}, {"type": "string"}],
         "description": "Traditional Union",
     }
 
@@ -457,7 +461,7 @@ def test_empty_and_edge_cases() -> None:
 
     # Test Any type
     any_schema = create_schema(any_param)
-    assert "type" in any_schema.parameters["properties"]["x"]
+    assert any_schema.parameters["properties"]["x"] == {}
 
     # Test variadic args (should be ignored)
     var_schema = create_schema(variadic)
@@ -534,18 +538,21 @@ def test_union_type_variations() -> None:
     schema = create_schema(func)
     props = schema.parameters["properties"]
 
-    # Check basic union (should use first type)
-    assert props["basic_union"]["type"] == "integer"
-
-    # Check multi-type union (should use first type)
-    assert props["multi_union"]["type"] == "integer"
-
-    # Check optional union
-    assert props["optional_union"]["type"] == "integer"
+    assert props["basic_union"]["anyOf"] == [{"type": "integer"}, {"type": "string"}]
+    assert props["multi_union"]["anyOf"] == [
+        {"type": "integer"},
+        {"type": "string"},
+        {"type": "number"},
+    ]
+    assert props["optional_union"]["anyOf"] == [
+        {"type": "integer"},
+        {"type": "string"},
+        {"type": "null"},
+    ]
 
     # Check nested union in container
     assert props["nested_union"]["type"] == "array"
-    assert props["nested_union"]["items"]["type"] == "integer"
+    assert props["nested_union"]["items"] == {"anyOf": [{"type": "integer"}, {"type": "string"}]}
 
 
 def test_recursive_types() -> None:
