@@ -284,3 +284,23 @@ async def test_yaml_without_comments_comparison():
     print(regular_yaml)
     print("\n=== Same config with comments ===")
     print(commented_yaml)
+
+
+def test_validate_uses_the_validated_instance():
+    """With validate=True the dump comes from the validated model (validators applied)."""
+    from pydantic import field_validator
+
+    from schemez.commented_yaml import create_yaml_description
+
+    class Shouting(Schema):
+        word: str
+
+        @field_validator("word")
+        @classmethod
+        def _upper(cls, value: str) -> str:
+            return value.upper()
+
+    validated = create_yaml_description(Shouting, validate=True)
+    constructed = create_yaml_description(Shouting)
+    assert validated == constructed.upper().replace("WORD:", "word:")
+    assert validated != constructed
