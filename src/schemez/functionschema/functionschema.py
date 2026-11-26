@@ -466,6 +466,7 @@ def _create_schema_pydantic(
             if fallback_required_fields:
                 fallback_parameters["required"] = fallback_required_fields
             parameters = fallback_parameters
+            required_fields = fallback_required_fields
         except Exception:  # noqa: BLE001
             # If JSON schema generation fails, fall back to original implementation
             return _create_schema_simple(func, name_override, description_override, exclude_types)
