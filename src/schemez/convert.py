@@ -77,8 +77,8 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
             description=param_docs.get(param_name),  # TODO: Add docstring parsing
         )
         fields[param_name] = (type_hint, field)
-    name = get_object_name(func, "unknown")
-    model_name = name or f"{name}Params"
+    func_name = get_object_name(func, "unknown")
+    model_name = name or f"{func_name}Params"
     return create_model(model_name, **fields, __base__=Schema, __doc__=description)
 
 

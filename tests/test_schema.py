@@ -32,3 +32,19 @@ async def test_schema_to_python_code_method():
     assert "class GeneratedSchema" in code
     assert "title: str" in code
     assert "count: int" in code
+
+
+def test_get_function_model_respects_name_and_ctor_name():
+    """Custom model name is respected by for_function and used by for_class_ctor."""
+
+    def greet(who: str) -> str:
+        return f"hi {who}"
+
+    class Person:
+        def __init__(self, full_name: str, age: int = 0) -> None:
+            self.full_name = full_name
+            self.age = age
+
+    assert Schema.for_function(greet).__name__ == "greetParams"
+    assert Schema.for_function(greet, name="GreetInput").__name__ == "GreetInput"
+    assert Schema.for_class_ctor(Person).__name__ == "Person"
