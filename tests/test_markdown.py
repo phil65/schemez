@@ -205,11 +205,11 @@ def test_no_excessive_blank_lines():
 
 def test_default_template_is_valid():
     """Test that default template can be parsed."""
-    from jinja2 import Environment
+    from minijinja import Environment
 
-    env = Environment(autoescape=False)
+    env = Environment(auto_escape_callback=lambda _name: None, pycompat=True)
     # Should not raise
-    env.from_string(DEFAULT_TEMPLATE)
+    env.add_template("default", DEFAULT_TEMPLATE)
 
 
 def test_model_to_markdown_python_code_mode():

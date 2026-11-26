@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, get_args, get_
 
 
 if TYPE_CHECKING:
-    import jinja2
     from pydantic import BaseModel
 
 OutputMode = Literal["table", "python_code", "yaml"]
@@ -462,7 +461,7 @@ def model_to_markdown(
     Returns:
         Markdown string documenting the model
     """
-    import jinja2
+    import minijinja
 
     if isinstance(model, str):
         model = _resolve_model_from_import_path(model)
@@ -582,9 +581,8 @@ def model_to_markdown(
         include_constraints=include_constraints,
     )
 
-    env = jinja2.Environment(autoescape=False)
-    tmpl = env.from_string(template or DEFAULT_TEMPLATE)
-    result = tmpl.render(**context).strip() + "\n"
+    env = minijinja.Environment(auto_escape_callback=lambda _name: None, pycompat=True)
+    result = env.render_str(template or DEFAULT_TEMPLATE, **context).strip() + "\n"
     return _clean_markdown(result)
 
 
@@ -851,7 +849,7 @@ def model_union_to_markdown(
     return _clean_markdown(result)
 
 
-def setup_jinjarope_filters(env: jinja2.Environment) -> None:
+def setup_jinjarope_filters(env: Any) -> None:
     """Set up schemez markdown filters for jinjarope.
 
     This function is used as an entry point for the jinjarope.environment
