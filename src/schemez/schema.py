@@ -58,7 +58,8 @@ class Schema(BaseModel):
         place after the fields, and aliases rank like the field they belong to.
         """
         data = serializer(self)
-        if not isinstance(data, dict):
+        # A nested field holding a plain dict (model_construct) is passed in as `self`
+        if not isinstance(data, dict) or not isinstance(self, BaseModel):
             return data
         rank = _key_rank(type(self))
         end = len(rank)
