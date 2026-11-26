@@ -5,13 +5,16 @@ Credits to Marvin / prefect for original code.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import MISSING, field, make_dataclass
 from datetime import datetime
 from enum import Enum
 import hashlib
+import itertools
 import json
 import re
+import threading
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -49,7 +52,13 @@ FORMAT_TYPES: dict[str, Any] = {
     "json": Json,
 }
 
-_classes: dict[tuple[str, Any], type | None] = {}
+_MAX_CACHED_CLASSES = 512
+# Finished classes by (schema hash, $defs hash, name), least recently used first.
+_classes: OrderedDict[tuple[str, str, str], type] = OrderedDict()
+_classes_lock = threading.Lock()
+# Classes being built by this thread (recursive refs see a ForwardRef to them).
+_building = threading.local()
+_enum_counter = itertools.count()
 
 
 def jsonschema_to_type(schema: Mapping[str, Any], name: str | None = None) -> type:
@@ -252,7 +261,7 @@ def schema_to_type(schema: Mapping[str, Any], schemas: Mapping[str, Any]) -> typ
         return Literal[schema["const"]]
 
     if "enum" in schema:
-        return create_enum(f"Enum_{len(_classes)}", schema["enum"])  # ty: ignore[invalid-explicit-return]
+        return create_enum(f"Enum_{next(_enum_counter)}", schema["enum"])  # ty: ignore[invalid-explicit-return]
 
     schema_type = schema.get("type")
     if not schema_type:
@@ -323,20 +332,35 @@ def create_dataclass(
     name = name or schema.get("title")
     # Sanitize name for class creation
     sanitized_name = sanitize_name(name or "Root")
-    schema_hash = hash_schema(schema)
-    cache_key = (schema_hash, sanitized_name)
-    original_schema = dict(schema)  # Store copy for validator
+    cache_key = (hash_schema(schema), hash_schema(schemas or {}), sanitized_name)
 
     # Return existing class if already built
-    if cache_key in _classes:
-        existing = _classes[cache_key]
-        if existing is None:
-            return ForwardRef(sanitized_name)  # ty: ignore[invalid-explicit-return]
-        return existing
+    with _classes_lock:
+        if (existing := _classes.get(cache_key)) is not None:
+            _classes.move_to_end(cache_key)
+            return existing
+    in_progress: set[tuple[str, str, str]] = _building.__dict__.setdefault("keys", set())
+    if cache_key in in_progress:  # recursive reference while building it
+        return ForwardRef(sanitized_name)  # ty: ignore[invalid-explicit-return]
+    in_progress.add(cache_key)
+    try:
+        cls = _build_dataclass(schema, sanitized_name, schemas)
+    finally:
+        in_progress.discard(cache_key)
 
-    # Place placeholder for recursive references
-    _classes[cache_key] = None
+    with _classes_lock:
+        _classes[cache_key] = cls
+        while len(_classes) > _MAX_CACHED_CLASSES:
+            _classes.popitem(last=False)
+    return cls
 
+
+def _build_dataclass(
+    schema: Mapping[str, Any],
+    sanitized_name: str,
+    schemas: Mapping[str, Any] | None,
+) -> type:
+    original_schema = dict(schema)  # Store copy for validator
     if "$ref" in schema:
         ref = schema["$ref"]
         if ref == "#":
@@ -393,9 +417,6 @@ def create_dataclass(
         return data
 
     cls._apply_defaults = _apply_defaults  # ty: ignore[missing-attribute]
-
-    # Store completed class
-    _classes[cache_key] = cls
     return cls
 
 
