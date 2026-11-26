@@ -141,8 +141,10 @@ def test_bound_method_with_parameter_exclusion() -> None:
 
 
 def test_bound_method_wrapper_preserves_attributes() -> None:
-    """Test that bound method wrapper preserves all important attributes."""
-    from schemez.functionschema.functionschema import _wrap_bound_method
+    """Test that the schema stand-in for a bound method preserves important attributes."""
+    import inspect
+
+    from schemez.functionschema.functionschema import _schema_proxy
 
     class TestMethodAttributes:
         """Test class for attribute preservation."""
@@ -161,13 +163,17 @@ def test_bound_method_wrapper_preserves_attributes() -> None:
 
     instance = TestMethodAttributes()
     original_method = instance.method_with_attrs
-    wrapped_method = _wrap_bound_method(original_method)
+    hints = original_method.__func__.__annotations__
+    wrapped_method = _schema_proxy(original_method, inspect.signature(original_method), hints)
 
     # Test preserved attributes
     assert wrapped_method.__name__ == original_method.__func__.__name__
     assert wrapped_method.__qualname__ == original_method.__func__.__qualname__
     assert wrapped_method.__doc__ == original_method.__func__.__doc__
     assert wrapped_method.__annotations__ == original_method.__func__.__annotations__
+    assert inspect.signature(wrapped_method) == inspect.signature(original_method)
+    # the user's callable is not modified
+    assert "__signature__" not in vars(original_method.__func__)
 
     # Test that wrapped method still works
     result = wrapped_method(42, "test")

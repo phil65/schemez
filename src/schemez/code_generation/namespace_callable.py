@@ -7,6 +7,7 @@ import inspect
 from typing import TYPE_CHECKING, Any
 
 from schemez.helpers import get_object_name
+from schemez.introspection import get_signature
 
 
 if TYPE_CHECKING:
@@ -73,7 +74,7 @@ class NamespaceCallable:
     def signature(self) -> str:
         """Get function signature for debugging."""
         try:
-            sig = inspect.signature(self.callable)
+            sig = get_signature(self.callable)
         except ValueError, TypeError:
             return f"{self.name}(...)"
         else:

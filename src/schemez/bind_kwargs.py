@@ -4,10 +4,19 @@ import inspect
 from typing import TYPE_CHECKING, Any
 
 from schemez.helpers import get_object_name, get_object_qualname
+from schemez.introspection import get_resolved_hints, get_signature
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def _get_annotations(func: Callable[..., Any]) -> dict[str, Any]:
+    """`func.__annotations__`, resolved leniently if they can't be evaluated as written."""
+    try:
+        return dict(getattr(func, "__annotations__", {}))
+    except Exception:  # noqa: BLE001  (e.g. NameError for TYPE_CHECKING-only names)
+        return get_resolved_hints(func)
 
 
 class BoundFunction[T]:
@@ -34,11 +43,11 @@ class BoundFunction[T]:
         self.__module__ = func.__module__
         self.__qualname__ = get_object_qualname(func, "unknown")
         self.__doc__ = remove_kwargs_from_docstring(func.__doc__, self.bound_kwargs)
-        self.__annotations__ = self._update_annotations(getattr(func, "__annotations__", {}))
+        self.__annotations__ = self._update_annotations(_get_annotations(func))
         self.__signature__ = self._update_signature()
 
         # Verify all bound kwargs are valid parameters
-        sig = inspect.signature(func)
+        sig = get_signature(func)
         for param in bound_kwargs:
             if param not in sig.parameters:
                 name = get_object_name(func, "unknown")
@@ -65,7 +74,7 @@ class BoundFunction[T]:
         Returns:
             Updated signature without bound parameters
         """
-        sig = inspect.signature(self.func)
+        sig = get_signature(self.func)
         params = [p for name, p in sig.parameters.items() if name not in self.bound_kwargs]
         return sig.replace(parameters=params)
 

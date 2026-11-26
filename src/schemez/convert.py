@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import inspect
 from types import UnionType
 from typing import (
     TYPE_CHECKING,
@@ -12,13 +11,13 @@ from typing import (
     Union,
     get_args,
     get_origin,
-    get_type_hints,
 )
 
 from pydantic import BaseModel, Field, create_model
 
 from schemez.docstrings import get_docstring_info
 from schemez.helpers import get_object_name
+from schemez.introspection import get_resolved_hints, get_signature
 from schemez.schema import Schema
 
 
@@ -57,8 +56,8 @@ def get_function_model(func: AnyCallable, *, name: str | None = None) -> type[Sc
         ...     return f"Hello {name}"
         >>> model = get_function_model(greet)
     """
-    sig = inspect.signature(func)
-    hints = get_type_hints(func, include_extras=True)
+    sig = get_signature(func)
+    hints = get_resolved_hints(func, include_extras=True)
     fields: dict[str, Any] = {}
     description, param_docs = get_docstring_info(func, sig)
 
@@ -116,7 +115,7 @@ def get_ctor_basemodel(cls: type) -> type[Schema]:
 
     if dataclasses.is_dataclass(cls):
         fields: dict[str, Any] = {}
-        hints = get_type_hints(cls)
+        hints = get_resolved_hints(cls, include_extras=False)
         for field in dataclasses.fields(cls):
             fields[field.name] = (hints[field.name], ...)
         return create_model(cls.__name__, __base__=Schema, **fields)

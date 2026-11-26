@@ -19,7 +19,6 @@ from pydantic.json_schema import GenerateJsonSchema
 from schemez import log
 from schemez.functionschema.helpers import (
     determine_function_type,
-    get_resolved_hints,
     pydantic_model_to_signature,
     resolve_type_annotation,
     types_match,
@@ -31,6 +30,7 @@ from schemez.functionschema.typedefs import (
     clean_property,
 )
 from schemez.helpers import get_object_name, json_schema_to_pydantic_code
+from schemez.introspection import get_resolved_hints, get_signature
 
 
 if typing.TYPE_CHECKING:
@@ -299,24 +299,38 @@ def create_schema(
     )
 
 
-def _wrap_bound_method(bound_method: Callable[..., Any]) -> Callable[..., Any]:
-    """Wrap a bound method in a function to allow signature modification."""
-    import functools
+def _schema_proxy(
+    func: Callable[..., Any],
+    signature: inspect.Signature,
+    hints: dict[str, Any],
+) -> Callable[..., Any]:
+    """Stand-in for `func` that carries a given signature and evaluated type hints.
 
-    underlying = cast("Any", bound_method).__func__
+    Used to feed pydantic-ai a callable whose signature lacks excluded parameters or
+    whose annotations can't be evaluated as written (`TYPE_CHECKING`-only names),
+    without mutating the user's callable.
+    """
 
-    # Create wrapper that delegates to the bound method
-    @functools.wraps(underlying)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        return bound_method(*args, **kwargs)
+    def proxy(*args: Any, **kwargs: Any) -> Any:
+        return func(*args, **kwargs)
 
-    # Copy important attributes from the bound method
-    wrapper.__annotations__ = getattr(underlying, "__annotations__", {})
-    wrapper.__doc__ = underlying.__doc__
-    wrapper.__name__ = underlying.__name__
-    wrapper.__qualname__ = underlying.__qualname__
+    proxy.__name__ = get_object_name(func, "unknown")
+    proxy.__qualname__ = getattr(func, "__qualname__", proxy.__name__)
+    proxy.__module__ = getattr(func, "__module__", None) or __name__
+    proxy.__doc__ = func.__doc__
+    proxy.__signature__ = signature  # ty: ignore[missing-attribute]
+    proxy.__annotations__ = hints
+    return proxy
 
-    return wrapper
+
+def _annotations_evaluate(func: Callable[..., Any]) -> bool:
+    try:
+        inspect.signature(func)
+    except ValueError:
+        return True  # no signature at all, not an annotation problem
+    except Exception:  # noqa: BLE001
+        return False
+    return True
 
 
 def _create_schema_pydantic(
@@ -346,40 +360,37 @@ def _create_schema_pydantic(
     gen_schema = _generate_schema.GenerateSchema(config_wrapper)
 
     try:
-        sig = inspect.signature(func)
+        sig = get_signature(func)
     except ValueError:
         sig = inspect.signature(lambda: None)
 
-    type_hints = _typing_extra.get_function_type_hints(func)
+    evaluable = _annotations_evaluate(func)
+    if evaluable:
+        type_hints = _typing_extra.get_function_type_hints(func)
+    else:  # names only imported under TYPE_CHECKING: resolve what we can, rest is Any
+        type_hints = get_resolved_hints(func, include_extras=True)
     try:
         from pydantic_ai._function_schema import function_schema
 
-        # Create a wrapper function without excluded parameters
-        if exclude_types:
-            # Create a new signature without excluded parameters
-            orig_sig = sig
-            filtered_params = []
-            for param in orig_sig.parameters.values():
-                # Get parameter annotation
-                if param.annotation is orig_sig.empty:
-                    annotation = Any
-                else:
-                    annotation = type_hints.get(param.name, param.annotation)
-                # Skip excluded types
-                if not any(types_match(annotation, exclude_type) for exclude_type in exclude_types):
-                    filtered_params.append(param)
-
-            # Create new signature
-            new_sig = orig_sig.replace(parameters=filtered_params)
-
-            # Check if this is a bound method - wrap it to allow signature modification
-            if hasattr(func, "__func__") and hasattr(func, "__self__"):
-                func = _wrap_bound_method(func)
-
-            # Dynamic signature modification
-            cast("Any", func).__signature__ = new_sig
-        # Use pydantic-ai's function_schema
-        pydantic_ai_schema = function_schema(func, schema_generator_cls)
+        schema_func = func
+        filtered_params = [
+            param
+            for param in sig.parameters.values()
+            if not any(
+                types_match(
+                    Any
+                    if param.annotation is sig.empty
+                    else type_hints.get(param.name, param.annotation),
+                    exclude_type,
+                )
+                for exclude_type in exclude_types
+            )
+        ]
+        if not evaluable or len(filtered_params) != len(sig.parameters):
+            # pydantic-ai reads signature and hints itself: hand it a stand-in
+            new_sig = sig.replace(parameters=filtered_params)
+            schema_func = _schema_proxy(func, new_sig, type_hints)
+        pydantic_ai_schema = function_schema(schema_func, schema_generator_cls)
         # Convert to our format - now we can use the rich JSON schema directly
         json_schema = pydantic_ai_schema.json_schema
         # Create ToolParameters directly from the rich JSON schema
@@ -499,7 +510,7 @@ def _create_schema_simple(
     import docstring_parser
 
     # Parse function signature and docstring
-    sig = inspect.signature(func)
+    sig = get_signature(func)
     docstring = docstring_parser.parse(func.__doc__ or "")
 
     # Clean type hints without extras; unresolvable ones stay strings (schema `{}`)

@@ -32,6 +32,9 @@ All code lives in `src/schemez/` (uv_build, `src` layout). `__init__.py` re-expo
 - `helpers.py`: codegen (`json_schema_to_pydantic_code`, `openapi_to_code`, `jsonschema_to_code`,
   `model_to_python_code`), `import_callable`/`import_class`, `merge_models`, `iter_submodel(_type)s`,
   `models_to_markdown_docs`.
+- `introspection.py`: `get_signature` / `get_resolved_hints`: PEP 649-safe signature and type-hint reading
+  for user callables (names imported only under `TYPE_CHECKING` degrade to `Any`, the rest resolves).
+  Use these instead of `inspect.signature` / `get_type_hints` wherever user callables are read.
 - `markdown.py`: model/instance/union -> markdown docs; `setup_jinjarope_filters` is registered as the
   `jinjarope.environment` entry point in `pyproject.toml`.
 - `code_generation/`: `ToolCodeGenerator` (one callable/schema -> signature, models, FastAPI route),

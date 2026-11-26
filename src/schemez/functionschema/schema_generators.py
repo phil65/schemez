@@ -5,12 +5,13 @@ import dataclasses
 import importlib
 import inspect
 import types
-from typing import Any, Literal, get_type_hints
+from typing import Any, Literal
 
 import pydantic
 
 from schemez.functionschema import FunctionSchema, create_schema, resolve_type_annotation
 from schemez.functionschema.typedefs import ToolParameters
+from schemez.introspection import get_resolved_hints, get_signature
 
 
 def create_schemas_from_callables(
@@ -108,7 +109,7 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
         properties = {}
         required = []
         dc_fields = dataclasses.fields(cls)
-        hints = get_type_hints(cls)
+        hints = get_resolved_hints(cls, include_extras=False)
 
         for dc_field in dc_fields:
             param_type = hints[dc_field.name]
@@ -123,8 +124,8 @@ def create_constructor_schema(cls: type) -> FunctionSchema:
 
     # Handle regular classes
     else:
-        sig = inspect.signature(cls.__init__)
-        hints = get_type_hints(cls.__init__)
+        sig = get_signature(cls.__init__)
+        hints = get_resolved_hints(cls.__init__, include_extras=False)
         properties = {}
         required = []
 

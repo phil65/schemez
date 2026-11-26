@@ -29,6 +29,7 @@ from typing import (
 from uuid import UUID
 
 from schemez import log
+from schemez.introspection import get_resolved_hints
 
 
 if typing.TYPE_CHECKING:
@@ -150,41 +151,6 @@ def _enum_schema(values: list[Any]) -> dict[str, Any]:
         [(type_str, vals)] = by_type.items()
         return {"type": type_str, "enum": vals}
     return {"anyOf": [{"type": t, "enum": vals} for t, vals in by_type.items()]}
-
-
-def get_resolved_hints(obj: Any, *, include_extras: bool = True) -> dict[str, Any]:
-    """Evaluated annotations of a function or class (also for postponed annotations).
-
-    Names that can't be resolved (e.g. imports under `TYPE_CHECKING`) don't spoil the
-    others: each annotation is evaluated on its own then, unresolvable ones stay strings.
-    """
-    try:
-        return typing.get_type_hints(obj, include_extras=include_extras)
-    except Exception:  # noqa: BLE001
-        import annotationlib
-
-        owners = reversed(obj.__mro__) if isinstance(obj, type) else [obj]
-        hints: dict[str, Any] = {}
-        for owner in owners:
-            try:
-                anns = annotationlib.get_annotations(owner, format=annotationlib.Format.FORWARDREF)
-            except Exception:  # noqa: BLE001
-                continue
-            for name, ann in anns.items():
-                hints[name] = _evaluate_annotation(ann, owner)
-        return hints
-
-
-def _evaluate_annotation(ann: Any, owner: Any) -> Any:
-    if isinstance(ann, str):
-        module = getattr(owner, "__module__", None)
-        ann = typing.ForwardRef(ann, module=module, owner=owner)
-    if isinstance(ann, typing.ForwardRef):
-        try:
-            return typing.evaluate_forward_ref(ann, owner=owner)
-        except Exception:  # noqa: BLE001
-            return ann.__forward_arg__
-    return ann
 
 
 def _resolve_class_fields(typ: Any, ctx: _Context, is_parameter: bool) -> dict[str, Any]:
