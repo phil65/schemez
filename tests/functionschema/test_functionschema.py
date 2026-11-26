@@ -754,5 +754,26 @@ def test_extended_string_formats() -> None:
     }
 
 
+def test_jsonschema_mode_without_pydantic_ai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fallback jsonschema generation works when pydantic-ai is not installed."""
+    import sys
+
+    def func(x: int, label: str = "default") -> str:
+        """Sample function.
+
+        Args:
+            x: Required integer
+            label: Optional label
+        """
+        return f"{label}:{x}"
+
+    monkeypatch.setitem(sys.modules, "pydantic_ai", None)
+    monkeypatch.setitem(sys.modules, "pydantic_ai._function_schema", None)
+
+    schema = create_schema(func, mode="jsonschema")
+    assert schema.required == ["x"]
+    assert set(schema.parameters["properties"]) == {"x", "label"}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
