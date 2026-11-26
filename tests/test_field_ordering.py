@@ -271,3 +271,20 @@ def test_computed_fields_are_kept():
 
     assert Sub().model_dump() == {"sub_field": "sub", "base_field": "base", "doubled": "subsub"}
     assert list(Sub().model_dump()) == ["sub_field", "base_field", "doubled"]
+
+
+def test_model_construct_with_nested_dict_does_not_crash():
+    """Dumping a model_construct'd Schema with a dict for a nested Schema must not crash."""
+    from schemez import models_to_markdown_docs
+
+    class Inner(Schema):
+        z_sub: int = 1
+
+    class Outer(Schema):
+        a_base: str = "hi"
+        inner: Inner
+
+    constructed = Outer.model_construct(a_base="hi", inner={"z_sub": 2})  # ty: ignore[invalid-argument-type]
+    assert constructed.model_dump() == {"a_base": "hi", "inner": {"z_sub": 2}}
+    docs = models_to_markdown_docs(Outer)
+    assert "## Outer" in docs
