@@ -89,7 +89,8 @@ class OpenAPICallableFactory:
                 return list[Any]
 
             case "object":
-                if additional_props := schema.get("additionalProperties"):
+                # `additionalProperties: true` is a bool, not a schema
+                if isinstance(additional_props := schema.get("additionalProperties"), dict):
                     value_type = self.get_type_for_schema(additional_props)
                     type DictType = dict[str, value_type]
                     return DictType
