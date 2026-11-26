@@ -138,9 +138,7 @@ def create_yaml_description(
     else:  # default
         data = generator.generate()
 
-    if validate:
-        instance = model.model_validate(data)
-    instance = model.model_construct(**data)
+    instance = model.model_validate(data) if validate else model.model_construct(**data)
     data = instance.model_dump(
         exclude_none=exclude_none,
         exclude_defaults=exclude_defaults,
