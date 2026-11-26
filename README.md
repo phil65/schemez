@@ -145,6 +145,12 @@ More class methods: `Schema.for_function(func)` and `Schema.for_class_ctor(cls)`
 signatures, `Schema.from_json_schema(json_schema)` builds one from JSON Schema (`codegen` extra),
 `to_python_code()` emits model source code, and `merge()` / `iter_submodels()` work on instances.
 
+Dumps list the fields of the most derived class first, then those of its bases (pydantic puts
+base fields first). A wrap serializer does this reordering on every dump, nested models included,
+so `Schema` dumps are about 3x slower than a plain `BaseModel`'s (around 1.8 µs instead of 0.6 µs
+for a three-field model). This is deliberate: dumped configs read subclass-first. For hot paths
+that don't care about key order, use a plain `BaseModel`.
+
 ### JSON Schema and OpenAPI to code
 
 `jsonschema_to_code()` and `openapi_to_code()` generate Pydantic model source code (via
