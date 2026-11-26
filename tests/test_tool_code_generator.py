@@ -278,5 +278,29 @@ class TestToolCodeGenerator:
         assert return_with == return_without
 
 
+def test_route_uses_default_for_omitted_optional_param() -> None:
+    """FastAPI routes apply non-None defaults when optional query params are omitted."""
+    fastapi = pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from schemez import ToolsetCodeGenerator
+
+    def greet(name: str, greeting: str = "Hello") -> str:
+        """Greet someone."""
+        return f"{greeting}, {name}!"
+
+    app = fastapi.FastAPI()
+    ToolsetCodeGenerator.from_callables([greet]).add_all_routes(app)
+    client = TestClient(app)
+
+    default_resp = client.get("/tools/greet", params={"name": "Alice"})
+    assert default_resp.status_code == 200  # noqa: PLR2004
+    assert default_resp.json() == {"result": "Hello, Alice!"}
+
+    custom_resp = client.get("/tools/greet", params={"name": "Alice", "greeting": "Hi"})
+    assert custom_resp.status_code == 200  # noqa: PLR2004
+    assert custom_resp.json() == {"result": "Hi, Alice!"}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
