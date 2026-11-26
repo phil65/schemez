@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable  # noqa: TC003
+import concurrent.futures
 from typing import TYPE_CHECKING, Any, TypeVar, assert_never, overload
 
 from schemez.functionschema import create_schema
@@ -14,6 +15,17 @@ if TYPE_CHECKING:
     from schemez.functionschema.helpers import FunctionType
 
 T_co = TypeVar("T_co", covariant=True)
+
+
+def _run_coroutine(make_coro: Callable[[], Any]) -> Any:
+    """Run a coroutine to completion from sync code, also inside a running loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(make_coro())
+    # A running loop can't be re-entered: use a fresh loop on a worker thread.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(make_coro())).result()
 
 
 class ExecutableFunction[T_co]:
@@ -41,7 +53,7 @@ class ExecutableFunction[T_co]:
         self.func = func
         self.function_type: FunctionType = determine_function_type(self.func)
 
-    def run(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:  # noqa: PLR0911
+    def run(self, *args: Any, **kwargs: Any) -> T_co | list[T_co]:
         """Run the function synchronously.
 
         Args:
@@ -50,47 +62,20 @@ class ExecutableFunction[T_co]:
 
         Returns:
             Either a single result or list of results for generators
+
+        Inside a running event loop, coroutines run on a worker thread's own loop
+        (blocking the caller); use `arun` from async code.
         """
         func: Callable[..., Any] = self.func
         match self.function_type:
             case "sync":
                 return func(*args, **kwargs)
             case "async":
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    return asyncio.run(func(*args, **kwargs))
-                else:
-                    if loop.is_running():
-                        new_loop = asyncio.new_event_loop()
-                        try:
-                            return new_loop.run_until_complete(
-                                func(*args, **kwargs),
-                            )
-                        finally:
-                            new_loop.close()
-                    return loop.run_until_complete(
-                        func(*args, **kwargs),
-                    )
+                return _run_coroutine(lambda: func(*args, **kwargs))
             case "sync_generator":
                 return list(func(*args, **kwargs))
             case "async_generator":
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    return asyncio.run(self._collect_async_gen(*args, **kwargs))
-                else:
-                    if loop.is_running():
-                        new_loop = asyncio.new_event_loop()
-                        try:
-                            return new_loop.run_until_complete(
-                                self._collect_async_gen(*args, **kwargs),
-                            )
-                        finally:
-                            new_loop.close()
-                    return loop.run_until_complete(
-                        self._collect_async_gen(*args, **kwargs),
-                    )
+                return _run_coroutine(lambda: self._collect_async_gen(*args, **kwargs))
             case _ as unreachable:
                 assert_never(unreachable)
 

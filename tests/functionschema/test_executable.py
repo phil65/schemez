@@ -42,3 +42,18 @@ async def test_async_generator_execution() -> None:
 
     collected = [item async for item in exe.astream(3)]
     assert collected == ["0", "1", "2"]
+
+
+async def test_run_inside_running_loop() -> None:
+    """Sync run() works from code that runs in an event loop (worker thread)."""
+    from schemez.functionschema.executable import create_executable
+
+    async def add(a: int, b: int) -> int:
+        return a + b
+
+    async def gen(n: int):
+        for i in range(n):
+            yield i
+
+    assert create_executable(add).run(1, 2) == 3  # noqa: PLR2004
+    assert create_executable(gen).run(3) == [0, 1, 2]
