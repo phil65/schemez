@@ -75,7 +75,13 @@ def create_route_handler(
     async def route_handler(*args: Any, **kwargs: Any) -> dict[str, Any]:
         """Route handler for the tool."""
         if param_cls:
-            params_instance = param_cls(**kwargs)  # Parse and validate parameters
+            model_fields = getattr(param_cls, "model_fields", {})
+            filtered = {
+                k: v
+                for k, v in kwargs.items()
+                if not (v is None and k in model_fields and not model_fields[k].is_required())
+            }
+            params_instance = param_cls(**filtered)  # Parse and validate parameters
             dct = params_instance.model_dump()  # Convert to dict and remove None values
             clean_params = {k: v for k, v in dct.items() if v is not None}
             result = await _execute_tool_function(tool_callable, **clean_params)
