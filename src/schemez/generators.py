@@ -93,8 +93,8 @@ class SchemaDataGenerator:
     def _gen_any(self, schema: dict[str, Any]) -> Any:  # noqa: PLR0911
         """Generate data for any JSON Schema type."""
         # Preference hierarchy: const > enum > examples > generated
-        if const := schema.get("const"):
-            return const
+        if "const" in schema:  # falsy consts (0, False, "", None) count too
+            return schema["const"]
         if enum := schema.get("enum"):
             return enum[self.seed % len(enum)]
         if examples := schema.get("examples"):
@@ -136,8 +136,8 @@ class SchemaDataGenerator:
     def _gen_any_maximal(self, schema: dict[str, Any]) -> Any:  # noqa: PLR0911
         """Generate maximal data for any JSON Schema type."""
         # Same preference hierarchy, but with maximal generation
-        if const := schema.get("const"):
-            return const
+        if "const" in schema:  # falsy consts (0, False, "", None) count too
+            return schema["const"]
         if enum := schema.get("enum"):
             # For maximal, pick the last enum value
             return enum[-1]
