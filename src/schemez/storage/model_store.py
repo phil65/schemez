@@ -31,6 +31,11 @@ TYPE_MAP: dict[type, str] = {
 META_TABLE = "_model_meta"
 
 
+def _quote(identifier: str) -> str:
+    """Quote an SQL identifier (table or column name)."""
+    return '"' + identifier.replace('"', '""') + '"'
+
+
 def _get_sqlite_type(annotation: Any) -> tuple[str, bool]:
     """Get SQLite type and nullability from a Python type annotation.
 
@@ -254,8 +259,8 @@ class ModelStore[T: BaseModel]:
         for name, field_info in self._model_type.model_fields.items():
             annotation = field_info.annotation
             sqlite_type, is_nullable = _get_sqlite_type(annotation)
-            # Also nullable if field has a default
-            if field_info.default is not None or field_info.default_factory is not None:
+            # Fields with a default may still default to None
+            if not field_info.is_required() and field_info.default is None:
                 is_nullable = True
             columns.append((name, sqlite_type, is_nullable, annotation))
         return columns
@@ -269,9 +274,9 @@ class ModelStore[T: BaseModel]:
         column_defs = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
         for name, sqlite_type, is_nullable, _ in self._columns:
             null_clause = "" if is_nullable else " NOT NULL"
-            column_defs.append(f"{name} {sqlite_type}{null_clause}")
+            column_defs.append(f"{_quote(name)} {sqlite_type}{null_clause}")
         columns_sql = ", ".join(column_defs)
-        return f"CREATE TABLE IF NOT EXISTS {self._table_name} ({columns_sql})"
+        return f"CREATE TABLE IF NOT EXISTS {self._quoted_table} ({columns_sql})"
 
     def _create_meta_table_sql(self) -> str:
         """Generate CREATE TABLE SQL for metadata."""
@@ -348,19 +353,23 @@ class ModelStore[T: BaseModel]:
         """Open connection and create/load table."""
         import aiosqlite
 
-        self._connection = await aiosqlite.connect(self._path)
-        self._connection.row_factory = aiosqlite.Row
-
-        if self._model_type is None:
-            # Opening existing DB - reconstruct model from schema
-            await self._load_schema(self._connection)
-        else:
-            # Creating new or opening with known type
-            await self._connection.execute(self._create_meta_table_sql())
-            await self._connection.execute(self._create_table_sql())
-            await self._store_schema(self._connection)
-            await self._connection.commit()
-
+        conn = await aiosqlite.connect(self._path)
+        conn.row_factory = aiosqlite.Row
+        try:
+            if self._model_type is None:
+                # Opening existing DB - reconstruct model from schema
+                await self._load_schema(conn)
+            else:
+                # Creating new or opening with known type
+                await conn.execute(self._create_meta_table_sql())
+                await conn.execute(self._create_table_sql())
+                await self._store_schema(conn)
+                await conn.commit()
+        except BaseException:
+            # __aexit__ won't run; an open connection's worker thread blocks exit
+            await conn.close()
+            raise
+        self._connection = conn
         return self
 
     async def __aexit__(
@@ -373,6 +382,13 @@ class ModelStore[T: BaseModel]:
         if self._connection:
             await self._connection.close()
             self._connection = None
+
+    @property
+    def _quoted_table(self) -> str:
+        if self._table_name is None:
+            msg = "Table name not initialized"
+            raise RuntimeError(msg)
+        return _quote(self._table_name)
 
     def _ensure_connected(self) -> aiosqlite.Connection:
         """Ensure we have an active connection."""
@@ -415,12 +431,16 @@ class ModelStore[T: BaseModel]:
             The inserted row's id
         """
         conn = self._ensure_connected()
-        row = self._instance_to_row(instance)
-        columns = ", ".join(row.keys())
-        placeholders = ", ".join("?" for _ in row)
-        sql = f"INSERT INTO {self._table_name} ({columns}) VALUES ({placeholders})"
-        cursor = await conn.execute(sql, list(row.values()))
+        row_id = await self._insert_row(conn, instance)
         await conn.commit()
+        return row_id
+
+    async def _insert_row(self, conn: aiosqlite.Connection, instance: T) -> int:
+        row = self._instance_to_row(instance)
+        columns = ", ".join(_quote(name) for name in row)
+        placeholders = ", ".join("?" for _ in row)
+        sql = f"INSERT INTO {self._quoted_table} ({columns}) VALUES ({placeholders})"
+        cursor = await conn.execute(sql, list(row.values()))
         row_id = cursor.lastrowid
         assert row_id is not None  # always set after a successful INSERT
         return row_id
@@ -434,10 +454,13 @@ class ModelStore[T: BaseModel]:
         Returns:
             List of inserted row ids
         """
-        ids = []
-        for instance in instances:
-            row_id = await self.insert(instance)
-            ids.append(row_id)
+        conn = self._ensure_connected()
+        try:  # one transaction for all rows
+            ids = [await self._insert_row(conn, instance) for instance in instances]
+        except BaseException:
+            await conn.rollback()
+            raise
+        await conn.commit()
         return ids
 
     async def get(self, row_id: int) -> T | None:
@@ -450,7 +473,7 @@ class ModelStore[T: BaseModel]:
             The model instance, or None if not found
         """
         conn = self._ensure_connected()
-        sql = f"SELECT * FROM {self._table_name} WHERE id = ?"
+        sql = f"SELECT * FROM {self._quoted_table} WHERE id = ?"
         cursor = await conn.execute(sql, (row_id,))
         row = await cursor.fetchone()
         if row is None:
@@ -464,7 +487,7 @@ class ModelStore[T: BaseModel]:
             List of all model instances
         """
         conn = self._ensure_connected()
-        sql = f"SELECT * FROM {self._table_name}"
+        sql = f"SELECT * FROM {self._quoted_table}"
         cursor = await conn.execute(sql)
         rows = await cursor.fetchall()
         return [self._row_to_instance(row) for row in rows]
@@ -479,7 +502,7 @@ class ModelStore[T: BaseModel]:
             True if a row was deleted, False otherwise
         """
         conn = self._ensure_connected()
-        sql = f"DELETE FROM {self._table_name} WHERE id = ?"
+        sql = f"DELETE FROM {self._quoted_table} WHERE id = ?"
         cursor = await conn.execute(sql, (row_id,))
         await conn.commit()
         return cursor.rowcount > 0
@@ -491,7 +514,7 @@ class ModelStore[T: BaseModel]:
             Number of rows
         """
         conn = self._ensure_connected()
-        sql = f"SELECT COUNT(*) FROM {self._table_name}"
+        sql = f"SELECT COUNT(*) FROM {self._quoted_table}"
         cursor = await conn.execute(sql)
         row = await cursor.fetchone()
         return row[0] if row else 0
@@ -528,11 +551,14 @@ class ModelStore[T: BaseModel]:
             if field not in annotations:
                 msg = f"Unknown field: {field}"
                 raise ValueError(msg)
-            conditions.append(f"{field} = ?")
+            if value is None:
+                conditions.append(f"{_quote(field)} IS NULL")
+                continue
+            conditions.append(f"{_quote(field)} = ?")
             values.append(_serialize_value(value, annotations[field]))
 
         where_clause = " AND ".join(conditions)
-        sql = f"SELECT * FROM {self._table_name} WHERE {where_clause}"
+        sql = f"SELECT * FROM {self._quoted_table} WHERE {where_clause}"
         cursor = await conn.execute(sql, values)
         rows = await cursor.fetchall()
         return [self._row_to_instance(row) for row in rows]

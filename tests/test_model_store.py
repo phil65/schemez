@@ -287,3 +287,46 @@ async def test_model_type_property_before_enter():
     store = ModelStore(SimpleModel)
     # Before entering, model_type should still work since it was provided
     assert store.model_type == SimpleModel
+
+
+class KeywordModel(BaseModel):
+    order: int
+    group: str
+    note: str | None = None
+
+
+async def test_sql_keyword_identifiers(tmp_path):
+    path = tmp_path / "kw.db"
+    async with ModelStore(KeywordModel, path=path, table_name="select") as store:
+        await store.insert(KeywordModel(order=1, group="a"))
+        await store.insert_many([KeywordModel(order=2, group="b", note="x")])
+        assert [m.order for m in await store.query(group="b")] == [2]
+        assert await store.count() == 2  # noqa: PLR2004
+
+
+async def test_query_none_matches_null():
+    async with ModelStore(KeywordModel) as store:
+        await store.insert(KeywordModel(order=1, group="a"))
+        await store.insert(KeywordModel(order=2, group="b", note="x"))
+        assert [m.order for m in await store.query(note=None)] == [1]
+
+
+async def test_required_columns_are_not_null():
+    async with ModelStore(KeywordModel) as store:
+        conn = store._ensure_connected()
+        cursor = await conn.execute('PRAGMA table_info("keywordmodel")')
+        notnull = {row[1]: bool(row[3]) for row in await cursor.fetchall()}
+        assert notnull["order"] is True
+        assert notnull["note"] is False
+
+
+async def test_failed_enter_closes_connection(monkeypatch):
+    store = ModelStore(SimpleModel)
+
+    async def boom(conn):
+        raise RuntimeError("schema store failed")
+
+    monkeypatch.setattr(store, "_store_schema", boom)
+    with pytest.raises(RuntimeError, match="schema store failed"):
+        await store.__aenter__()
+    assert store._connection is None
