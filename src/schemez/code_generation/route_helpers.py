@@ -31,6 +31,9 @@ def create_param_model(parameters_schema: dict[str, Any]) -> type[BaseModel] | N
     return None
 
 
+_BUILTIN_TYPES: dict[Any, str] = {t: t.__name__ for t in (str, int, float, bool, list, dict)}
+
+
 def generate_func_code(model_fields: dict[str, FieldInfo]) -> str:
     """Generate dynamic function code for FastAPI route handler.
 
@@ -42,7 +45,8 @@ def generate_func_code(model_fields: dict[str, FieldInfo]) -> str:
     """
     route_params = []
     for name, field_info in model_fields.items():
-        type_name = getattr(field_info.annotation, "__name__", "Any")
+        # Only builtins resolve in the handler's namespace (enums, models: Any)
+        type_name = _BUILTIN_TYPES.get(field_info.annotation, "Any")
         if field_info.is_required():
             route_params.append(f"{name}: {type_name}")
         else:

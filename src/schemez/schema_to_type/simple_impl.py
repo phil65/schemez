@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+import functools
+import operator
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, create_model
-
-
-if TYPE_CHECKING:
-    from pydantic.fields import FieldInfo
 
 
 TYPE_MAPPING: dict[str, type] = {
@@ -26,53 +24,94 @@ def json_schema_to_base_model[TModel: BaseModel = BaseModel](
     schema: dict[str, Any],
     model_cls: type[TModel] = BaseModel,  # ty: ignore[invalid-parameter-default]
 ) -> type[TModel]:
+    """Create a pydantic model from a JSON schema object.
 
-    properties = schema.get("properties", {})
-    required_fields = schema.get("required", [])
-    model_fields: dict[str, Any] = {}
+    Handles nested objects and arrays, `enum` (an Enum for strings, `Literal`
+    otherwise), `anyOf` / `oneOf` and `"type": [...]` (unions, `"null"` is None),
+    and `$ref`s into `$defs` / `definitions` (also recursive ones).
+    """
+    builder = _ModelBuilder(schema)
+    model = builder.build(schema, schema.get("title", "DynamicModel"), model_cls)
+    for created in builder.created:
+        created.model_rebuild(_types_namespace=builder.namespace)
+    return model
 
-    def process_field(field_name: str, field_props: dict[str, Any]) -> tuple[Any, FieldInfo]:
-        """Recursively processes a field and returns its type and Field instance."""
-        json_type = field_props.get("type", "string")
-        enum_values = field_props.get("enum")
 
-        # Handle Enums
-        if enum_values:
-            enum_name: str = f"{field_name.capitalize()}Enum"
-            field_type: Any = Enum(enum_name, {v: v for v in enum_values})
-        # Handle Nested Objects
-        elif json_type == "object" and "properties" in field_props:
-            # Recursively create submodel
-            field_type = json_schema_to_base_model(field_props)
-        # Handle Arrays with Nested Objects
-        elif json_type == "array" and "items" in field_props:
-            item_props = field_props["items"]
-            if item_props.get("type") == "object":
-                item_type: Any = json_schema_to_base_model(item_props)  # pyright: ignore[reportRedeclaration]
-            else:
-                item_type = TYPE_MAPPING.get(item_props.get("type"), Any)  # pyright: ignore[reportAssignmentType]
-            field_type = list[item_type]
+class _ModelBuilder:
+    def __init__(self, root: dict[str, Any]) -> None:
+        self.defs: dict[str, Any] = {**root.get("definitions", {}), **root.get("$defs", {})}
+        self.namespace: dict[str, Any] = {}  # def name -> model (or in progress: None)
+        self.created: list[type[BaseModel]] = []
+
+    def build[M: BaseModel](
+        self,
+        schema: dict[str, Any],
+        name: str,
+        base: type[M] = BaseModel,  # ty: ignore[invalid-parameter-default]
+    ) -> type[M]:
+        required = schema.get("required", [])
+        fields: dict[str, Any] = {}
+        for field_name, props in schema.get("properties", {}).items():
+            field_type = self.type_for(props, field_name)
+            if props.get("nullable", False):
+                field_type = Optional[field_type]  # noqa: UP045
+            default = props.get("default", ...) if field_name in required else props.get("default")
+            description = props.get("description", props.get("title", ""))
+            fields[field_name] = (field_type, Field(default, description=description))
+        model = create_model(name, **fields, __base__=base)
+        self.created.append(model)
+        return model
+
+    def type_for(self, props: Any, field_name: str) -> Any:  # noqa: PLR0911
+        """Python type of a property schema."""
+        if not isinstance(props, dict):
+            return Any
+        if isinstance(ref := props.get("$ref"), str):
+            return self.ref_type(ref)
+        if variants := props.get("anyOf") or props.get("oneOf"):
+            return _union([self.type_for(v, field_name) for v in variants])
+        if enum_values := props.get("enum"):
+            if all(isinstance(v, str) for v in enum_values):
+                enum_name = f"{field_name.capitalize()}Enum"
+                return Enum(enum_name, {v: v for v in enum_values})
+            return Literal[tuple(enum_values)]
+        json_type = props.get("type")
+        if isinstance(json_type, list):
+            return _union([self.type_for({**props, "type": t}, field_name) for t in json_type])
+        if json_type == "null":
+            return type(None)
+        if json_type == "object" and "properties" in props:
+            return self.build(props, props.get("title", field_name.capitalize()))
+        if json_type == "array" and isinstance(props.get("items"), dict):
+            item_type = self.type_for(props["items"], field_name)
+            return list[item_type]
+        return TYPE_MAPPING.get(json_type, Any)
+
+    def ref_type(self, ref: str) -> Any:
+        for prefix in ("#/$defs/", "#/definitions/"):
+            if ref.startswith(prefix):
+                name = ref.removeprefix(prefix)
+                break
         else:
-            field_type = TYPE_MAPPING.get(json_type, Any)
+            return Any
+        if name in self.namespace:  # built, or in progress (recursive ref)
+            return self.namespace[name] or name
+        target = self.defs.get(name)
+        if not isinstance(target, dict):
+            return Any
+        if target.get("type", "object") != "object" or "properties" not in target:
+            return self.type_for(target, name)
+        self.namespace[name] = None
+        model = self.build(target, name)
+        self.namespace[name] = model
+        return model
 
-        # Handle default values and optionality
-        default_value = field_props.get("default", ...)
-        nullable = field_props.get("nullable", False)
-        description = field_props.get("title", "")
 
-        if nullable:
-            field_type = Optional[field_type]  # noqa: UP045
-
-        if field_name not in required_fields:
-            default_value = field_props.get("default")
-
-        return field_type, Field(default_value, description=description)  # pyright: ignore[reportReturnType]  # ty: ignore[invalid-explicit-return]
-
-    # Process each field
-    for field_name, field_props in properties.items():
-        model_fields[field_name] = process_field(field_name, field_props)
-
-    return create_model(schema.get("title", "DynamicModel"), **model_fields, __base__=model_cls)
+def _union(members: list[Any]) -> Any:
+    unique = list(dict.fromkeys(members))
+    if Any in unique:
+        return Any
+    return functools.reduce(operator.or_, unique)
 
 
 if __name__ == "__main__":
