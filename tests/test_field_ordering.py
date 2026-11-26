@@ -226,3 +226,50 @@ class TestFieldOrdering:
         assert dumped["sub_y"] == 99  # noqa: PLR2004
         assert dumped["base_a"] == "custom_a"
         assert dumped["base_b"] == 10  # noqa: PLR2004
+
+
+def test_by_alias_keeps_aliased_fields():
+    class Base(Schema):
+        base_field: str = Field(default="base", alias="baseField")
+
+    class Sub(Base):
+        tool_name: str = Field(default="x", alias="toolName")
+
+    instance = Sub()
+    assert instance.model_dump(by_alias=True) == {"toolName": "x", "baseField": "base"}
+    assert json.loads(instance.model_dump_json(by_alias=True)) == {
+        "toolName": "x",
+        "baseField": "base",
+    }
+
+
+def test_serialization_alias_and_alias_generator():
+    from pydantic import ConfigDict
+    from pydantic.alias_generators import to_camel
+
+    class Base(Schema):
+        model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+        base_field: str = "base"
+
+    class Sub(Base):
+        sub_field: str = Field(default="sub", serialization_alias="SUB")
+
+    assert list(Sub().model_dump(by_alias=True)) == ["SUB", "baseField"]
+
+
+def test_computed_fields_are_kept():
+    from pydantic import computed_field
+
+    class Base(Schema):
+        base_field: str = "base"
+
+    class Sub(Base):
+        sub_field: str = "sub"
+
+        @computed_field
+        @property
+        def doubled(self) -> str:
+            return self.sub_field * 2
+
+    assert Sub().model_dump() == {"sub_field": "sub", "base_field": "base", "doubled": "subsub"}
+    assert list(Sub().model_dump()) == ["sub_field", "base_field", "doubled"]

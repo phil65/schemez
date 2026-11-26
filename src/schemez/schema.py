@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import annotationlib
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, model_serializer
@@ -45,22 +46,17 @@ class Schema(BaseModel):
 
     @model_serializer(mode="wrap")
     def _serialize_with_subclass_fields_first(self, serializer: Any, info: Any) -> dict[str, Any]:
-        """Serialize with subclass fields appearing before base class fields."""
+        """Serialize with subclass fields appearing before base class fields.
+
+        Only reorders: keys without a known rank (computed fields, extras) keep their
+        place after the fields, and aliases rank like the field they belong to.
+        """
         data = serializer(self)
-
-        # Get fields from most derived class to base class
-        field_order: list[str] = []
-        for cls in type(self).__mro__:
-            if cls is BaseModel or not issubclass(cls, BaseModel):
-                continue
-            # Get fields defined in this specific class
-            cls_fields = getattr(cls, "__annotations__", {})
-            for field_name in cls_fields:
-                if field_name not in field_order and field_name in data:
-                    field_order.append(field_name)
-
-        # Reorder the dictionary
-        return {k: data[k] for k in field_order if k in data}
+        if not isinstance(data, dict):
+            return data
+        rank = _key_rank(type(self))
+        end = len(rank)
+        return {k: data[k] for k in sorted(data, key=lambda k: rank.get(k, end))}
 
     def model_dump_markdown(
         self,
@@ -464,6 +460,27 @@ class ConfigSchema(Schema):
     def required_python_packages(cls) -> list[str]:
         """Return the Python packages this config needs. Override in subclasses."""
         return []
+
+
+def _key_rank(cls: type[BaseModel]) -> dict[str, int]:
+    """Rank of each field name and alias: most derived class first, cached per class."""
+    cached = cls.__dict__.get("__schemez_key_rank__")
+    if cached is not None:
+        return cached
+    order: list[str] = []
+    for klass in cls.__mro__:
+        if klass is BaseModel or not issubclass(klass, BaseModel):
+            continue
+        names = annotationlib.get_annotations(klass, format=annotationlib.Format.FORWARDREF)
+        order.extend(n for n in names if n in cls.model_fields and n not in order)
+    rank: dict[str, int] = {}
+    for i, name in enumerate(order):
+        field = cls.model_fields[name]
+        for key in (name, field.alias, field.serialization_alias):
+            if key is not None:
+                rank.setdefault(key, i)
+    type.__setattr__(cls, "__schemez_key_rank__", rank)
+    return rank
 
 
 if __name__ == "__main__":
