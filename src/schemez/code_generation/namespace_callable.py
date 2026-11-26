@@ -51,16 +51,15 @@ class NamespaceCallable:
         return cls(generator.callable, generator.name_override)
 
     async def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Execute the wrapped callable."""
-        try:
-            if inspect.iscoroutinefunction(self.callable):
-                result = await self.callable(*args, **kwargs)
-            else:
-                result = self.callable(*args, **kwargs)
-        except Exception as e:  # noqa: BLE001
-            return f"Error executing {self.name}: {e!s}"
-        else:
-            return result or "Operation completed successfully"
+        """Execute the wrapped callable.
+
+        Results (also falsy ones) and exceptions pass through unchanged; only `None`
+        becomes a short confirmation text.
+        """
+        result = self.callable(*args, **kwargs)
+        if inspect.isawaitable(result):
+            result = await result
+        return "Operation completed successfully" if result is None else result
 
     def __repr__(self) -> str:
         """Return detailed representation for debugging."""
