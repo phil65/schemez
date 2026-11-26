@@ -132,6 +132,8 @@ class FunctionSchema(pydantic.BaseModel):
             "properties": self.parameters["properties"],
             "required": self.required,
         }
+        if "$defs" in self.parameters:
+            parameters["$defs"] = self.parameters["$defs"]
 
         # First create the function definition
         function_def = OpenAIFunctionDefinition(
