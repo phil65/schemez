@@ -38,7 +38,12 @@ from schemez.functionschema.typedefs import (
     OpenAIFunctionTool,
     Property,
 )
-from schemez.code_generation import ToolCodeGenerator, ToolsetCodeGenerator
+from schemez.code_generation import (
+    SplitTypeAliasesResult,
+    ToolCodeGenerator,
+    ToolsetCodeGenerator,
+    split_scalar_type_aliases,
+)
 from schemez.helpers import models_to_markdown_docs, openapi_to_code, jsonschema_to_code
 
 __version__ = version("schemez")
@@ -63,6 +68,7 @@ __all__ = [
     "Schema",
     "SchemaDef",
     "SchemaField",
+    "SplitTypeAliasesResult",
     "TOMLCode",
     "ToolCodeGenerator",
     "ToolsetCodeGenerator",
@@ -77,4 +83,5 @@ __all__ = [
     "jsonschema_to_code",
     "models_to_markdown_docs",
     "openapi_to_code",
+    "split_scalar_type_aliases",
 ]
